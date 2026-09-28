@@ -5,6 +5,13 @@ async function addTask(page: Page, title: string) {
   await page.getByRole("button", { name: "Add" }).click();
 }
 
+/** Clicks the checkbox and waits until the Task shows as Completed, i.e. it is saved. */
+async function completeTask(page: Page, title: string) {
+  const checkbox = page.getByRole("checkbox", { name: `Complete ${title}` });
+  await checkbox.click();
+  await expect(checkbox).toBeChecked();
+}
+
 async function waitForOfflineReady(page: Page) {
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -19,7 +26,7 @@ test("add a Task and Complete it; both survive a reload", async ({ page }) => {
 
   await addTask(page, "Buy birthday present");
   await addTask(page, "Book restaurant");
-  await page.getByRole("checkbox", { name: "Complete Buy birthday present" }).check();
+  await completeTask(page, "Buy birthday present");
   await page.reload();
 
   await expect(page.getByRole("listitem")).toHaveText(["Buy birthday present", "Book restaurant"].map((t) => new RegExp(t)));
@@ -34,7 +41,7 @@ test("works with no network connection once installed", async ({ page, context }
   await context.setOffline(true);
   await page.reload();
   await addTask(page, "Pack for the trip");
-  await page.getByRole("checkbox", { name: "Complete Pack for the trip" }).check();
+  await completeTask(page, "Pack for the trip");
   await page.reload();
 
   await expect(page.getByRole("checkbox", { name: "Complete Pack for the trip" })).toBeChecked();

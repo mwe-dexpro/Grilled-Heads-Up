@@ -32,9 +32,7 @@ export function useTasks() {
   const completeTask = useCallback(
     async (id: string) => {
       if (!store) return;
-      // Show it Completed right away; the controlled checkbox would otherwise flick back until the write lands.
-      const completedAt = new Date().toISOString();
-      setTasks((current) => current.map((task) => (task.id === id ? { ...task, completedAt } : task)));
+      // Shown as Completed only once saved, so a reload right after never loses what the screen showed.
       await store.completeTask(id);
       setTasks(await store.listTasks());
     },
