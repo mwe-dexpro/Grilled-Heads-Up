@@ -1,0 +1,27 @@
+{
+  "name": "grilled-heads-up",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w client",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm run test -w client",
+    "test:e2e": "npm run build && playwright test",
+    "test:mutation": "npm run test:mutation -w client"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "qs": "^6.16.0",
+    "vitest": "^4.1.11"
+  }
+}
