@@ -11,3 +11,8 @@ Default canonical labels: needs-triage, needs-info, ready-for-agent, ready-for-h
 ### Domain docs
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## UI reference
+Visual design: docs/design/README.md + docs/design/screenshots/.
+Match the look; CONTEXT.md and docs/v1-scope.md win on terms and behaviour.
+Open gaps: docs/design/ALIGNMENT.md.

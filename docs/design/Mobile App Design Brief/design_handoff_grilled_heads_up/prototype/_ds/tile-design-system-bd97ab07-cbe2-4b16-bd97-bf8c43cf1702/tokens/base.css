@@ -1,0 +1,24 @@
+/* Interaction helpers used by components (press, focus, links) + type utility classes */
+.tl-press{transition:transform var(--duration-press) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+.tl-press:active{transform:scale(var(--press-scale))}
+.tl-press:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.tl-link{text-decoration:none}
+.tl-link:hover{text-decoration:underline}
+.tl-link:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px;border-radius:var(--radius-xs)}
+.tl-nav-link{text-decoration:none;opacity:.8;transition:opacity var(--duration-fade) var(--ease-standard)}
+.tl-nav-link:hover{opacity:1}
+.tl-input:focus-within{outline:2px solid var(--color-focus);outline-offset:0}
+
+.t-hero{font:var(--type-hero);letter-spacing:var(--track-hero)}
+.t-display-lg{font:var(--type-display-lg);letter-spacing:var(--track-display-lg)}
+.t-display-md{font:var(--type-display-md);letter-spacing:var(--track-display-md)}
+.t-lead{font:var(--type-lead);letter-spacing:var(--track-lead)}
+.t-lead-airy{font:var(--type-lead-airy);letter-spacing:var(--track-lead-airy)}
+.t-tagline{font:var(--type-tagline);letter-spacing:var(--track-tagline)}
+.t-body-strong{font:var(--type-body-strong);letter-spacing:var(--track-body-strong)}
+.t-body{font:var(--type-body);letter-spacing:var(--track-body)}
+.t-dense-link{font:var(--type-dense-link);letter-spacing:var(--track-dense-link)}
+.t-caption{font:var(--type-caption);letter-spacing:var(--track-caption)}
+.t-caption-strong{font:var(--type-caption-strong);letter-spacing:var(--track-caption-strong)}
+.t-fine-print{font:var(--type-fine-print);letter-spacing:var(--track-fine-print)}
+.t-micro-legal{font:var(--type-micro-legal);letter-spacing:var(--track-micro-legal)}

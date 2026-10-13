@@ -1,0 +1,22 @@
+:root{
+--font-display:"SF Pro Display",system-ui,-apple-system,BlinkMacSystemFont,"Inter",sans-serif;
+--font-text:"SF Pro Text",system-ui,-apple-system,BlinkMacSystemFont,"Inter",sans-serif;
+--weight-light:300;--weight-regular:400;--weight-semibold:600;--weight-bold:700;
+
+--type-hero:600 56px/1.07 var(--font-display);--track-hero:-0.28px;
+--type-display-lg:600 40px/1.1 var(--font-display);--track-display-lg:0px; /* @kind font */
+--type-display-md:600 34px/1.47 var(--font-text);--track-display-md:-0.374px;
+--type-lead:400 28px/1.14 var(--font-display);--track-lead:0.196px;
+--type-lead-airy:300 24px/1.5 var(--font-display);--track-lead-airy:0px; /* @kind font */
+--type-tagline:600 21px/1.19 var(--font-display);--track-tagline:0.231px;
+--type-body-strong:600 17px/1.24 var(--font-text);--track-body-strong:-0.374px;
+--type-body:400 17px/1.47 var(--font-text);--track-body:-0.374px;
+--type-dense-link:400 17px/2.41 var(--font-text);--track-dense-link:0px; /* @kind font */
+--type-caption:400 14px/1.43 var(--font-text);--track-caption:-0.224px;
+--type-caption-strong:600 14px/1.29 var(--font-text);--track-caption-strong:-0.224px;
+--type-button-large:300 18px/1 var(--font-text);--track-button-large:0px; /* @kind font */
+--type-button-utility:400 14px/1.29 var(--font-text);--track-button-utility:-0.224px;
+--type-fine-print:400 12px/1 var(--font-text);--track-fine-print:-0.12px;
+--type-micro-legal:400 10px/1.3 var(--font-text);--track-micro-legal:-0.08px;
+--type-nav-link:400 12px/1 var(--font-text);--track-nav-link:-0.12px;
+}

@@ -1,0 +1,2 @@
+/* SF Pro is proprietary — system-ui resolves to it on Apple platforms. Inter (Google Fonts) is the off-platform substitute. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap");
