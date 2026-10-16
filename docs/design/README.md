@@ -49,7 +49,7 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 ## Shared components
 - **Task row**: 22px check circle (1.5px `#d2d2d7`; overdue 1.5px amber; completed = filled `#0066cc` with a white 1.8px check, title struck through, row text `#7a7a7a`) · title 17/400 · meta line 14px: the Event name in blue (tappable, opens Event detail), then " · " and the Offset ("7 days before") or date · optional trailing chevron `#d2d2d7` 16px.
 - **Swipe actions** (swipe left on any Task row): actions revealed at 78px each, label 12px under an 18px icon. Shown: Reschedule (bg `#d2d2d7`, ink, `clock`) then Complete (bg `#0066cc`, white, `check`). Delete is still missing (see ALIGNMENT).
-- **Tab bar**: white, 1px top hairline, padding 8/8/30, 4 equal columns. Each tab is a 22px icon over a 10px label; active `#0066cc`, inactive `#7a7a7a`. Tabs: Today `sun` · Calendar `calendar` · Plan `list-checks` · Projects `folder`.
+- **Tab bar**: white, 1px top hairline, padding 8/8/30, equal columns. Each tab is a 22px icon over a 10px label; active `#0066cc`, inactive `#7a7a7a`. v1 tabs: Today `sun` · Calendar `calendar` · Projects `folder` (the drawn Plan tab `list-checks` returns with the Planning wizard after v1).
 - **FAB (Quick add)**: 56px circle `#0066cc`, white `plus` 26px, right 20px, bottom = 16px above the tab bar. It never overlaps the tab bar. No shadow.
 - **Nav bar**: 44px tall, 17px blue text. Left: `chevron-left` 20px + parent name; right: text action ("Edit", "Done") or `ellipsis`.
 - **Bottom sheet**: white, top radius 18, padding 20/16/42, over a scrim; dimmed content behind at 50% opacity.
@@ -58,14 +58,14 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 
 ## Screens
 **4a Home (Today tab)**: `screenshots/4a-home.png`
-- Header: "Saturday, Oct 4" (14 gray) over the large title "Today". Right side: a 28px Progress ring (2.5px stroke, track `#e0e0e0`, arc `#0066cc`, starts at 12 o'clock) and "4 of 9 done" (14 gray).
-- **Overdue bucket** card (white): header row with a 10px amber dot, "Overdue" 17/600 and a right-aligned blue bulk action. Task rows with amber circles below it. The meta line names the consequence ("Puts Mom's birthday at risk", amber) or the age and history ("9 days · rescheduled 3×"). Row 2 is drawn mid-swipe.
+- Header: "Saturday, Oct 4" (14 gray) over the large title "Today". Right side: a 28px Progress ring (2.5px stroke, track `#e0e0e0`, arc `#0066cc`, starts at 12 o'clock) and "N of M done" (14 gray): Progress of the Today bucket, matching its "N left".
+- **Overdue bucket** card (white): header row with a 10px amber dot, "Overdue" 17/600, a count pill (not drawn; see ALIGNMENT §1) and a right-aligned blue bulk action "Reschedule all…". Task rows with amber circles below it. The meta line names the consequence ("Puts Mom's birthday at risk", amber) or the age and history ("9 days · rescheduled 3×"). Row 2 is drawn mid-swipe.
 - Bucket cards below: **Today** ("2 left"), **Tomorrow** ("Sun Oct 5 · 1"), **Next 3 days** ("Mon – Wed · 3"). Each is a section heading plus a white card of Task rows. The list scrolls under the FAB.
 
 **4b Event detail**: `4b-event-detail.png`
 - Nav "‹ Calendar" / "Edit". Meta line "Sunday, Oct 12 · 12:30 pm · in 8 days · every year" (14 gray), then the title 34/600.
 - **Location**: `map-pin` 16px + text, 15px blue, one line with ellipsis; tap opens maps. **Description**: 15/1.4 `#333`, `text-wrap: pretty`.
-- **Risk band**, full-bleed white with top/bottom hairlines, padding 18/20/16. Top row: "1 of 3 prepared" (21/600, no wrap); on the right `triangle-alert` 15px + "At risk" 14/600 amber. Below it a 72px **countdown line**: a 1px track `#e0e0e0`, filled in ink up to a "Today" tick (1×17px, label 11/600 below). Tasks are plotted by Offset above the line (completed = blue filled dot with check; overdue = amber 2px ring with an amber 11/600 label; open = gray ring) and the Event sits at the right end as a 14px blue rounded square with its date. Last a one-line explanation (14 gray).
+- **Risk band**, full-bleed white with top/bottom hairlines, padding 18/20/16. Top row: Progress, e.g. "1 of 3 done" (21/600, no wrap; the drawn "prepared" is replaced, see ALIGNMENT §1); on the right `triangle-alert` 15px + "At risk" 14/600 amber. Below it a 72px **countdown line**: a 1px track `#e0e0e0`, filled in ink up to a "Today" tick (1×17px, label 11/600 below). Tasks are plotted by Offset above the line (completed = blue filled dot with check; overdue = amber 2px ring with an amber 11/600 label; open = gray ring) and the Event sits at the right end as a 14px blue rounded square with its date. Last a one-line explanation (14 gray).
 - **Preparation** section ("relative to the event" in gray): a card of Linked task rows showing their Offset, with "Add task" (primary) and "Move event" (secondary) buttons below.
 
 **4c Task detail**: `4c-task-detail.png`
@@ -76,7 +76,7 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 
 **4d Reschedule sheet** (opened from swipe → Reschedule): `4d-reschedule-sheet.png`
 - Header "Move" (14 gray) over the Task title 21/600 and context (14 gray).
-- Options card (rows 14×16): Tomorrow / Day after / [Event-aware option] / Next week, with dates right-aligned in 14 gray. An option that lands **after the Event** is gray with an amber `triangle-alert` and "after the event". Last row: "Pick a date" (blue, calendar icon).
+- Options card (rows 14×16): Tomorrow / Day after / Day before the event (Linked tasks only) / Next week, with dates right-aligned in 14 gray. An option that lands **after the Event** is gray with an amber `triangle-alert` and "after the event". Last row: "Pick a date" (blue, calendar icon).
 - Footer: "Cancel" (blue) on the left, the reschedule count (gray) on the right.
 
 **4e Planning wizard · step 1, brain dump**: `4e-wizard-brain-dump.png`
@@ -98,7 +98,7 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 - Suggestion card: `sparkles` icon tile, then "Looks like Leo's home game on Oct 10." and "Bring over its tasks?". Selectable Task rows with Offsets, then "Import 2 tasks" (primary sm) and "Skip" (secondary sm).
 
 **4i Projects**: `4i-projects.png`
-- Large title + a 2-option segmented control (pill track `#e0e0e0`, selected white, 600).
+- Large title + a 2-option segmented control (pill track `#e0e0e0`, selected white, 600): "Projects & Lists" | "Events" (see ALIGNMENT §1).
 - One card per Project/Event: name 21/600, status on the right (amber "At risk" + icon, or gray "On track" / "No deadline"), date line, a **segmented progress bar** (one segment per Task: blue = completed, amber = overdue, `#e0e0e0` = open; continuous for large Lists), and a footer "N of M · next/overdue task" with "Open ›".
 
 **4j Calendar (month)**: `4j-calendar.png`
@@ -117,4 +117,4 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 - `prototype/Linked Planner.dc.html`: source of all screens
 - `prototype/ios-frame.jsx`, `prototype/support.js`: preview runtime only (not part of the app)
 - `prototype/_ds/tile-design-system-…/tokens/*.css`: token values
-- `ALIGNMENT.md`: gaps and conflicts against the repo concept, plus open decisions
+- `ALIGNMENT.md`: decisions taken, gaps and conflicts against the repo concept, open questions
