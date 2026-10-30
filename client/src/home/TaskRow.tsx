@@ -1,6 +1,7 @@
 import { hrefOf } from "../app/routes";
 import type { Event } from "../events/event";
 import { formatOffset } from "../events/formatEvent";
+import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
 import { taskMeta, type BucketKind } from "./buckets";
@@ -34,6 +35,15 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
     metaText = [formatShortDay(meta.date, language), meta.time && formatTime(meta.time, language)].filter(Boolean).join(" · ");
   }
 
+  // An Overdue Preparation task says it puts its Event At risk, instead of its age.
+  const atRisk = event !== undefined && meta?.kind === "overdue" && putsEventAtRisk(task, event, now);
+  const eventLink = event && (
+    <a className={atRisk ? "event-link at-risk" : "event-link"} href={hrefOf({ name: "event", id: event.id })}>
+      {event.title}
+    </a>
+  );
+  const [beforeEvent, afterEvent] = t("risk.putsAtRisk").split("{event}");
+
   const classes = ["task", completed && "completed", meta?.kind === "overdue" && "overdue"].filter(Boolean).join(" ");
   return (
     <li className={classes}>
@@ -49,16 +59,20 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
         <a className="task-title" href={hrefOf({ name: "task", id: task.id })}>
           {task.title}
         </a>
-        {(event || metaText) && (
-          <span className="task-meta">
-            {event && (
-              <a className="event-link" href={hrefOf({ name: "event", id: event.id })}>
-                {event.title}
-              </a>
-            )}
-            {event && metaText && " · "}
-            {metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>}
+        {atRisk ? (
+          <span className="task-meta warning">
+            {beforeEvent}
+            {eventLink}
+            {afterEvent}
           </span>
+        ) : (
+          (event || metaText) && (
+            <span className="task-meta">
+              {eventLink}
+              {event && metaText && " · "}
+              {metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>}
+            </span>
+          )
         )}
         {completed && <span className="visually-hidden">{t("task.completed")}</span>}
       </div>

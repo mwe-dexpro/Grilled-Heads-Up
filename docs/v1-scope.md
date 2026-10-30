@@ -26,7 +26,7 @@ Outcome of the grilling session on [the concept](./Konzept.md). Terms are define
 - **Moving an Event**: one question covering all its Linked tasks, expandable per task. Default: follow when moved earlier, stay (Pinned) when moved later; Follow-up tasks get the same default. Completed Tasks never move. Tasks already Pinned are not asked about; the question lists them collapsed ("2 pinned tasks stay"). Tasks pushed into the past land in the Overdue bucket. Dragging an Event in the Calendar asks the same question.
 - **Rescheduling a Linked task past its Event**: allowed, with a warning.
 - **Series**: an Occurrence's Tasks are copied from the previous Occurrence once that one has passed; edits therefore carry forward. A copied Task whose date would already be past lands on today.
-- **Event passed with open Preparation tasks**: no "missed" status; the Tasks stay in the Overdue bucket, the Event shows "passed with N open tasks" in the Calendar.
+- **Event passed with open Preparation tasks**: no "missed" status; the Tasks stay in the Overdue bucket, the Event shows "passed with N open tasks" wherever it is displayed (Event view, Calendar, Project view). An Event has passed once its last day is over; while a multi-day Event is going on, Overdue Preparation tasks keep it At risk.
 - **Deleting an Event with Tasks**: ask; default deletes open Tasks, completed ones are kept.
 - **Deleting anything**: undo toast, then Trash for 30 days.
 - **Completed Tasks**: stay crossed out in place until the end of the day, then hidden; "Show completed" per List, Project and Event; the Event view always shows them.

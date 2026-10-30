@@ -15,6 +15,11 @@ export function formatShortDay(day: Day, language: Language): string {
   );
 }
 
+/** "Oct 12" / "12. Okt." */
+export function formatMonthDay(day: Day, language: Language): string {
+  return new Intl.DateTimeFormat(language, { month: "short", day: "numeric" }).format(dateAtNoon(day));
+}
+
 /** "Mon" / "Mo." */
 export function formatWeekday(day: Day, language: Language): string {
   return new Intl.DateTimeFormat(language, { weekday: "short" }).format(dateAtNoon(day));

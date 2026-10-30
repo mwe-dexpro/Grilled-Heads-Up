@@ -3,7 +3,7 @@ import { formatLongDay, formatShortDay, formatTime } from "../home/format";
 import type { Language, TranslationKey } from "../i18n/i18n";
 import { deviceTimeZone, eventDays, eventEnd, eventStart, type Event, type EventFields } from "./event";
 
-type Translate = (key: TranslationKey, params?: Record<string, string>) => string;
+export type Translate = (key: TranslationKey, params?: Record<string, string>) => string;
 
 /** "7 days before", "on the day", "2 days after". */
 export function formatOffset(offsetDays: number, t: Translate): string {
@@ -47,4 +47,3 @@ export function formatEventTime(event: Event, language: Language, t: Translate):
 export function inOtherTimeZone(event: EventFields): boolean {
   return !event.allDay && event.timeZone !== deviceTimeZone();
 }
-
