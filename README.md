@@ -88,7 +88,7 @@ The end-to-end tests run two servers, each with an in-memory database: the sign-
 
 Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `client/vitest.config.ts`), so day and time-zone tests mean the same on every machine, including daylight-saving changes.
 
-**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage key's name, the default database name (only used by the running app), `close()`, and a few equivalent mutants (a change no input can tell apart); none of them change behaviour.
+**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage keys' names (language, signed in), the default database name (only used by the running app), `close()`, and a few equivalent mutants (a change no input can tell apart); none of them change behaviour.
 
 **Regression testing:** CI (`.github/workflows/ci.yml`) runs typecheck, unit, end-to-end and mutation tests and a Docker smoke test on every pull request and every push to `main`.
 
