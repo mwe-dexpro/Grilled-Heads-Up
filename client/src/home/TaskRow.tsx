@@ -35,10 +35,10 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
     metaText = [formatShortDay(meta.date, language), meta.time && formatTime(meta.time, language)].filter(Boolean).join(" · ");
   }
 
-  // An Overdue Preparation task names the Event it endangers instead of its age.
-  const endangers = event !== undefined && meta?.kind === "overdue" && putsEventAtRisk(task, event, now);
+  // An Overdue Preparation task says it puts its Event At risk, instead of its age.
+  const atRisk = event !== undefined && meta?.kind === "overdue" && putsEventAtRisk(task, event, now);
   const eventLink = event && (
-    <a className={endangers ? "event-link endangered" : "event-link"} href={hrefOf({ name: "event", id: event.id })}>
+    <a className={atRisk ? "event-link at-risk" : "event-link"} href={hrefOf({ name: "event", id: event.id })}>
       {event.title}
     </a>
   );
@@ -59,7 +59,7 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
         <a className="task-title" href={hrefOf({ name: "task", id: task.id })}>
           {task.title}
         </a>
-        {endangers ? (
+        {atRisk ? (
           <span className="task-meta warning">
             {beforeEvent}
             {eventLink}

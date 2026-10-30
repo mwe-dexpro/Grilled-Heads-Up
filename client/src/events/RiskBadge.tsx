@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { useI18n } from "../i18n/I18nProvider";
-import { formatRiskStatus } from "./formatEvent";
+import { formatRiskStatus } from "./formatRisk";
 import type { EventRisk } from "./risk";
 
 /**

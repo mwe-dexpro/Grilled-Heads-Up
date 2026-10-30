@@ -1,11 +1,14 @@
-import { dayOf, daysBetween, type Day } from "../home/days";
+import { addDays, dayOf, daysBetween, type Day } from "../home/days";
 import type { Task } from "../tasks/taskStore";
-import { eventDays, withEventDates, type Event } from "./event";
+import { withEventDates, type Event } from "./event";
 
 /** Preparation tasks are dated on or before the day their Event starts; Follow-up tasks after it. */
 export type LinkedRole = "preparation" | "followUp";
 
 /**
+ * Risk is judged on the Event's own dates, the ones its Linked tasks' dates count from (ADR-0003), so an
+ * Event in another time zone can't pass while its Preparation tasks are still due today.
+ *
  * - **critical**: starts today or tomorrow and still has open Preparation tasks; wins over At risk.
  * - **atRisk**: at least one Preparation task is Overdue.
  * - **passed**: the Event is over with Preparation tasks still open; it has no risk status any more.
@@ -19,7 +22,7 @@ export interface EventRisk {
   openPreparation: number;
   /** Overdue Preparation tasks, dated, the most Overdue first. */
   overdue: Task[];
-  /** Days from today to the Event's first day on this device; negative once it has started. */
+  /** Days from today to the Event's start date; negative once it has started. */
   daysUntil: number;
 }
 
@@ -32,7 +35,8 @@ export function linkedRole(task: Pick<Task, "date">, event: Pick<Event, "startDa
 }
 
 const isOpen = (task: Task) => task.completedAt === null;
-const isOverdue = (task: Task, today: Day) => isOpen(task) && task.date! < today;
+/** Not Completed and dated before today; the Task must be dated. */
+export const isOverdue = (task: Task, today: Day) => isOpen(task) && task.date! < today;
 
 /** The Event's Linked tasks with their dates, Preparation ones only. */
 function preparationTasks(event: Event, tasks: Task[]): Task[] {
@@ -42,9 +46,10 @@ function preparationTasks(event: Event, tasks: Task[]): Task[] {
   ).filter((task) => linkedRole(task, event) === "preparation");
 }
 
-/** The Event is over once its last day on this device is before today. */
+/** The Event is over once its own last day is before today. A timed Event ending at midnight doesn't cover the next day. */
 function hasPassed(event: Event, today: Day): boolean {
-  return eventDays(event).last < today;
+  const endsAtMidnight = !event.allDay && event.endTime === "00:00" && event.endDate > event.startDate;
+  return (endsAtMidnight ? addDays(event.endDate, -1) : event.endDate) < today;
 }
 
 /** Whether the Event is At risk or Critical at `now`, from its Linked tasks (all Tasks may be passed in). */
@@ -53,7 +58,7 @@ export function eventRisk(event: Event, tasks: Task[], now: Date): EventRisk {
   const preparation = preparationTasks(event, tasks);
   const openPreparation = preparation.filter(isOpen).length;
   const overdue = preparation.filter((task) => isOverdue(task, today)).sort((a, b) => a.date!.localeCompare(b.date!));
-  const daysUntil = daysBetween(today, eventDays(event).first);
+  const daysUntil = daysBetween(today, event.startDate);
 
   let status: RiskStatus = "none";
   if (hasPassed(event, today)) status = openPreparation > 0 ? "passed" : "none";
@@ -82,7 +87,7 @@ export interface CountdownMark {
 export interface Countdown {
   marks: CountdownMark[];
   /** Where today is on the line. */
-  today: number;
+  todayPosition: number;
 }
 
 /** Tasks on the Event's day sit this far along the line, just before the Event itself. */
@@ -113,5 +118,5 @@ export function countdown(event: Event, tasks: Task[], now: Date): Countdown | n
       state: dayTasks.some((task) => isOverdue(task, today)) ? "overdue" : dayTasks.some(isOpen) ? "open" : "done",
     }));
 
-  return { marks, today: position(todayOffset) };
+  return { marks, todayPosition: position(todayOffset) };
 }

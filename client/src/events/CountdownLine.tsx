@@ -28,9 +28,9 @@ export function CountdownLine({ countdown, eventDay }: { countdown: Countdown; e
   return (
     <div className="countdown" aria-hidden="true">
       <span className="countdown-track" />
-      <span className="countdown-past" style={{ width: `${countdown.today * 100}%` }} />
-      <span className="countdown-tick" style={at(countdown.today)} />
-      <span className="countdown-today" style={at(countdown.today)}>
+      <span className="countdown-past" style={{ width: `${countdown.todayPosition * 100}%` }} />
+      <span className="countdown-tick" style={at(countdown.todayPosition)} />
+      <span className="countdown-today" style={at(countdown.todayPosition)}>
         {t("risk.today")}
       </span>
       {countdown.marks.map((mark) => (

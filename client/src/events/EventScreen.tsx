@@ -10,9 +10,10 @@ import { SegmentedProgress } from "../ui/SegmentedProgress";
 import { AddLinkedTaskSheet } from "./AddLinkedTaskSheet";
 import { CountdownLine } from "./CountdownLine";
 import { eventDays, eventProgress, withEventDates, type Event } from "./event";
-import { formatEventWhen, formatOffset, formatRelativeDay, formatRiskExplanation, inOtherTimeZone } from "./formatEvent";
+import { formatEventWhen, formatOffset, formatRelativeDay, inOtherTimeZone } from "./formatEvent";
+import { formatRiskExplanation } from "./formatRisk";
 import { RiskBadge } from "./RiskBadge";
-import { countdown, eventRisk, linkedRole } from "./risk";
+import { countdown, eventRisk, isOverdue, linkedRole } from "./risk";
 
 interface EventScreenProps {
   event: Event | undefined;
@@ -43,7 +44,7 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
   ).sort((a, b) => a.offsetDays! - b.offsetDays! || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt));
   const progress = eventProgress(event.id, tasks);
   const risk = eventRisk(event, tasks, now);
-  const line = countdown(event, tasks, now);
+  const countdownLine = countdown(event, tasks, now);
   const explanation = formatRiskExplanation(event, risk, now, t);
   const preparation = linked.filter((task) => linkedRole(task, event) === "preparation");
   const followUp = linked.filter((task) => linkedRole(task, event) === "followUp");
@@ -53,7 +54,7 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
     <ul className="card task-list">
       {list.map((task) => {
         const completed = task.completedAt !== null;
-        const overdue = !completed && task.date! < today;
+        const overdue = isOverdue(task, today);
         const meta = [formatOffset(task.offsetDays!, t), formatShortDay(task.date!, language), task.time && formatTime(task.time, language)]
           .filter(Boolean)
           .join(" · ");
@@ -110,7 +111,7 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
             </h2>
             <RiskBadge risk={risk} />
           </div>
-          {line ? <CountdownLine countdown={line} eventDay={eventDays(event).first} /> : <SegmentedProgress progress={progress} />}
+          {countdownLine ? <CountdownLine countdown={countdownLine} eventDay={eventDays(event).first} /> : <SegmentedProgress progress={progress} />}
           {explanation && <p className="band-note">{explanation}</p>}
         </section>
       )}

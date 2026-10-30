@@ -616,7 +616,7 @@ a.task-title {
   color: var(--ink-meta);
 }
 
-.event-link.endangered {
+.event-link.at-risk {
   color: inherit;
 }
 

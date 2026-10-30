@@ -156,11 +156,33 @@ describe("eventRisk", () => {
     });
   });
 
-  it("counts Critical by the day the Event starts on this device", () => {
-    // 19:00 in New York on the 12th is 01:00 on the 13th in Berlin.
-    const newYork = event({ startTime: "19:00", endTime: "20:00", timeZone: "America/New_York" });
-    expect(eventRisk(newYork, [linked(0)], at(11)).status).toBe("none");
-    expect(eventRisk(newYork, [linked(0)], at(12)).status).toBe("critical");
+  describe("an Event in another time zone counts by its own dates, like its Tasks", () => {
+    it("behind the device: 19:00 in New York on the 12th is 01:00 on the 13th in Berlin", () => {
+      const newYork = event({ startTime: "19:00", endTime: "20:00", timeZone: "America/New_York" });
+      expect(eventRisk(newYork, [linked(0)], at(10)).status).toBe("none");
+      expect(eventRisk(newYork, [linked(0)], at(11))).toMatchObject({ status: "critical", daysUntil: 1 });
+      expect(eventRisk(newYork, [linked(0)], at(12))).toMatchObject({ status: "critical", daysUntil: 0 });
+      expect(eventRisk(newYork, [linked(0)], at(13)).status).toBe("passed");
+    });
+
+    it("ahead of the device: 06:00 in Tokyo on the 12th is 23:00 on the 11th in Berlin", () => {
+      const tokyo = event({ startTime: "06:00", endTime: "07:00", timeZone: "Asia/Tokyo" });
+      const onTheDay = linked(0);
+      expect(eventRisk(tokyo, [onTheDay], at(11))).toMatchObject({ status: "critical", daysUntil: 1 });
+      // Its Task is due today, so it is not passed yet.
+      expect(eventRisk(tokyo, [onTheDay], at(12))).toMatchObject({ status: "critical", daysUntil: 0, overdue: [] });
+      expect(eventRisk(tokyo, [onTheDay], at(13)).status).toBe("passed");
+      expect(putsEventAtRisk(withEventDates([onTheDay], [tokyo])[0], tokyo, at(13))).toBe(false);
+    });
+  });
+
+  it("doesn't count the next day for a timed Event that ends at midnight", () => {
+    const evening = event({ startTime: "20:00", endDate: "2026-10-13", endTime: "00:00" });
+    expect(eventRisk(evening, [linked(-1)], at(13)).status).toBe("passed");
+    const overnight = event({ startTime: "20:00", endDate: "2026-10-13", endTime: "02:00" });
+    expect(eventRisk(overnight, [linked(-1)], at(13)).status).toBe("atRisk");
+    const atMidnight = event({ startTime: "00:00", endTime: "00:00" });
+    expect(eventRisk(atMidnight, [linked(0)], at(12)).status).toBe("critical");
   });
 });
 
@@ -196,12 +218,12 @@ describe("countdown: the Event's Preparation tasks on a line towards it", () => 
     ]);
     expect(line.marks[0].position).toBe(0);
     expect(line.marks[2].position).toBeCloseTo((7 / 8) * 0.9);
-    expect(line.today).toBeCloseTo((2 / 8) * 0.9);
+    expect(line.todayPosition).toBeCloseTo((2 / 8) * 0.9);
   });
 
   it("starts the line at Today when Today comes before every Task", () => {
     const line = countdown(event(), [linked(-2)], at(2))!;
-    expect(line.today).toBe(0);
+    expect(line.todayPosition).toBe(0);
     expect(line.marks[0].position).toBeCloseTo((8 / 10) * 0.9);
   });
 
@@ -217,7 +239,7 @@ describe("countdown: the Event's Preparation tasks on a line towards it", () => 
   it("puts everything at the Event on its day", () => {
     const line = countdown(event(), [linked(0)], at(12))!;
     expect(line.marks[0].position).toBe(0.9);
-    expect(line.today).toBe(0.9);
+    expect(line.todayPosition).toBe(0.9);
   });
 
   it("is absent without Preparation tasks or once the Event has started on an earlier day", () => {
