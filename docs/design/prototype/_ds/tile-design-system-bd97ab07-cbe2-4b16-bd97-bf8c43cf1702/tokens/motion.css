@@ -1,0 +1,6 @@
+:root{
+--press-scale:0.95; /* @kind other */
+--duration-press:120ms; /* @kind other */
+--duration-fade:240ms; /* @kind other */
+--ease-standard:cubic-bezier(0.25,0.1,0.25,1); /* @kind other */
+}

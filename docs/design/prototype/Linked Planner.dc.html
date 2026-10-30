@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/tile-design-system-bd97ab07-cbe2-4b16-bd97-bf8c43cf1702/styles.css">
+<script src="_ds/tile-design-system-bd97ab07-cbe2-4b16-bd97-bf8c43cf1702/_ds_bundle.js"></script>
+<style>body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}a{color:#0066cc}a:hover{color:#0066cc}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-sub{font:600 12px/1.2 system-ui,sans-serif;color:rgba(0,0,0,.55);margin:36px 0 14px;text-transform:uppercase;letter-spacing:.06em}.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px;width:402px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}.dv-notes{max-width:760px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:18px 22px;font:13px/1.55 system-ui,sans-serif;color:#1d1d1f;margin-bottom:8px}.dv-notes h3{margin:0 0 6px;font-size:13px}.dv-notes ul{margin:0;padding-left:18px}</style>
+</helmet>
+
+<section class="dv-turn" id="t4">
+<div class="dv-thd"><a class="dv-tid" href="#t4">4</a><span class="dv-tname">Linked Planner · chosen screens · iOS · amber = overdue / at risk</span></div>
+<div class="dv-opts">
+<div class="dv-opt" id="4a" data-screen-label="4a Home"><div class="dv-olabel"><a class="dv-oid" href="#4a">4a</a>Home · progress ring, overdue bucket with swipe, horizon cards</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0">
+ <div style="display:flex;align-items:flex-end;justify-content:space-between;margin:14px 4px 18px">
+  <div><div style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Saturday, Oct 4</div><div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Today</div></div>
+  <div style="display:flex;align-items:center;gap:8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="none" stroke="#e0e0e0" stroke-width="2.5"></circle><circle cx="14" cy="14" r="12" fill="none" stroke="#0066cc" stroke-width="2.5" stroke-dasharray="33.5 75.4" stroke-linecap="round" transform="rotate(-90 14 14)"></circle></svg>4 of 9 done</div>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px 10px"><span style="width:10px;height:10px;border-radius:50%;background:#c25e00;flex:none"></span><span style="white-space:nowrap;font:600 17px/1.24 var(--font-text);flex:1">Overdue</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#0066cc">Snooze all to today</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #c25e00;flex:none"></span><div style="flex:1"><div style="font:400 17px/1.3 var(--font-text)">Buy gift for Mom</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#c25e00">Puts Mom's birthday at risk</div></div></div>
+  <div style="position:relative;overflow:hidden;border-top:1px solid #f0f0f0">
+   <div style="position:absolute;inset:0;display:flex;justify-content:flex-end">
+    <div style="width:78px;background:#d2d2d7;color:#1d1d1f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:400 12px/1 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="clock" size="18" hint-size="18px,18px"></x-import>Snooze</div>
+    <div style="width:78px;background:#0066cc;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:400 12px/1 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="check" size="18" hint-size="18px,18px"></x-import>Done</div>
+   </div>
+   <div style="position:relative;display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;transform:translateX(-156px)"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #c25e00;flex:none"></span><div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text);white-space:nowrap">Book train to Hamburg</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;white-space:nowrap">2 days · Weekend at Anna &amp; Tom's</div></div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 16px 14px;border-top:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #c25e00;flex:none"></span><div style="flex:1"><div style="font:400 17px/1.3 var(--font-text)">Pay dentist invoice</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">9 days · snoozed 3×</div></div></div>
+ </div>
+
+ <div style="display:flex;align-items:baseline;gap:8px;margin:24px 4px 10px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Today</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">2 left</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0">
+   <svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0066cc"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+   <div style="flex:1;min-width:0;color:#7a7a7a"><div style="font:400 17px/1.3 var(--font-text);text-decoration:line-through">Order cake</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px"><span>Mom's birthday</span> · 8 days before</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Wash Leo's jersey</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span style="color:#0066cc">Leo's home game</span> · Sat Oct 10</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Call the plumber</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Before 1 pm</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+ </div>
+
+ <div style="display:flex;align-items:baseline;gap:8px;margin:24px 4px 10px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Tomorrow</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Sun Oct 5 · 1</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Sort boxes in the basement</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span style="color:#0066cc">Clear out the basement</span> · 2 of 5 subtasks</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+ </div>
+
+ <div style="display:flex;align-items:baseline;gap:8px;margin:24px 4px 10px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Next 3 days</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Mon – Wed · 3</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Prep slides for Q4 review</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span style="color:#0066cc">Q4 planning review</span> · Mon</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Renew passport</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Wed</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+ </div>
+</div>
+<div style="background:#fff;border-top:1px solid #e0e0e0;padding:8px 8px 30px;display:grid;grid-template-columns:repeat(4,1fr);flex:none;position:relative">
+ <div role="button" aria-label="Add task" style="position:absolute;right:20px;bottom:calc(100% + 16px);width:56px;height:56px;border-radius:50%;background:#0066cc;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 120ms cubic-bezier(.25,.1,.25,1)" style-active="transform:scale(0.95)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="plus" size="26" hint-size="26px,26px"></x-import></div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0066cc;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="sun" size="22" hint-size="22px,22px"></x-import>Today</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="22" hint-size="22px,22px"></x-import>Calendar</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="list-checks" size="22" hint-size="22px,22px"></x-import>Plan</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="folder" size="22" hint-size="22px,22px"></x-import>Projects</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4b" data-screen-label="4b Event detail"><div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>Event detail · location, description, countdown strip, preparation</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 0 0">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 16px;font:400 17px/1 var(--font-text);color:#0066cc"><span style="display:flex;align-items:center;gap:2px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-left" size="20" hint-size="20px,20px"></x-import>Calendar</span><span>Edit</span></div>
+ <div style="margin:8px 20px 18px">
+  <div style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Sunday, Oct 12 · 12:30 pm · in 8 days · every year</div>
+  <div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Mom's birthday</div>
+  <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font:400 15px/1.4 var(--font-text);letter-spacing:-0.224px;color:#0066cc"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="map-pin" size="16" hint-size="16px,16px"></x-import><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">Café Luise, Berlin</span></div>
+  <div style="margin-top:6px;font:400 15px/1.4 var(--font-text);letter-spacing:-0.224px;color:#333333;text-wrap:pretty">Family lunch, table for 8. Grandma is coming and would love prints from the summer.</div>
+ </div>
+ <div style="background:#fff;border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;padding:18px 20px 16px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 21px/1.19 var(--font-display);white-space:nowrap">1 of 3 prepared</span><span style="display:flex;align-items:center;gap:6px;font:600 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#c25e00;white-space:nowrap"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="triangle-alert" size="15" hint-size="15px,15px"></x-import>At risk</span></div>
+  <div style="position:relative;height:72px;margin-top:18px">
+   <div style="position:absolute;left:0;right:0;top:34px;height:1px;background:#e0e0e0"></div>
+   <div style="position:absolute;left:0;top:34px;width:38%;height:1px;background:#1d1d1f"></div>
+   <div style="position:absolute;left:38%;top:26px;width:1px;height:17px;background:#1d1d1f"></div>
+   <div style="position:absolute;left:38%;top:48px;transform:translateX(-50%);font:600 11px/1 var(--font-text);white-space:nowrap">Today</div>
+   <div style="position:absolute;left:4%;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font:400 11px/1 var(--font-text);color:#7a7a7a;white-space:nowrap">Cake</span><span style="width:14px;height:14px;border-radius:50%;background:#0066cc;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5 9-10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></div>
+   <div style="position:absolute;left:28%;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font:600 11px/1 var(--font-text);color:#c25e00;white-space:nowrap">Gift · overdue</span><span style="width:14px;height:14px;border-radius:50%;border:2px solid #c25e00;box-sizing:border-box;background:#fff"></span></div>
+   <div style="position:absolute;left:84%;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font:400 11px/1 var(--font-text);color:#7a7a7a;white-space:nowrap">Wrap</span><span style="width:14px;height:14px;border-radius:50%;border:1.5px solid #d2d2d7;box-sizing:border-box;background:#fff"></span></div>
+   <div style="position:absolute;left:100%;top:0;transform:translateX(-100%);display:flex;flex-direction:column;align-items:flex-end;gap:4px"><span style="font:400 11px/1 var(--font-text);color:#7a7a7a;white-space:nowrap">Oct 12</span><span style="width:14px;height:14px;border-radius:3px;background:#0066cc"></span></div>
+  </div>
+  <div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:10px">Gift is 1 day overdue. Latest safe date: Fri Oct 10.</div>
+ </div>
+ <div style="padding:0 16px">
+ <div style="display:flex;align-items:baseline;gap:8px;margin:22px 4px 10px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Preparation</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">relative to the event</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0">
+   <svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0066cc"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+   <div style="flex:1;min-width:0;color:#7a7a7a"><div style="font:400 17px/1.3 var(--font-text);text-decoration:line-through">Order cake</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px">8 days before · done Oct 4</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #c25e00;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Buy gift</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#c25e00;font-weight:600">7 days before · overdue</div></div>
+   <span style="font:400 14px/1.3 var(--font-text);color:#0066cc">Move</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+   <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+   <div style="flex:1;min-width:0"><div style="font:400 17px/1.3 var(--font-text)">Wrap gift</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">1 day before · Sat Oct 11 · reminder 9 am</div></div>
+   <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+  </div>
+ </div>
+ <div style="display:flex;gap:10px;margin:18px 0 0"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" icon="plus" hint-size="auto,40px">Add task</x-import><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" variant="secondary" hint-size="auto,40px">Move event</x-import></div>
+ </div>
+</div>
+<div style="background:#fff;border-top:1px solid #e0e0e0;padding:8px 8px 30px;display:grid;grid-template-columns:repeat(4,1fr);flex:none">
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="sun" size="22" hint-size="22px,22px"></x-import>Today</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0066cc;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="22" hint-size="22px,22px"></x-import>Calendar</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="list-checks" size="22" hint-size="22px,22px"></x-import>Plan</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="folder" size="22" hint-size="22px,22px"></x-import>Projects</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4c" data-screen-label="4c Task detail"><div class="dv-olabel"><a class="dv-oid" href="#4c">4c</a>Task detail · subtasks, linked event, quick move</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;font:400 17px/1 var(--font-text);color:#0066cc"><span style="display:flex;align-items:center;gap:2px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-left" size="20" hint-size="20px,20px"></x-import>Today</span><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="ellipsis" size="22" hint-size="22px,22px"></x-import></div>
+ <div style="display:flex;gap:14px;align-items:flex-start;margin:8px 4px 18px"><span style="width:28px;height:28px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none;margin-top:6px"></span><div><div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Pack for the weekend</div><div style="font:400 17px/1.47 var(--font-text);color:#7a7a7a">Due Thu Oct 16 · reminder 1 day before</div></div></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+  <span style="width:40px;height:40px;border-radius:10px;background:#f5f5f7;display:flex;align-items:center;justify-content:center;flex:none"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="20" hint-size="20px,20px"></x-import></span>
+  <div style="flex:1;min-width:0"><div style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Part of</div><div style="font:600 17px/1.24 var(--font-text)">Weekend at Anna &amp; Tom's</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Fri Oct 17 – Sun Oct 19 · on track · 3 of 4 tasks</div></div>
+  <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+ </div>
+ <div style="display:flex;align-items:baseline;justify-content:space-between;margin:24px 4px 8px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Packing list</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">3 of 7</span></div>
+ <div style="height:4px;border-radius:999px;background:#e0e0e0;margin:0 4px 12px;overflow:hidden"><div style="width:43%;height:100%;background:#0066cc;border-radius:999px"></div></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0;color:#7a7a7a"><svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0066cc"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text);text-decoration:line-through">Hiking boots</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0;color:#7a7a7a"><svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0066cc"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text);text-decoration:line-through">Rain jacket</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0;color:#7a7a7a"><svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0066cc"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text);text-decoration:line-through">Board game for the kids</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Wine for Anna &amp; Tom</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Chargers</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Swimwear</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Train tickets (printed)</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;color:#0066cc"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="plus" size="20" hint-size="20px,20px"></x-import><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Add item</span></div>
+ </div>
+ <div style="margin:22px 4px 8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Move to</div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap">
+  <span style="border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:7px 14px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px">Tomorrow</span>
+  <span style="border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:7px 14px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px">Day after</span>
+  <span style="border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:7px 14px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px">Next week</span>
+  <span style="border:1px solid #e0e0e0;background:#fff;border-radius:999px;padding:7px 14px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;display:flex;gap:6px;align-items:center"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="14" hint-size="14px,14px"></x-import>Pick a date</span>
+ </div>
+</div>
+<div style="padding:12px 16px 42px;background:#f5f5f7;display:flex;gap:10px;flex:none"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" icon="check" style="{{ fullWidth }}" dc-props="{{ btnFull }}" hint-size="100%,42px">Mark done</x-import></div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4d" data-screen-label="4d Task move sheet"><div class="dv-olabel"><a class="dv-oid" href="#4d">4d</a>Swipe → Snooze opens a move sheet that knows the task's event</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px;position:relative">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0;opacity:.5">
+ <div style="margin:14px 4px 18px;font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Today</div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:#c25e00"></span><span style="white-space:nowrap;font:600 17px/1.24 var(--font-text)">Overdue</span></div>
+</div>
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 16px 42px">
+ <div style="margin:0 4px 14px"><div style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Move</div><div style="font:600 21px/1.19 var(--font-display)">Buy gift for Mom</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:3px">Needed for Mom's birthday on Sun Oct 12. Wrap gift waits on it.</div></div>
+ <div style="border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0;font:400 17px/1.3 var(--font-text)"><span>Tomorrow</span><span style="color:#7a7a7a;font-size:14px">Sun Oct 5</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0;font:400 17px/1.3 var(--font-text)"><span>Day after</span><span style="color:#7a7a7a;font-size:14px">Mon Oct 6</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0;font:400 17px/1.3 var(--font-text)"><span>Day before wrapping</span><span style="color:#7a7a7a;font-size:14px">Fri Oct 10 · latest safe</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0;font:400 17px/1.3 var(--font-text);color:#7a7a7a"><span style="display:flex;align-items:center;gap:8px">Next week<x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="triangle-alert" size="16" color="#c25e00" hint-size="16px,16px"></x-import></span><span style="font-size:14px">Mon Oct 13 · after the event</span></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;font:400 17px/1.3 var(--font-text);color:#0066cc"><span style="display:flex;align-items:center;gap:8px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="18" hint-size="18px,18px"></x-import>Pick a date</span><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import></div>
+ </div>
+ <div style="display:flex;justify-content:space-between;margin:16px 4px 0;font:400 17px/1 var(--font-text);color:#0066cc"><span>Cancel</span><span style="color:#7a7a7a">Snoozed 1×</span></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4e" data-screen-label="4e Wizard brain dump"><div class="dv-olabel"><a class="dv-oid" href="#4e">4e</a>Planning wizard · step 1, brain dump</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" keyboard="{{ true }}" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0;display:flex;flex-direction:column">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;font:400 17px/1 var(--font-text);color:#0066cc"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="x" size="22" hint-size="22px,22px"></x-import><span style="font:400 14px/1 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Step 1 of 2</span><span style="width:22px"></span></div>
+ <div style="display:flex;gap:6px;margin:2px 4px 16px"><span style="flex:1;height:4px;border-radius:999px;background:#0066cc"></span><span style="flex:1;height:4px;border-radius:999px;background:#e0e0e0"></span></div>
+ <div style="margin:0 4px 16px"><div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Get it all out.</div><div style="font:400 17px/1.47 var(--font-text);color:#7a7a7a">No order, no dates. Just type.</div></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:6px;height:6px;border-radius:50%;background:#d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Birthday card for Jonas</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:6px;height:6px;border-radius:50%;background:#d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Renew passport</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:6px;height:6px;border-radius:50%;background:#d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Buy running shoes</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:6px;height:6px;border-radius:50%;background:#d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Snacks for the home game</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f0"><span style="width:6px;height:6px;border-radius:50%;background:#d2d2d7;flex:none"></span><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Email landlord about heating</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px"><span style="width:6px;height:6px;border-radius:50%;background:#0066cc;flex:none"></span><span style="font:400 17px/1.3 var(--font-text);white-space:nowrap">Book dentist follow</span><span style="width:2px;height:20px;background:#0066cc;margin-left:-10px"></span></div>
+ </div>
+ <div style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding:12px 4px 10px"><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">6 items</span><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" icon-right="chevron-right" hint-size="auto,40px">Structure</x-import></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4f" data-screen-label="4f Wizard drag buckets"><div class="dv-olabel"><a class="dv-oid" href="#4f">4f</a>Planning wizard · step 2, drag into day buckets</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0;display:flex;flex-direction:column">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;font:400 17px/1 var(--font-text);color:#0066cc"><span style="display:flex;align-items:center;gap:2px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-left" size="20" hint-size="20px,20px"></x-import>Back</span><span style="font:400 14px/1 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Step 2 of 2</span><span>Done</span></div>
+ <div style="margin:6px 4px 14px"><div style="font:600 28px/1.14 var(--font-display)">Drag into a day.</div><div style="font:400 15px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Or tap an item, then tap a bucket.</div></div>
+ <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+  <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:12px 10px;min-height:92px"><div style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Today</div><div style="font:400 12px/1.3 var(--font-text);color:#7a7a7a">Sat</div><div style="margin-top:10px;font:600 21px/1 var(--font-display)">2</div></div>
+  <div style="background:#fff;border:2px solid #0071e3;border-radius:18px;padding:11px 9px;min-height:92px"><div style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Tomorrow</div><div style="font:400 12px/1.3 var(--font-text);color:#7a7a7a">Sun</div><div style="margin-top:10px;font:600 21px/1 var(--font-display);color:#0066cc">1 +1</div></div>
+  <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:12px 10px;min-height:92px"><div style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Mon</div><div style="font:400 12px/1.3 var(--font-text);color:#7a7a7a">Oct 6</div><div style="margin-top:10px;font:600 21px/1 var(--font-display)">0</div></div>
+  <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:12px 10px;min-height:92px"><div style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Later</div><div style="font:400 12px/1.3 var(--font-text);color:#7a7a7a">no date</div><div style="margin-top:10px;font:600 21px/1 var(--font-display)">1</div></div>
+ </div>
+ <div style="display:flex;gap:8px;margin:8px 0 18px;overflow:hidden">
+  <span style="display:flex;align-items:center;gap:6px;border:1px solid #e0e0e0;border-radius:999px;padding:7px 13px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;white-space:nowrap;background:#fff"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="14" hint-size="14px,14px"></x-import>Leo's home game</span>
+  <span style="display:flex;align-items:center;gap:6px;border:1px solid #e0e0e0;border-radius:999px;padding:7px 13px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;white-space:nowrap;background:#fff"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="14" hint-size="14px,14px"></x-import>Mom's birthday</span>
+  <span style="display:flex;align-items:center;gap:6px;border:1px solid #e0e0e0;border-radius:999px;padding:7px 13px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;white-space:nowrap;background:#fff"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="folder" size="14" hint-size="14px,14px"></x-import>Basement</span>
+ </div>
+ <div style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin:0 4px 8px">Unsorted · 2 left</div>
+ <div style="position:relative;background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:visible">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="grip-vertical" size="18" color="#d2d2d7" hint-size="18px,18px"></x-import><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Email landlord about heating</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;opacity:.25"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="grip-vertical" size="18" color="#d2d2d7" hint-size="18px,18px"></x-import><span style="flex:1;min-width:0;font:400 17px/1.3 var(--font-text)">Book dentist follow-up</span></div>
+  <div style="position:absolute;left:28px;top:-54px;width:260px;background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:12px 16px;transform:rotate(-2deg);display:flex;align-items:center;gap:12px;font:400 17px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="grip-vertical" size="18" color="#0066cc" hint-size="18px,18px"></x-import>Book dentist follow-up</div>
+ </div>
+ <div style="margin-top:auto;padding:12px 4px 10px;display:flex;justify-content:space-between;align-items:center"><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Placed items go straight to Today.</span><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" size="sm" variant="secondary" hint-size="auto,30px">Skip the rest</x-import></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4g" data-screen-label="4g Move event"><div class="dv-olabel"><a class="dv-oid" href="#4g">4g</a>Move event · should tasks move too?</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px;position:relative">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0;opacity:.5">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;font:400 17px/1 var(--font-text);color:#0066cc"><span style="display:flex;align-items:center;gap:2px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-left" size="20" hint-size="20px,20px"></x-import>Calendar</span><span>Done</span></div>
+ <div style="margin:8px 4px 18px"><div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Leo's home game</div><div style="font:400 17px/1.47 var(--font-text);color:#7a7a7a">Saturday, Oct 17 · 2 pm</div></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:14px 16px;display:flex;justify-content:space-between;font:400 17px/1.3 var(--font-text)"><span>Date</span><span style="color:#0066cc">Oct 17</span></div>
+</div>
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:20px 16px 42px">
+ <div style="margin:0 4px"><div style="font:600 21px/1.19 var(--font-display)">Move 3 tasks too?</div><div style="font:400 15px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:6px">The game moved a week later. Keeping task dates is the safe default when you gain time.</div></div>
+ <div style="display:flex;flex-direction:column;gap:8px;margin:16px 0">
+  <div style="display:flex;align-items:center;gap:12px;border:2px solid #0071e3;border-radius:999px;padding:11px 15px"><span style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Keep task dates</span><span style="margin-left:auto;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Suggested</span></div>
+  <div style="display:flex;align-items:center;gap:12px;border:1px solid #e0e0e0;border-radius:999px;padding:12px 16px"><span style="font:600 14px/1.29 var(--font-text);letter-spacing:-0.224px">Move tasks with the event</span><span style="margin-left:auto;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">+7 days</span></div>
+ </div>
+ <div style="border:1px solid #e0e0e0;border-radius:18px;overflow:hidden">
+  <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #f0f0f0;font:400 15px/1.3 var(--font-text)"><span>Wash Leo's jersey</span><span style="color:#7a7a7a">Oct 9 stays</span></div>
+  <div style="display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #f0f0f0;font:400 15px/1.3 var(--font-text)"><span>Pack snacks</span><span style="color:#7a7a7a">Oct 10 stays</span></div>
+  <div style="display:flex;justify-content:space-between;padding:10px 16px;font:400 15px/1.3 var(--font-text)"><span>Charge camera</span><span style="color:#7a7a7a">Oct 9 stays</span></div>
+ </div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:18px"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" style="{{ fullWidth }}" dc-props="{{ btnFull }}" hint-size="100%,42px">Move event</x-import><span style="font:400 17px/1 var(--font-text);color:#0066cc">Cancel</span></div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4h" data-screen-label="4h New event"><div class="dv-olabel"><a class="dv-oid" href="#4h">4h</a>New event · suggested tasks from a similar past event</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0">
+ <div style="display:flex;align-items:center;justify-content:space-between;height:44px;font:400 17px/1 var(--font-text);color:#0066cc"><span>Cancel</span><span style="font:600 17px/1 var(--font-text);color:#1d1d1f">New event</span><span style="font-weight:600">Add</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden;margin-top:12px">
+  <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;font:600 21px/1.19 var(--font-display)">Leo's home game</div>
+  <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #f0f0f0;font:400 17px/1.3 var(--font-text)"><span>Date</span><span style="color:#0066cc">Sat Oct 24 · 2 pm</span></div>
+  <div style="display:flex;justify-content:space-between;padding:12px 16px;font:400 17px/1.3 var(--font-text)"><span>Repeats</span><span style="color:#7a7a7a">Never</span></div>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;overflow:hidden;margin-top:18px">
+  <div style="padding:16px 16px 12px;display:flex;gap:12px;align-items:flex-start">
+   <span style="width:40px;height:40px;border-radius:10px;background:#f5f5f7;display:flex;align-items:center;justify-content:center;flex:none"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="sparkles" size="20" hint-size="20px,20px"></x-import></span>
+   <div><div style="font:600 17px/1.24 var(--font-text)">Looks like Leo's home game on Oct 10.</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:3px">Bring over its tasks? You can edit them after.</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid #f0f0f0"><svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0071e3"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex:1;font:400 17px/1.3 var(--font-text)">Wash Leo's jersey</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">1 day before</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid #f0f0f0"><svg width="22" height="22" viewBox="0 0 24 24" style="flex:none"><circle cx="12" cy="12" r="10.5" fill="#0071e3"></circle><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="flex:1;font:400 17px/1.3 var(--font-text)">Pack snacks</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">On the day</span></div>
+  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid #f0f0f0"><span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span><span style="flex:1;font:400 17px/1.3 var(--font-text);color:#7a7a7a">Charge camera</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">1 day before</span></div>
+  <div style="display:flex;gap:10px;padding:14px 16px;border-top:1px solid #f0f0f0"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" size="sm" hint-size="auto,30px">Import 2 tasks</x-import><x-import component-from-global-scope="TileDesignSystem_bd97ab.Button" size="sm" variant="secondary" hint-size="auto,30px">Skip</x-import></div>
+ </div>
+ <div style="margin:18px 4px 0;font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">Imported tasks keep their timing relative to the new date.</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4i" data-screen-label="4i Projects"><div class="dv-olabel"><a class="dv-oid" href="#4i">4i</a>Projects &amp; focus · milestone progress</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0">
+ <div style="margin:14px 4px 16px;font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">Projects</div>
+ <div style="display:flex;background:#e0e0e0;border-radius:999px;padding:2px;margin-bottom:18px;font:400 14px/1.29 var(--font-text);letter-spacing:-0.224px"><span style="flex:1;text-align:center;padding:7px;border-radius:999px;background:#fff;font-weight:600">Projects</span><span style="flex:1;text-align:center;padding:7px;color:#7a7a7a">Focus · next 3 days</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:16px 18px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:6px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display);flex:1">Mom's birthday</span><span style="display:flex;align-items:center;gap:5px;font:600 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#c25e00"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="triangle-alert" size="15" hint-size="15px,15px"></x-import>At risk</span></div>
+  <div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:2px">Sun Oct 12 · in 8 days</div>
+  <div style="display:flex;gap:4px;margin-top:14px"><span style="flex:1;height:5px;border-radius:999px;background:#0066cc"></span><span style="flex:1;height:5px;border-radius:999px;background:#c25e00"></span><span style="flex:1;height:5px;border-radius:999px;background:#e0e0e0"></span></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span>1 of 3 · <span style="color:#c25e00">Buy gift overdue</span></span><span style="color:#0066cc">Open ›</span></div>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:16px 18px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display);flex:1">Weekend at Anna &amp; Tom's</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">On track</span></div>
+  <div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:2px">Fri Oct 17 · in 13 days</div>
+  <div style="display:flex;gap:4px;margin-top:14px"><span style="flex:1;height:5px;border-radius:999px;background:#0066cc"></span><span style="flex:1;height:5px;border-radius:999px;background:#0066cc"></span><span style="flex:1;height:5px;border-radius:999px;background:#0066cc"></span><span style="flex:1;height:5px;border-radius:999px;background:#e0e0e0"></span></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span>3 of 4 · Pack for the weekend next</span><span style="color:#0066cc">Open ›</span></div>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:16px 18px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display);flex:1">Leo's home game</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">On track</span></div>
+  <div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:2px">Sat Oct 10 · in 6 days</div>
+  <div style="display:flex;gap:4px;margin-top:14px"><span style="flex:1;height:5px;border-radius:999px;background:#e0e0e0"></span><span style="flex:1;height:5px;border-radius:999px;background:#e0e0e0"></span><span style="flex:1;height:5px;border-radius:999px;background:#e0e0e0"></span></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span>0 of 3 · first task due Oct 9</span><span style="color:#0066cc">Open ›</span></div>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:16px 18px">
+  <div style="display:flex;align-items:center;gap:8px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display);flex:1">Clear out the basement</span><span style="font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">No deadline</span></div>
+  <div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a;margin-top:2px">List → project · 2 milestones</div>
+  <div style="height:5px;border-radius:999px;background:#e0e0e0;margin-top:14px;overflow:hidden"><div style="width:44%;height:100%;background:#0066cc"></div></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;font:400 14px/1.3 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a"><span>4 of 9 · milestone "Sorted" next</span><span style="color:#0066cc">Open ›</span></div>
+ </div>
+</div>
+<div style="background:#fff;border-top:1px solid #e0e0e0;padding:8px 8px 30px;display:grid;grid-template-columns:repeat(4,1fr);flex:none">
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="sun" size="22" hint-size="22px,22px"></x-import>Today</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="22" hint-size="22px,22px"></x-import>Calendar</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="list-checks" size="22" hint-size="22px,22px"></x-import>Plan</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0066cc;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="folder" size="22" hint-size="22px,22px"></x-import>Projects</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div class="dv-opt" id="4j" data-screen-label="4j Calendar month"><div class="dv-olabel"><a class="dv-oid" href="#4j">4j</a>Calendar · month with event, task and at-risk markers</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:#f5f5f7;font-family:var(--font-text);color:#1d1d1f;letter-spacing:-0.374px">
+<div style="flex:1;overflow:hidden;padding:62px 16px 0">
+ <div style="display:flex;align-items:flex-end;justify-content:space-between;margin:14px 4px 14px"><div style="font:600 34px/1.15 var(--font-display);letter-spacing:-0.374px">October</div><div style="display:flex;gap:18px;color:#0066cc"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-left" size="22" hint-size="22px,22px"></x-import><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="22" hint-size="22px,22px"></x-import></div></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:12px 10px 10px">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);font:400 12px/1 var(--font-text);color:#7a7a7a;text-align:center;margin-bottom:8px"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;font:400 15px/1 var(--font-text);text-align:center">
+   <div style="padding:4px 0 6px;color:#d2d2d7"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">28</span></div>
+   <div style="padding:4px 0 6px;color:#d2d2d7"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">29</span></div>
+   <div style="padding:4px 0 6px;color:#d2d2d7"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">30</span></div>
+   <div style="padding:4px 0 6px;color:#7a7a7a"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">1</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#d2d2d7"></span></div></div>
+   <div style="padding:4px 0 6px;color:#7a7a7a"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">2</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#d2d2d7"></span></div></div>
+   <div style="padding:4px 0 6px;color:#7a7a7a"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">3</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;border:1.5px solid #0066cc;border-radius:50%;box-sizing:border-box;font-weight:600;color:#0066cc">4</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">5</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">6</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">7</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">8</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">9</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">10</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">11</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;background:#c25e00;color:#fff;border-radius:50%;font-weight:600">12</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#c25e00"></span><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">13</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">14</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">15</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">16</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">17</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">18</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">19</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">20</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">21</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">22</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">23</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#7a7a7a"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">24</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"><span style="width:4px;height:4px;border-radius:50%;background:#0066cc"></span></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">25</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">26</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">27</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">28</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">29</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">30</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">31</span><div style="display:flex;gap:3px;justify-content:center;height:4px;margin-top:1px"></div></div>
+   <div style="padding:4px 0 6px;color:#d2d2d7"><span style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center">1</span></div>
+  </div>
+  <div style="display:flex;gap:14px;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font:400 12px/1 var(--font-text);color:#7a7a7a"><span style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#0066cc"></span>Event</span><span style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#7a7a7a"></span>Tasks</span><span style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#c25e00"></span>At risk</span></div>
+ </div>
+ <div style="display:flex;align-items:baseline;gap:8px;margin:22px 4px 10px"><span style="white-space:nowrap;font:600 21px/1.19 var(--font-display)">Sun Oct 12</span><span style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">1 event · 1 task</span></div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+  <span style="width:10px;height:10px;border-radius:50%;background:#c25e00;flex:none"></span>
+  <div style="flex:1;min-width:0"><div style="font:600 17px/1.24 var(--font-text)">Mom's birthday</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">12:30 pm · 1 of 3 prepared · <span style="color:#c25e00;font-weight:600">at risk</span></div></div>
+  <x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="chevron-right" size="16" color="#d2d2d7" hint-size="16px,16px"></x-import>
+ </div>
+ <div style="background:#fff;border:1px solid #e0e0e0;border-radius:18px;margin-top:8px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+  <span style="width:22px;height:22px;border-radius:50%;border:1.5px solid #d2d2d7;flex:none"></span>
+  <div style="flex:1"><div style="font:400 17px/1.3 var(--font-text)">Pick up cake</div><div style="font:400 14px/1.4 var(--font-text);letter-spacing:-0.224px;color:#7a7a7a">On the day · 10 am</div></div>
+ </div>
+</div>
+<div style="background:#fff;border-top:1px solid #e0e0e0;padding:8px 8px 30px;display:grid;grid-template-columns:repeat(4,1fr);flex:none">
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="sun" size="22" hint-size="22px,22px"></x-import>Today</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0066cc;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="calendar" size="22" hint-size="22px,22px"></x-import>Calendar</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="list-checks" size="22" hint-size="22px,22px"></x-import>Plan</div>
+ <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#7a7a7a;font:400 10px/1.3 var(--font-text)"><x-import component-from-global-scope="TileDesignSystem_bd97ab.Icon" name="folder" size="22" hint-size="22px,22px"></x-import>Projects</div>
+</div>
+</div>
+</x-import>
+</div>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { fullWidth: { width: '100%' }, btnFull: { style: { width: '100%' } } };
+  }
+}
+</script>
+</body>
+</html>

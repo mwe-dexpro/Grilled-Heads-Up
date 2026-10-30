@@ -5,7 +5,7 @@ A personal calendar and to-do app that links tasks to the events they prepare fo
 ## Planning
 
 **Event**:
-Anything dated that tasks can attach to: a timed appointment or an all-day deadline. An Event inside a Project is what the concept calls a milestone; it is not a separate thing.
+Anything dated that tasks can attach to: a timed appointment or an all-day deadline, on one day or spanning several. An Event inside a Project is what the concept calls a milestone; it is not a separate thing.
 _German UI_: Termin
 _Avoid_: Milestone, Appointment, Deadline (as separate concepts)
 
@@ -34,7 +34,7 @@ A Task attached to an Event.
 _German UI_: verknüpfte Aufgabe
 
 **Offset**:
-The distance of a Linked task's date from its Event (e.g. −7 days); the task's date follows the Event when it moves.
+The distance of a Linked task's date from the start of its Event (e.g. −7 days); the task's date follows the Event when it moves.
 _German UI_: Abstand zum Termin
 _Avoid_: Relative date, lead time
 
@@ -43,15 +43,15 @@ A Linked task whose date is fixed and no longer follows its Event.
 _German UI_: fixiert
 
 **Preparation task**:
-A Linked task dated on or before its Event. Only these determine At risk and Critical.
+A Linked task dated on or before the day its Event starts. Only these determine At risk and Critical.
 _German UI_: Vorbereitung
 
 **Follow-up task**:
-A Linked task dated after its Event (e.g. thank-you card). Counts toward Progress, never toward risk.
+A Linked task dated after the day its Event starts (e.g. thank-you card). Counts toward Progress, never toward risk.
 _German UI_: Nachbereitung
 
 **Reminder**:
-A push notification at a chosen moment for a Task or an Event; both can have several.
+A push notification set at a distance before or after a Task's or Event's date and time (e.g. 1 day before); both can have several.
 _German UI_: Erinnerung
 _Avoid_: Alarm, notification (for the concept)
 
@@ -87,7 +87,7 @@ _German UI_: gefährdet
 _Avoid_: Endangered, in danger
 
 **Critical**:
-An Event that is today or tomorrow and still has open Preparation tasks.
+An Event that starts today or tomorrow and still has open Preparation tasks.
 _German UI_: kritisch
 
 **Progress**:

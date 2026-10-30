@@ -1,0 +1,6 @@
+:root{
+--shadow-product:rgba(0,0,0,0.22) 3px 5px 30px 0;
+--border-card:1px solid var(--hairline);
+--border-soft-line:1px solid rgba(0,0,0,0.08); /* @kind other */
+--blur-frosted:saturate(180%) blur(20px); /* @kind other */
+}
