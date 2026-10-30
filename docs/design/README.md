@@ -19,14 +19,14 @@ The files in `prototype/` are **design references built in HTML**. They show the
 Colours
 - Action blue `#0066cc`: links, primary pills, active tab, checked circles, FAB, event markers
 - Focus blue `#0071e3`: focus ring (2px solid, 2px offset), selected chip/option outline (2px)
-- Ink `#1d1d1f`: primary text · `#333333` body secondary (event description) · `#7a7a7a` meta text, inactive tabs
+- Ink `#1d1d1f`: primary text · `#333333` body secondary (event description) · `#6e6e73` meta text, inactive tabs (the prototype's `#7a7a7a` fails AA contrast; see ALIGNMENT §3)
 - Screen background (parchment) `#f5f5f7` · cards / sheets / tab bar `#ffffff`
 - Hairline `#e0e0e0` (card border, tab-bar top, empty progress) · row divider `#f0f0f0` · unchecked circle / disabled `#d2d2d7`
-- **Amber `#c25e00` = Overdue / At risk.** This is an addition to the Tile system, which has no warning colour. Contrast on white is ≈4.3:1, so use it at ≥14px **600**, or darken to `#b35600` for 400-weight small text.
+- **Amber = Overdue / At risk / Critical.** This is an addition to the Tile system, which has no warning colour. Use **`#b35600`** for all amber text and fills (4.94:1 on white, 4.54:1 on parchment). The prototype's `#c25e00` (4.29:1) fails AA for text at any size used here; keep it only for dots and icons.
 - Sheet scrim `rgba(0,0,0,.35)`
 - No gradients. **No shadows on UI** (Tile's single shadow is reserved for product photos, unused here).
 
-Typography (`system-ui` → SF Pro on Apple, Roboto on Android; Tile uses Inter as fallback. Load Inter for a consistent look). Weights 400/600 only (never 500).
+Typography: ship **Inter** bundled with the app (woff2, Latin + Latin-extended, precached by the service worker). Do not load it from Google Fonts as `tokens/fonts.css` does (offline use, GDPR). The screenshots were rendered in Ubuntu, so don't match their font metrics. Weights 400/600 only (never 500).
 - Large title 34/1.15, 600, −0.374px
 - Wizard B title 28/1.14, 600
 - Section heading 21/1.19, 600
@@ -47,9 +47,9 @@ Icons: **Lucide** at 1.5px stroke, `currentColor`: `sun, calendar, list-checks, 
 Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every button/FAB. Otherwise short fades only, no bounce.
 
 ## Shared components
-- **Task row**: 22px check circle (1.5px `#d2d2d7`; overdue 1.5px amber; completed = filled `#0066cc` with a white 1.8px check, title struck through, row text `#7a7a7a`) · title 17/400 · meta line 14px: the Event name in blue (tappable, opens Event detail), then " · " and the Offset ("7 days before") or date · optional trailing chevron `#d2d2d7` 16px.
+- **Task row**: 22px check circle (1.5px `#d2d2d7`; overdue 1.5px amber; completed = filled `#0066cc` with a white 1.8px check, title struck through, row text `#6e6e73`) · title 17/400 · meta line 14px: the Event name in blue (tappable, opens Event detail), then " · " and the Offset ("7 days before") or date · optional trailing chevron `#d2d2d7` 16px.
 - **Swipe actions** (swipe left on any Task row): actions revealed at 78px each, label 12px under an 18px icon. Shown: Reschedule (bg `#d2d2d7`, ink, `clock`) then Complete (bg `#0066cc`, white, `check`). Delete is still missing (see ALIGNMENT).
-- **Tab bar**: white, 1px top hairline, padding 8/8/30, equal columns. Each tab is a 22px icon over a 10px label; active `#0066cc`, inactive `#7a7a7a`. v1 tabs: Today `sun` · Calendar `calendar` · Projects `folder` (the drawn Plan tab `list-checks` returns with the Planning wizard after v1).
+- **Tab bar**: white, 1px top hairline, padding 8/8/30, equal columns. Each tab is a 22px icon over a 10px label; active `#0066cc`, inactive `#6e6e73`. v1 tabs: Today `sun` · Calendar `calendar` · Projects `folder` (the drawn Plan tab `list-checks` returns with the Planning wizard after v1).
 - **FAB (Quick add)**: 56px circle `#0066cc`, white `plus` 26px, right 20px, bottom = 16px above the tab bar. It never overlaps the tab bar. No shadow.
 - **Nav bar**: 44px tall, 17px blue text. Left: `chevron-left` 20px + parent name; right: text action ("Edit", "Done") or `ellipsis`.
 - **Bottom sheet**: white, top radius 18, padding 20/16/42, over a scrim; dimmed content behind at 50% opacity.
@@ -72,7 +72,7 @@ Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every b
 - 28px check circle + title 34/600, then "Due Thu Oct 16 · reminder 1 day before".
 - "Part of" card: 40px icon tile + Event name 17/600 + "Fri Oct 17 – Sun Oct 19 · on track · 3 of 4 tasks" + chevron. It opens the Event.
 - Subtasks: heading + count "3 of 7", a 4px progress bar, then a card of subtask rows with an "Add item" row (blue `plus`).
-- "Move to" quick chips: Tomorrow · Day after · Next week · Pick a date (with icon). Sticky full-width primary "Mark done" button.
+- "Move to" quick chips: Tomorrow · Day after · Next week · Pick a date (with icon). Sticky full-width primary "Complete" button.
 
 **4d Reschedule sheet** (opened from swipe → Reschedule): `4d-reschedule-sheet.png`
 - Header "Move" (14 gray) over the Task title 21/600 and context (14 gray).

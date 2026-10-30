@@ -1,8 +1,8 @@
 # Alignment: prototype ↔ repo concept
 
-Compared against `CONTEXT.md`, `docs/v1-scope.md`, `docs/Konzept.md` and ADRs 0001–0009 (updated 2026-10-16). Rule: **terminology and behaviour follow the repo; look and layout follow the prototype.** Where this file and the README disagree, this file wins.
+Compared against `CONTEXT.md`, `docs/v1-scope.md`, `docs/Konzept.md` and ADRs 0001–0009 (updated 2026-10-30). Every item below is decided; §4 and §5 list what is out of scope or still to build. Rule: **terminology and behaviour follow the repo; look and layout follow the prototype.** Where this file and the README disagree, this file wins.
 
-## 1. Decided (product owner, 2026-10-16)
+## 1. Decided: behaviour and layout (product owner, 2026-10-16)
 
 Navigation and home
 - **Tab bar: 3 tabs**, Today · Calendar · Projects. No Plan tab in v1; it returns with the Planning wizard.
@@ -28,8 +28,8 @@ Tasks
 - **Reschedule count** is stored from v1 on but not shown until Smart hints (after v1). The prototype's "snoozed 3×" / "Snoozed 1×" are not shown in v1.
 - **Delete** swipe action and buttons: ink `#1d1d1f` background, white text.
 
-## 2. Open: copy to fix (awaiting product owner)
-Prototype uses terms CONTEXT.md avoids.
+## 2. Decided: copy to fix (product owner, 2026-10-30)
+The prototype uses terms CONTEXT.md avoids. Use the right-hand wording in the EN/DE translation files.
 1. "Snooze", "Snooze all to today", "snoozed 3×", "Snoozed 1×" (4a, 4d) → **Reschedule** ("Reschedule all…"; the count is hidden in v1, see §1)
 2. Swipe "Done", button "Mark done" (4a, 4c) → **Complete**
 3. "Move" next to a Linked task (4b), "Move to" chips (4c), "Move" sheet header (4d) → **Reschedule**. *Move* is only for Events.
@@ -39,14 +39,14 @@ Prototype uses terms CONTEXT.md avoids.
 7. "On track" / "No deadline" (4c, 4i) are not glossary terms → treat as UI copy only, German "im Plan" / "ohne Termin"
 8. "items" in the wizard (4e, 4f) → "tasks" when the wizard is built (after v1)
 
-## 3. Open: visual and platform (awaiting product owner)
-1. **Amber text contrast**: `#c25e00` is 4.29:1 on white and 3.94:1 on parchment, so 14px 600 fails WCAG AA (it is not "large text"); the 11px "Gift · overdue" label fails worse. Proposal: `#b35600` for all amber text and fills (4.94 / 4.54); `#c25e00` only for dots and icons.
-2. **Grey meta text**: `#7a7a7a` is 4.29:1 on white and 3.94:1 on parchment, failing AA at 14px (section counts, 10px tab labels). Proposal: darken the token to `#6e6e73` (5.07 / 4.66).
-3. **Inter from Google Fonts** (`tokens/fonts.css`): breaks offline use and sends visitor IPs to Google (ruled unlawful by a German court in 2022). Proposal: bundle Inter as woff2 (Latin + Latin-extended for umlauts), precache it in the service worker. The screenshots were rendered in Ubuntu, so don't match their font metrics pixel for pixel.
-4. **Android back gesture vs swipe rows**: a swipe left from the right edge can trigger system back, and swipes aren't reachable without touch. Proposal: ignore swipes that start in the edge zone; offer the same actions via long-press and in Task detail.
-5. **German text length**: 34px titles already wrap in English (4c). Proposal: `lang="de"` with `hyphens: auto`; check chips and rows at 360px width ("Nächste 3 Tage", "überfällig", "verschieben").
-6. **Dark mode**: not designed, though Tile has dark tokens. Proposal: light only in v1, colours as tokens so dark mode can follow.
-7. **Demo data contradicts itself** ("Buy gift" 7 days before Oct 12 can't be overdue on Oct 4; "Pick up cake" in 4j is missing from 4b; Leo's game on Oct 10 vs Oct 17; ring "4 of 9"). Proposal: don't use it as test fixtures; build fixtures from the domain rules.
+## 3. Decided: visual and platform (product owner, 2026-10-30)
+1. **Amber text contrast**: `#c25e00` is 4.29:1 on white and 3.94:1 on parchment, so 14px 600 fails WCAG AA (it is not "large text"); the 11px "Gift · overdue" label fails worse. Use `#b35600` for all amber text and fills (4.94 / 4.54); `#c25e00` only for dots and icons.
+2. **Grey meta text**: `#7a7a7a` is 4.29:1 on white and 3.94:1 on parchment, failing AA at 14px (section counts, 10px tab labels). Darken the token to `#6e6e73` (5.07 / 4.66).
+3. **Inter from Google Fonts** (`tokens/fonts.css`): breaks offline use and sends visitor IPs to Google (ruled unlawful by a German court in 2022). Bundle Inter as woff2 (Latin + Latin-extended for umlauts), precache it in the service worker. The screenshots were rendered in Ubuntu, so don't match their font metrics pixel for pixel.
+4. **Android back gesture vs swipe rows**: a swipe left from the right edge can trigger system back, and swipes aren't reachable without touch. Ignore swipes that start in the edge zone; offer the same actions via long-press and in Task detail.
+5. **German text length**: 34px titles already wrap in English (4c). Set `lang="de"` with `hyphens: auto`; check chips and rows at 360px width ("Nächste 3 Tage", "überfällig", "verschieben").
+6. **Dark mode**: not designed, though Tile has dark tokens. Light only in v1, colours as tokens so dark mode can follow.
+7. **Demo data contradicts itself** ("Buy gift" 7 days before Oct 12 can't be overdue on Oct 4; "Pick up cake" in 4j is missing from 4b; Leo's game on Oct 10 vs Oct 17; ring "4 of 9"). Don't use it as test fixtures; build fixtures from the domain rules.
 8. **Platform** (unchanged): drawn in an iPhone frame, v1 is an Android/Chrome PWA (ADR-0001). Keep the layout, use safe-area insets; the text back button ("‹ Calendar") stays as an in-app control alongside Android system back.
 
 ## 4. After-v1 features drawn in the prototype
