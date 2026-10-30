@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:

@@ -1,0 +1,13 @@
+{
+  "app.title": "Grilled Heads-Up",
+  "language.label": "Language",
+  "language.en": "English",
+  "language.de": "Deutsch",
+  "tasks.heading": "Tasks",
+  "tasks.empty": "No Tasks yet. Add your first one above.",
+  "task.newTitle.label": "New Task",
+  "task.newTitle.placeholder": "What needs doing?",
+  "task.add": "Add",
+  "task.completeNamed": "Complete {title}",
+  "task.completed": "Completed"
+}

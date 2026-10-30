@@ -1,0 +1,10 @@
+{
+  "$schema": "../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.config.ts" },
+  "mutate": ["src/tasks/taskStore.ts", "src/i18n/i18n.ts"],
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "thresholds": { "high": 90, "low": 80, "break": 80 },
+  "tempDirName": ".stryker-tmp"
+}
