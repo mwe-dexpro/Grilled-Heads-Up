@@ -319,6 +319,79 @@ a.task-title {
   color: var(--ink);
 }
 
+/* Account (in the footer until Settings exist) */
+
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 12px;
+}
+
+.account .button-text {
+  margin-right: 0;
+  padding: 6px 0;
+  font-size: 15px;
+}
+
+.account-message {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-meta);
+}
+
+/* Sign-in (ADR-0006). Not designed yet: built from the detail screens' parts. */
+
+.auth-screen {
+  padding-top: calc(env(safe-area-inset-top) + 32px);
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.auth-text {
+  margin: 0 0 8px;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--ink-80);
+}
+
+.auth-recovery {
+  margin-top: 40px;
+}
+
+.auth-recovery .section-title {
+  margin: 0 0 8px;
+}
+
+.recovery-input {
+  width: 100%;
+  border: none;
+  background: none;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+}
+
+.recovery-input:focus {
+  outline: none;
+}
+
+.recovery-code {
+  margin: 0 0 16px;
+  padding: 20px 16px;
+  font: 600 21px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-align: center;
+  word-break: break-word;
+  user-select: all;
+}
+
+@media print {
+  .no-print {
+    display: none;
+  }
+}
+
 /* Quick add */
 
 .fab {

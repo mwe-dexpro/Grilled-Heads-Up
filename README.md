@@ -42,10 +42,17 @@ npm start       # http://localhost:3000, SQLite file in ./data/
 **While developing the UI:**
 
 ```sh
-npm run dev     # Vite dev server with hot reload, http://localhost:5173
+npm run build && npm start   # once, in a second terminal: the API, incl. sign-in
+npm run dev                  # Vite dev server with hot reload, http://localhost:5173
 ```
 
-The service worker only runs in the built app, so check offline behaviour with `npm run build && npm start`.
+The dev server passes `/api` on to the server at port 3000. The service worker only runs in the built app, so check offline behaviour with `npm run build && npm start`.
+
+### Sign in
+
+The app opens with a sign-in screen (ADR-0006). On first launch, *Create passkey* registers a passkey and makes you the **Owner**; the app then shows a **Recovery code** once, to print or store. After that, nobody else can register: more passkeys (e.g. for a laptop that doesn't share Google Password Manager) are added with *Add a passkey* at the bottom of the home screen, while signed in. If no passkey is at hand, the recovery code signs you in and offers to create one; each use replaces the code with a new one, shown once.
+
+A device that was signed in keeps working offline (its data is on the device); the server checks the session again when it can be reached. Passkeys only work on `localhost` or HTTPS, and are bound to the address the app is opened at (see `ORIGIN` below).
 
 ### Install on an Android phone
 
@@ -55,8 +62,8 @@ The PWA needs HTTPS (or `localhost`) to be installable. To try it on a phone dur
 
 ```sh
 npm test               # unit tests, then end-to-end tests
-npm run test:unit      # Vitest: domain rules, stores, routes, formats, translations
-npm run test:e2e       # builds, starts the server, runs Playwright on an emulated Pixel 7
+npm run test:unit      # Vitest: domain rules, stores, routes, formats, translations; server sign-in
+npm run test:e2e       # builds, starts the servers, runs Playwright on an emulated Pixel 7
 npm run test:mutation  # Stryker mutation tests on the client domain modules
 npm run typecheck
 ```
@@ -72,7 +79,12 @@ What is tested where:
 | Stores (`client/src/tasks/taskStore.ts`, `client/src/events/eventStore.ts`) | Vitest + fake-indexeddb | add, Complete, link and unlink, persistence across reopen (reload), upgrade from older data |
 | Routes and formats (`client/src/app/routes.ts`, `*/format*.ts`) | Vitest | screen addresses, dates, times and Offsets in English and German |
 | Translations (`client/src/i18n/i18n.ts`) | Vitest | English and German have the same texts, English default, choice remembered |
+| Start screen (`client/src/auth/session.ts`) | Vitest | setup, sign-in or the app, from the server's answer or, offline, from what the device remembers |
+| Server sign-in (`server/src/auth.ts`) | Vitest + a software passkey (`server/src/testing/`) over HTTP | registration, the owner rule, sign-in, replayed and foreign-site answers, recovery, sign-out, data routes rejecting requests that aren't signed in |
 | The whole app | Playwright | Tasks survive reload and work offline, Buckets, Events with Linked tasks (Offsets, moving, unlinking), tabs, language switch, installable manifest |
+| Sign-in in the browser (`e2e/sign-in.spec.ts`) | Playwright + Chrome's virtual authenticator | first launch with a recovery code, the owner rule, passkey sign-in on Android and (synced) on desktop, recovery on a new phone, data routes |
+
+The end-to-end tests run two servers, each with an in-memory database: the sign-in tests start from a first launch on their own server; on the other, `e2e/owner.setup.ts` registers the owner once and the app's tests start signed in.
 
 Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `client/vitest.config.ts`), so day and time-zone tests mean the same on every machine, including daylight-saving changes.
 
@@ -102,6 +114,7 @@ Server configuration (environment variables):
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP port |
 | `CLIENT_DIR` | `client/dist` | built PWA to serve |
-| `DATABASE_FILE` | `data/grilled-heads-up.sqlite` | SQLite file, created if missing |
+| `DATABASE_FILE` | `data/grilled-heads-up.sqlite` | SQLite file, created if missing; `:memory:` for a throwaway database (tests) |
+| `ORIGIN` | `http://localhost:$PORT` (plus `http://localhost:5173` unless `NODE_ENV=production`) | the address(es) the app is opened at, comma-separated, e.g. `https://heads-up.example.com`. Passkeys are bound to the first one's host name; with `https:` the session cookie is `Secure` |
 
-`GET /api/health` answers `{"status":"ok","database":"ready"}`.
+`GET /api/health` answers `{"status":"ok","database":"ready"}`. Sign-in lives under `/api/auth/`; every other `/api/` route answers 401 without a signed-in session.
