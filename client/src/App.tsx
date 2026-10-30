@@ -1,80 +1,40 @@
-import { useState, type FormEvent } from "react";
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { HomeScreen } from "./home/HomeScreen";
+import { useNow } from "./home/useNow";
 import { useI18n } from "./i18n/I18nProvider";
-import { languages, type Language } from "./i18n/i18n";
 import { useTasks } from "./tasks/useTasks";
+import { NewTaskSheet } from "./ui/NewTaskSheet";
+import { TabBar, type Tab } from "./ui/TabBar";
 
 export function App() {
-  const { language, setLanguage, t } = useI18n();
+  const { t } = useI18n();
   const { ready, tasks, addTask, completeTask } = useTasks();
-  const [title, setTitle] = useState("");
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (title.trim() === "") return;
-    // Clear first so typing the next Task while this one is saved is not wiped out.
-    setTitle("");
-    await addTask(title);
-  }
+  const now = useNow();
+  const [tab, setTab] = useState<Tab>("today");
+  const [adding, setAdding] = useState(false);
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>{t("app.title")}</h1>
-        <label className="language">
-          <span className="visually-hidden">{t("language.label")}</span>
-          <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-            {languages.map((l) => (
-              <option key={l} value={l}>
-                {t(`language.${l}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </header>
-
       <main>
-        <form className="new-task" onSubmit={handleSubmit}>
-          <label htmlFor="new-task-title" className="visually-hidden">
-            {t("task.newTitle.label")}
-          </label>
-          <input
-            id="new-task-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t("task.newTitle.placeholder")}
-            autoComplete="off"
-            enterKeyHint="done"
-          />
-          <button type="submit" disabled={!ready || title.trim() === ""}>
-            {t("task.add")}
-          </button>
-        </form>
-
-        <section aria-labelledby="tasks-heading">
-          <h2 id="tasks-heading">{t("tasks.heading")}</h2>
-          {ready && tasks.length === 0 && <p className="empty">{t("tasks.empty")}</p>}
-          <ul className="tasks">
-            {tasks.map((task) => {
-              const completed = task.completedAt !== null;
-              return (
-                <li key={task.id} className={completed ? "task completed" : "task"}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={completed}
-                      disabled={completed}
-                      onChange={() => completeTask(task.id)}
-                      aria-label={t("task.completeNamed", { title: task.title })}
-                    />
-                    <span className="task-title">{task.title}</span>
-                  </label>
-                  {completed && <span className="visually-hidden">{t("task.completed")}</span>}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        {tab === "today" ? (
+          <HomeScreen ready={ready} tasks={tasks} now={now} onComplete={completeTask} />
+        ) : (
+          <div className="screen">
+            <header className="screen-header">
+              <h1 className="large-title">{t(`tabs.${tab}`)}</h1>
+            </header>
+            <p className="calm">{t("screen.notBuilt")}</p>
+          </div>
+        )}
       </main>
+
+      {/* Quick add sits on every screen. */}
+      <button type="button" className="fab" aria-label={t("newTask.open")} disabled={!ready} onClick={() => setAdding(true)}>
+        <Plus size={26} strokeWidth={1.5} aria-hidden="true" />
+      </button>
+      <NewTaskSheet open={adding} onAdd={addTask} onClose={() => setAdding(false)} />
+      <TabBar current={tab} onSelect={setTab} />
     </div>
   );
 }

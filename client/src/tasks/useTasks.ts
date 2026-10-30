@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { openTaskStore, type Task, type TaskStore } from "./taskStore";
+import { openTaskStore, type Task, type TaskStore, type TaskWhen } from "./taskStore";
 
 export function useTasks() {
   const [store, setStore] = useState<TaskStore | null>(null);
@@ -21,9 +21,9 @@ export function useTasks() {
   }, []);
 
   const addTask = useCallback(
-    async (title: string) => {
+    async (title: string, when?: TaskWhen) => {
       if (!store) return;
-      await store.addTask(title);
+      await store.addTask(title, when);
       setTasks(await store.listTasks());
     },
     [store],

@@ -22,8 +22,8 @@ describe("Translations", () => {
   });
 
   it("translates a text into the chosen language", () => {
-    expect(translate("en", "task.add")).toBe("Add");
-    expect(translate("de", "task.add")).toBe("Hinzufügen");
+    expect(translate("en", "newTask.add")).toBe("Add");
+    expect(translate("de", "newTask.add")).toBe("Hinzufügen");
   });
 
   it("fills placeholders in a text", () => {

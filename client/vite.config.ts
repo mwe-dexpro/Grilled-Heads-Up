@@ -17,8 +17,8 @@ export default defineConfig({
         scope: "/",
         display: "standalone",
         orientation: "portrait",
-        background_color: "#fff7ed",
-        theme_color: "#c2410c",
+        background_color: "#f5f5f7",
+        theme_color: "#f5f5f7",
         icons: [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
@@ -26,6 +26,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Fonts are precached so the app looks the same offline.
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
       },
