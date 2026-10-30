@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Event } from "../events/event";
 import type { Task } from "../tasks/taskStore";
 import { arrangeHome, bucketOf, isLate, isOverdueEmphasised, taskMeta, type BucketKind } from "./buckets";
 import { addDays, daysBetween, dayOf } from "./days";
@@ -15,6 +16,8 @@ function task(fields: Partial<Task> = {}): Task {
     title: `Task ${counter}`,
     date: null,
     time: null,
+    eventId: null,
+    offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
     ...fields,
@@ -216,5 +219,90 @@ describe("taskMeta: the second line of a Task row", () => {
     expect(taskMeta(task({ date: "2026-10-07" }), "nextDays", now)).toEqual({ kind: "date", date: "2026-10-07", time: null });
     expect(taskMeta(task({ date: "2026-11-20", time: "10:30" }), "later", now)).toEqual({ kind: "date", date: "2026-11-20", time: "10:30" });
     expect(taskMeta(task(), "inbox", now)).toBeNull();
+  });
+});
+
+function event(fields: Partial<Event> = {}): Event {
+  counter++;
+  return {
+    id: `e${counter}`,
+    title: `Event ${counter}`,
+    allDay: true,
+    startDate: today,
+    startTime: null,
+    endDate: today,
+    endTime: null,
+    timeZone: null,
+    location: "",
+    notes: "",
+    externalSource: null,
+    externalId: null,
+    createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
+    ...fields,
+  };
+}
+
+describe("Events on the home screen", () => {
+  const eventsIn = (kind: BucketKind, events: Event[]) =>
+    arrangeHome([], now, events).find((b) => b.kind === kind)!.events.map((e) => e.title);
+
+  it("puts an Event into the Bucket of the day it starts", () => {
+    const events = [
+      event({ title: "Today", startDate: today, endDate: today }),
+      event({ title: "Tomorrow", startDate: "2026-10-05", endDate: "2026-10-05" }),
+      event({ title: "In 3 days", startDate: "2026-10-07", endDate: "2026-10-07" }),
+      event({ title: "Later", startDate: "2026-10-12", endDate: "2026-10-12" }),
+    ];
+
+    expect(eventsIn("today", events)).toEqual(["Today"]);
+    expect(eventsIn("tomorrow", events)).toEqual(["Tomorrow"]);
+    expect(eventsIn("nextDays", events)).toEqual(["In 3 days"]);
+    expect(eventsIn("later", events)).toEqual(["Later"]);
+  });
+
+  it("shows an Event that is still going on in Today, and none that has passed", () => {
+    const events = [
+      event({ title: "Ongoing", startDate: "2026-10-02", endDate: "2026-10-05" }),
+      event({ title: "Ends today", startDate: "2026-10-03", endDate: today }),
+      event({ title: "Passed", startDate: "2026-10-01", endDate: "2026-10-03" }),
+    ];
+
+    expect(eventsIn("today", events)).toEqual(["Ongoing", "Ends today"]);
+    expect(arrangeHome([], now, events).flatMap((b) => b.events).map((e) => e.title)).not.toContain("Passed");
+  });
+
+  it("orders a Bucket's Events by when they start", () => {
+    const events = [
+      event({ title: "Evening", allDay: false, startTime: "19:00", endTime: "20:00", timeZone: "Europe/Berlin" }),
+      event({ title: "All day" }),
+      event({ title: "Morning", allDay: false, startTime: "08:00", endTime: "09:00", timeZone: "Europe/Berlin" }),
+    ];
+
+    expect(eventsIn("today", events)).toEqual(["All day", "Morning", "Evening"]);
+  });
+
+  it("dates Linked tasks from their Event before sorting them into Buckets", () => {
+    const birthday = event({ startDate: "2026-10-12", endDate: "2026-10-12" });
+    const gift = task({ eventId: birthday.id, offsetDays: -7 });
+    const cake = task({ eventId: birthday.id, offsetDays: -8 });
+
+    const home = arrangeHome([gift, cake], now, [birthday]);
+
+    expect(home.find((b) => b.kind === "today")!.tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
+    expect(home.find((b) => b.kind === "tomorrow")!.tasks.map((t) => t.id)).toEqual([gift.id]);
+  });
+});
+
+describe("taskMeta for Linked tasks", () => {
+  it("shows the Offset instead of the date", () => {
+    const linked = task({ date: "2026-10-07", eventId: "e", offsetDays: -5 });
+    expect(taskMeta(linked, "nextDays", now)).toEqual({ kind: "offset", offsetDays: -5 });
+    expect(taskMeta({ ...linked, date: today }, "today", now)).toEqual({ kind: "offset", offsetDays: -5 });
+  });
+
+  it("still shows how long it is overdue, and its time and Late in Today", () => {
+    const linked = { eventId: "e", offsetDays: -5 };
+    expect(taskMeta(task({ ...linked, date: "2026-10-02" }), "overdue", now)).toEqual({ kind: "overdue", days: 2 });
+    expect(taskMeta(task({ ...linked, date: today, time: "09:00" }), "today", now)).toEqual({ kind: "time", time: "09:00", late: true });
   });
 });

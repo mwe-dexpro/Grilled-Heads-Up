@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { Event } from "../events/event";
+import { EventRow } from "../events/EventRow";
 import { useI18n } from "../i18n/I18nProvider";
 import { languages, type Language } from "../i18n/i18n";
 import type { Task } from "../tasks/taskStore";
@@ -11,27 +13,45 @@ import { TaskRow } from "./TaskRow";
 interface HomeScreenProps {
   ready: boolean;
   tasks: Task[];
+  events: Event[];
   now: Date;
   onComplete(id: string): void;
 }
 
-export function HomeScreen({ ready, tasks, now, onComplete }: HomeScreenProps) {
+export function HomeScreen({ ready, tasks, events, now, onComplete }: HomeScreenProps) {
   const { language, setLanguage, t } = useI18n();
-  const buckets = arrangeHome(tasks, now);
+  const buckets = arrangeHome(tasks, now, events);
   const [overdue, today, ...rest] = buckets;
+  const eventsById = new Map(events.map((event) => [event.id, event]));
+  const isEmpty = (bucket: Bucket) => bucket.tasks.length === 0 && bucket.events.length === 0;
 
+  const taskRows = (bucket: Bucket) =>
+    bucket.tasks.map((task) => (
+      <TaskRow
+        key={task.id}
+        task={task}
+        bucket={bucket.kind}
+        now={now}
+        event={task.eventId === null ? undefined : eventsById.get(task.eventId)}
+        onComplete={onComplete}
+      />
+    ));
+
+  // Events first: they are what the day's Tasks prepare for.
   const taskList = (bucket: Bucket) => (
     <ul className="card task-list">
-      {bucket.tasks.map((task) => (
-        <TaskRow key={task.id} task={task} bucket={bucket.kind} now={now} onComplete={onComplete} />
+      {bucket.events.map((event) => (
+        <EventRow key={event.id} event={event} tasks={tasks} />
       ))}
+      {taskRows(bucket)}
     </ul>
   );
 
   const restMeta = (bucket: Bucket): string => {
     // Progress once something is Completed, otherwise just how many Tasks the Bucket holds.
     const { done, total } = bucket.progress;
-    const count = done > 0 ? t("home.progress", { done: String(done), total: String(total) }) : String(total);
+    const count =
+      done > 0 ? t("home.progress", { done: String(done), total: String(total) }) : String(total + bucket.events.length);
     if (bucket.kind === "tomorrow") return `${formatShortDay(bucket.firstDay!, language)} · ${count}`;
     if (bucket.kind === "nextDays")
       return `${formatWeekday(bucket.firstDay!, language)} – ${formatWeekday(bucket.lastDay!, language)} · ${count}`;
@@ -73,20 +93,16 @@ export function HomeScreen({ ready, tasks, now, onComplete }: HomeScreenProps) {
                   </span>
                 )}
               </div>
-              <ul className="task-list">
-                {overdue.tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} bucket="overdue" now={now} onComplete={onComplete} />
-                ))}
-              </ul>
+              <ul className="task-list">{taskRows(overdue)}</ul>
             </section>
           )}
 
           <BucketSection id="bucket-today" title={t("bucket.today")} meta={t("bucket.left", { count: String(today.open) })}>
-            {today.tasks.length === 0 ? <p className="card empty">{t("bucket.todayEmpty")}</p> : taskList(today)}
+            {isEmpty(today) ? <p className="card empty">{t("bucket.todayEmpty")}</p> : taskList(today)}
           </BucketSection>
 
           {rest
-            .filter((bucket) => bucket.tasks.length > 0)
+            .filter((bucket) => !isEmpty(bucket))
             .map((bucket) => (
               <BucketSection key={bucket.kind} id={`bucket-${bucket.kind}`} title={t(`bucket.${bucket.kind}`)} meta={restMeta(bucket)}>
                 {taskList(bucket)}

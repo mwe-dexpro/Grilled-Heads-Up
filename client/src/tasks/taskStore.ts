@@ -1,4 +1,4 @@
-import { openDB, type DBSchema } from "idb";
+import { defaultDatabaseName, openAppDb } from "../data/database";
 import type { Day, TimeOfDay } from "../home/days";
 
 export interface Task {
@@ -8,6 +8,10 @@ export interface Task {
   date: Day | null;
   /** Floating time of day; only a dated Task can have one. */
   time: TimeOfDay | null;
+  /** The Event a Linked task belongs to. Its date then comes from the Event and the Offset, not from `date`. */
+  eventId: string | null;
+  /** Days from the Event's start day (negative = before); set exactly when `eventId` is. */
+  offsetDays: number | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -15,11 +19,18 @@ export interface Task {
 export interface TaskWhen {
   date?: Day | null;
   time?: TimeOfDay | null;
+  /** For a Linked task: its Event and the Offset from the Event's start day, instead of a date. */
+  eventId?: string | null;
+  offsetDays?: number | null;
 }
 
 export interface TaskStore {
   addTask(title: string, when?: TaskWhen): Promise<Task>;
   completeTask(id: string): Promise<void>;
+  /** Attaches a Task to an Event at an Offset; from then on its date comes from the Event. */
+  linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
+  /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
+  unlinkTask(id: string, date: Day | null): Promise<void>;
   /** Tasks in the order they were added. */
   listTasks(): Promise<Task[]>;
   close(): void;
@@ -29,35 +40,43 @@ export interface TaskStoreOptions {
   now?: () => Date;
 }
 
-interface TaskDb extends DBSchema {
-  tasks: { key: string; value: Task };
-}
-
-/** Tasks saved before dates existed have no date or time fields. */
+/** Tasks saved by earlier versions lack the fields added since. */
 function withDefaults(task: Task): Task {
-  return { ...task, date: task.date ?? null, time: task.time ?? null };
+  return {
+    ...task,
+    date: task.date ?? null,
+    time: task.time ?? null,
+    eventId: task.eventId ?? null,
+    offsetDays: task.offsetDays ?? null,
+  };
 }
 
 export async function openTaskStore(
-  dbName = "grilled-heads-up",
+  dbName = defaultDatabaseName,
   { now = () => new Date() }: TaskStoreOptions = {},
 ): Promise<TaskStore> {
-  const db = await openDB<TaskDb>(dbName, 1, {
-    upgrade(db) {
-      db.createObjectStore("tasks", { keyPath: "id" });
-    },
-  });
+  const db = await openAppDb(dbName);
+
+  async function existing(id: string): Promise<Task> {
+    const task = await db.get("tasks", id);
+    if (!task) throw new Error(`No Task with id ${id}`);
+    return withDefaults(task);
+  }
 
   return {
-    async addTask(rawTitle, { date = null, time = null } = {}) {
+    async addTask(rawTitle, { date = null, time = null, eventId = null, offsetDays = null } = {}) {
       const title = rawTitle.trim();
       if (title === "") throw new Error("A Task needs a title");
-      if (time !== null && date === null) throw new Error("Only a dated Task can have a time");
+      if ((eventId === null) !== (offsetDays === null)) throw new Error("A Linked task needs both an Event and an Offset");
+      if (eventId !== null && date !== null) throw new Error("A Linked task gets its date from its Event");
+      if (time !== null && date === null && eventId === null) throw new Error("Only a dated Task can have a time");
       const task: Task = {
         id: crypto.randomUUID(),
         title,
         date,
         time,
+        eventId,
+        offsetDays,
         createdAt: now().toISOString(),
         completedAt: null,
       };
@@ -66,9 +85,15 @@ export async function openTaskStore(
     },
 
     async completeTask(id) {
-      const task = await db.get("tasks", id);
-      if (!task) throw new Error(`No Task with id ${id}`);
-      await db.put("tasks", { ...task, completedAt: now().toISOString() });
+      await db.put("tasks", { ...(await existing(id)), completedAt: now().toISOString() });
+    },
+
+    async linkTask(id, eventId, offsetDays) {
+      await db.put("tasks", { ...(await existing(id)), eventId, offsetDays, date: null });
+    },
+
+    async unlinkTask(id, date) {
+      await db.put("tasks", { ...(await existing(id)), eventId: null, offsetDays: null, date });
     },
 
     async listTasks() {

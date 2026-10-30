@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
   "vitest": { "configFile": "vitest.config.ts" },
-  "mutate": ["src/tasks/taskStore.ts", "src/i18n/i18n.ts", "src/home/buckets.ts", "src/home/days.ts", "src/home/format.ts"],
+  "mutate": ["src/tasks/taskStore.ts", "src/i18n/i18n.ts", "src/home/buckets.ts", "src/home/days.ts", "src/home/format.ts", "src/events/event.ts", "src/events/eventStore.ts", "src/events/formatEvent.ts", "src/app/routes.ts"],
   "reporters": ["clear-text", "progress", "html"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
   "thresholds": { "high": 90, "low": 80, "break": 80 },

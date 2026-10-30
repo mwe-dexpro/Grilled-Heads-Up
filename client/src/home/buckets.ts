@@ -1,3 +1,4 @@
+import { eventDays, eventStart, withEventDates, type Event } from "../events/event";
 import type { Task } from "../tasks/taskStore";
 import { addDays, daysBetween, dayOf, timeOf, type Day, type TimeOfDay } from "./days";
 
@@ -15,6 +16,8 @@ export interface Bucket {
   lastDay: Day | null;
   /** Open Tasks plus those Completed today, which stay in place until the end of the day. */
   tasks: Task[];
+  /** Events starting in the Bucket's days; Today also holds Events still going on. Never in Overdue or Inbox. */
+  events: Event[];
   progress: Progress;
   /** Tasks still to do; the Overdue badge and "N left" show this. */
   open: number;
@@ -34,20 +37,23 @@ export type TaskMeta =
   | { kind: "overdue"; days: number }
   | { kind: "time"; time: TimeOfDay; late: boolean }
   | { kind: "date"; date: Day; time: TimeOfDay | null }
+  | { kind: "offset"; offsetDays: number }
   | null;
 
 /**
  * Open Overdue Tasks show how long they are overdue; Today and Tomorrow show the time (if any) and Late;
- * the later Buckets show the date. Inbox Tasks have no date to show.
+ * otherwise a Linked task shows its Offset and other Tasks their date. Inbox Tasks have no date to show.
  */
 export function taskMeta(task: Task, bucket: BucketKind, now: Date): TaskMeta {
   if (task.date === null) return null;
   if (bucket === "overdue" && task.completedAt === null) {
     return { kind: "overdue", days: daysBetween(task.date, dayOf(now)) };
   }
-  if (bucket === "today" || bucket === "tomorrow") {
-    return task.time === null ? null : { kind: "time", time: task.time, late: isLate(task, now) };
+  if ((bucket === "today" || bucket === "tomorrow") && task.time !== null) {
+    return { kind: "time", time: task.time, late: isLate(task, now) };
   }
+  if (task.offsetDays !== null) return { kind: "offset", offsetDays: task.offsetDays };
+  if (bucket === "today" || bucket === "tomorrow") return null;
   return { kind: "date", date: task.date, time: task.time };
 }
 
@@ -80,8 +86,19 @@ function compareTasks(a: Task, b: Task): number {
   );
 }
 
-/** Groups Tasks into the home screen's Buckets, in display order, as seen at `now`. */
-export function arrangeHome(tasks: Task[], now: Date): Bucket[] {
+/** The Bucket an Event shows in: the day it starts, or Today while it is going on; null once it has passed. */
+export function bucketOfEvent(event: Event, today: Day): BucketKind | null {
+  const { first, last } = eventDays(event);
+  if (last < today) return null;
+  return first <= today ? "today" : bucketOf({ date: first }, today);
+}
+
+/**
+ * Groups Tasks and Events into the home screen's Buckets, in display order, as seen at `now`.
+ * Linked tasks get their dates from their Events first.
+ */
+export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): Bucket[] {
+  const tasks = withEventDates(rawTasks, events);
   const today = dayOf(now);
   const tomorrow = addDays(today, 1);
   const ranges: Record<BucketKind, [Day | null, Day | null]> = {
@@ -98,11 +115,15 @@ export function arrangeHome(tasks: Task[], now: Date): Bucket[] {
   return (Object.keys(ranges) as BucketKind[]).map((kind) => {
     const inBucket = shown.filter((task) => bucketOf(task, today) === kind);
     const done = inBucket.filter((task) => task.completedAt !== null).length;
+    const bucketEvents = events
+      .filter((event) => bucketOfEvent(event, today) === kind)
+      .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
     return {
       kind,
       firstDay: ranges[kind][0],
       lastDay: ranges[kind][1],
       tasks: inBucket,
+      events: bucketEvents,
       progress: { done, total: inBucket.length },
       open: inBucket.length - done,
     };
