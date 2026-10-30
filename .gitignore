@@ -1,6 +1,7 @@
 node_modules/
 dist/
-data/
+# The server's SQLite folder at the repo root (not client/src/data, which is code).
+/data/
 test-results/
 playwright-report/
 reports/

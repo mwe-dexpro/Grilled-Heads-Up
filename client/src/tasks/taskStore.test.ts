@@ -111,7 +111,57 @@ describe("Task dates", () => {
     const store = await openTaskStore(dbName);
 
     expect(await store.listTasks()).toEqual([
-      { id: "old", title: "Saved by the skeleton", date: null, time: null, createdAt: "2026-09-28T09:00:00.000Z", completedAt: null },
+      {
+        id: "old",
+        title: "Saved by the skeleton",
+        date: null,
+        time: null,
+        eventId: null,
+        offsetDays: null,
+        createdAt: "2026-09-28T09:00:00.000Z",
+        completedAt: null,
+      },
     ]);
+  });
+});
+
+describe("Linked tasks", () => {
+  it("adds a Task to an Event at an Offset; its own date stays empty because the Event gives it one", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    const task = await store.addTask("Buy gift", { eventId: "e1", offsetDays: -7 });
+
+    expect(task).toMatchObject({ eventId: "e1", offsetDays: -7, date: null, time: null });
+  });
+
+  it("refuses an Offset without an Event, an Event without an Offset, and a fixed date on a Linked task", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await expect(store.addTask("A", { offsetDays: -1 })).rejects.toThrow("A Linked task needs both an Event and an Offset");
+    await expect(store.addTask("B", { eventId: "e1" })).rejects.toThrow("A Linked task needs both an Event and an Offset");
+    await expect(store.addTask("C", { eventId: "e1", offsetDays: 0, date: "2026-10-12" })).rejects.toThrow(
+      "A Linked task gets its date from its Event",
+    );
+    expect(await store.listTasks()).toHaveLength(0);
+  });
+
+  it("links an existing Task to an Event, and unlinks it keeping the date it had", async () => {
+    const store = await openTaskStore(freshDbName());
+    const task = await store.addTask("Wrap gift", { date: "2026-10-11", time: "18:00" });
+
+    await store.linkTask(task.id, "e1", -1);
+    const [linked] = await store.listTasks();
+    await store.unlinkTask(task.id, "2026-10-11");
+    const [unlinked] = await store.listTasks();
+
+    expect(linked).toMatchObject({ eventId: "e1", offsetDays: -1, date: null, time: "18:00" });
+    expect(unlinked).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11", time: "18:00" });
+  });
+
+  it("refuses to link or unlink a Task that does not exist", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await expect(store.linkTask("missing", "e1", 0)).rejects.toThrow("No Task with id missing");
+    await expect(store.unlinkTask("missing", null)).rejects.toThrow("No Task with id missing");
   });
 });

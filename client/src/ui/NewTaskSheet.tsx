@@ -5,11 +5,12 @@ import type { TaskWhen } from "../tasks/taskStore";
 interface NewTaskSheetProps {
   open: boolean;
   onAdd(title: string, when: TaskWhen): void;
+  onNewEvent(): void;
   onClose(): void;
 }
 
 /** Quick add: a title, and optionally a date and time. Without a date the Task goes to the Inbox. */
-export function NewTaskSheet({ open, onAdd, onClose }: NewTaskSheetProps) {
+export function NewTaskSheet({ open, onAdd, onNewEvent, onClose }: NewTaskSheetProps) {
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
   const [title, setTitle] = useState("");
@@ -63,6 +64,16 @@ export function NewTaskSheet({ open, onAdd, onClose }: NewTaskSheetProps) {
         </div>
         <p className="hint">{t("newTask.hint")}</p>
         <div className="sheet-actions">
+          <button
+            type="button"
+            className="button-text"
+            onClick={() => {
+              onClose();
+              onNewEvent();
+            }}
+          >
+            {t("newTask.newEvent")}
+          </button>
           <button type="button" className="button-ghost" onClick={onClose}>
             {t("newTask.cancel")}
           </button>

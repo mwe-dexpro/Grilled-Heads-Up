@@ -9,7 +9,7 @@ A personal calendar and to-do app that links Tasks to the Events they prepare fo
 ## Layout
 
 ```
-client/   React + Vite PWA (TypeScript). Tasks live in the browser's IndexedDB.
+client/   React + Vite PWA (TypeScript). Tasks and Events live in the browser's IndexedDB.
 server/   Node + Express server: serves the built PWA, owns the SQLite file.
 e2e/      Playwright end-to-end tests, run against the built app served by the server.
 ```
@@ -55,7 +55,7 @@ The PWA needs HTTPS (or `localhost`) to be installable. To try it on a phone dur
 
 ```sh
 npm test               # unit tests, then end-to-end tests
-npm run test:unit      # Vitest: Task store and translations
+npm run test:unit      # Vitest: domain rules, stores, routes, formats, translations
 npm run test:e2e       # builds, starts the server, runs Playwright on an emulated Pixel 7
 npm run test:mutation  # Stryker mutation tests on the client domain modules
 npm run typecheck
@@ -67,13 +67,23 @@ What is tested where:
 
 | Seam | Tool | Covers |
 | --- | --- | --- |
-| Task store (`client/src/tasks/taskStore.ts`) | Vitest + fake-indexeddb | add, Complete, order, persistence across reopen (reload) |
+| Bucket rules (`client/src/home/buckets.ts`, `days.ts`) | Vitest | which Bucket a Task or Event goes in, midnight, Late, Progress, Overdue emphasis, a Task row's second line |
+| Event rules (`client/src/events/event.ts`) | Vitest | time zones incl. clock changes, days an Event covers, validation, Linked task dates from Offsets, Event Progress |
+| Stores (`client/src/tasks/taskStore.ts`, `client/src/events/eventStore.ts`) | Vitest + fake-indexeddb | add, Complete, link and unlink, persistence across reopen (reload), upgrade from older data |
+| Routes and formats (`client/src/app/routes.ts`, `*/format*.ts`) | Vitest | screen addresses, dates, times and Offsets in English and German |
 | Translations (`client/src/i18n/i18n.ts`) | Vitest | English and German have the same texts, English default, choice remembered |
-| The whole app | Playwright | add + Complete survive reload, works offline, installable manifest, language switch |
+| The whole app | Playwright | Tasks survive reload and work offline, Buckets, Events with Linked tasks (Offsets, moving, unlinking), tabs, language switch, installable manifest |
 
-**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage key's name, the default database name (only used by the running app) and `close()`, none of which the store's behaviour exposes.
+Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `client/vitest.config.ts`), so day and time-zone tests mean the same on every machine, including daylight-saving changes.
+
+**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage key's name, the default database name (only used by the running app), `close()`, and a few equivalent mutants (a change no input can tell apart); none of them change behaviour.
 
 **Regression testing:** CI (`.github/workflows/ci.yml`) runs typecheck, unit, end-to-end and mutation tests and a Docker smoke test on every pull request and every push to `main`.
+
+## Data model notes
+
+- **Events** are stored in the shape of Outlook/iCalendar events (ADR-0002): start and end, an all-day flag, the time zone of timed Events (IANA name; all-day Events are floating), and `externalSource` / `externalId`, which are null for Events created in the app and will hold e.g. `"outlook"` and the Outlook id once Outlook sync arrives after v1. See `client/src/events/event.ts`.
+- **Linked tasks** store their Event and an Offset in days, not a date (ADR-0003). Their date is always the Event's start date plus the Offset, so they follow when the Event moves.
 
 ## Translations
 
