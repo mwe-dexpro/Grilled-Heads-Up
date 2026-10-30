@@ -16,20 +16,23 @@ Outcome of the grilling session on [the concept](./Konzept.md). Terms are define
 - Subtasks (one level).
 - Lists, Projects, Tags.
 - Home screen with Buckets, Calendar with month, week and day views (Tasks as a strip at the top of each day, Events in time slots), Project view, Zen mode.
+- Three tabs: Today · Calendar · Projects. The Projects tab has two segments: "Projects & Lists" (Projects with their Progress, plain Lists as rows) and "Events" (upcoming Events with Linked tasks, At risk first).
 - Capture via a "+" button on every screen (to the Inbox by default) and the Android share sheet (Web Share Target).
 - Swipe actions and quick Reschedule on every Task; bulk-select and assign a date in the home screen, Inbox and Project view.
 - English and German UI, English default, translation files from the first screen.
 
 ## Behaviour rules
 
-- **Moving an Event**: one question covering all its Linked tasks, expandable per task. Default: follow when moved earlier, stay (Pinned) when moved later. Tasks pushed into the past land in the Overdue bucket. Dragging an Event in the Calendar asks the same question.
+- **Moving an Event**: one question covering all its Linked tasks, expandable per task. Default: follow when moved earlier, stay (Pinned) when moved later; Follow-up tasks get the same default. Completed Tasks never move. Tasks already Pinned are not asked about; the question lists them collapsed ("2 pinned tasks stay"). Tasks pushed into the past land in the Overdue bucket. Dragging an Event in the Calendar asks the same question.
 - **Rescheduling a Linked task past its Event**: allowed, with a warning.
 - **Series**: an Occurrence's Tasks are copied from the previous Occurrence once that one has passed; edits therefore carry forward. A copied Task whose date would already be past lands on today.
 - **Event passed with open Preparation tasks**: no "missed" status; the Tasks stay in the Overdue bucket, the Event shows "passed with N open tasks" in the Calendar.
 - **Deleting an Event with Tasks**: ask; default deletes open Tasks, completed ones are kept.
 - **Deleting anything**: undo toast, then Trash for 30 days.
 - **Completed Tasks**: stay crossed out in place until the end of the day, then hidden; "Show completed" per List, Project and Event; the Event view always shows them.
-- **Overdue bucket**: badge always shows the count, stronger emphasis from 5 items. Rescheduling removes a Task from it immediately. Reschedule without a chosen date means tomorrow.
+- **Overdue bucket**: badge always shows the count, stronger emphasis from 5 items. Rescheduling removes a Task from it immediately. Reschedule without a chosen date means tomorrow. An Overdue Task can only be rescheduled to tomorrow or later, never to today. "Reschedule all" opens the Reschedule sheet for every Overdue Task at once, with Tomorrow first.
+- **Overdue Tasks in the Calendar**: shown in today's Task strip, as on the home screen, not on their original past day.
+- **Reschedule count**: every Task records how often it was rescheduled from v1 on; it is only shown once Smart hints arrive (after v1).
 - **Zen mode**: today's Tasks and Events without risk colours, Overdue collapsed to one line; notifications stay on.
 - Weeks start on Monday. Timed Events store their time zone; all-day Events and Task dates are floating.
 
@@ -44,6 +47,8 @@ Outcome of the grilling session on [the concept](./Konzept.md). Terms are define
 7. Two-way Outlook sync
 8. Sharing / household
 9. Rule sets and importer, only if still missed
+
+Not scheduled, kept as a possible feature: Task dependencies with a "latest safe date" ([ADR-0009](./adr/0009-no-task-dependencies-in-v1.md)).
 
 ## Tech summary
 
