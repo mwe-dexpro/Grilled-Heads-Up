@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../tasks/taskStore";
-import { arrangeHome, bucketOf, isLate, type BucketKind } from "./buckets";
-import { addDays, dayOf } from "./days";
+import { arrangeHome, bucketOf, isLate, isOverdueEmphasised, taskMeta, type BucketKind } from "./buckets";
+import { addDays, daysBetween, dayOf } from "./days";
 
 /** Sunday 4 October 2026, 13:05 local time. */
 const now = new Date(2026, 9, 4, 13, 5);
@@ -36,6 +36,13 @@ describe("days", () => {
     expect(addDays("2026-12-30", 3)).toBe("2027-01-02");
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(addDays("2026-10-25", 1)).toBe("2026-10-26"); // daylight-saving change in Europe
+  });
+
+  it("counts whole days between two days, also across a daylight-saving change", () => {
+    expect(daysBetween("2026-10-01", "2026-10-04")).toBe(3);
+    expect(daysBetween("2026-10-24", "2026-10-26")).toBe(2);
+    expect(daysBetween("2026-10-04", "2026-10-04")).toBe(0);
+    expect(daysBetween("2026-10-04", "2026-10-01")).toBe(-3);
   });
 });
 
@@ -151,6 +158,14 @@ describe("arrangeHome", () => {
     ]);
   });
 
+  it("puts an untimed Task before a timed one on the same day, whichever was created first", () => {
+    const timed = task({ date: today, time: "07:30" });
+    const untimed = task({ date: today });
+
+    expect(bucket("today", [timed, untimed]).tasks).toEqual([untimed, timed]);
+    expect(bucket("today", [untimed, timed]).tasks).toEqual([untimed, timed]);
+  });
+
   it("keeps a Task in its place when it is Completed", () => {
     const first = task({ date: today });
     const second = task({ date: today });
@@ -159,5 +174,47 @@ describe("arrangeHome", () => {
     const after = bucket("today", [{ ...first, completedAt: now.toISOString() }, second]).tasks.map((t) => t.id);
 
     expect(after).toEqual(before);
+  });
+});
+
+describe("Overdue badge emphasis", () => {
+  const overdueTasks = (count: number) => Array.from({ length: count }, () => task({ date: "2026-10-01" }));
+
+  it("is stronger from 5 open Overdue Tasks", () => {
+    expect(isOverdueEmphasised(bucket("overdue", overdueTasks(4)))).toBe(false);
+    expect(isOverdueEmphasised(bucket("overdue", overdueTasks(5)))).toBe(true);
+  });
+
+  it("does not count Overdue Tasks Completed today", () => {
+    const tasks = overdueTasks(5);
+    tasks[0] = { ...tasks[0], completedAt: now.toISOString() };
+
+    expect(isOverdueEmphasised(bucket("overdue", tasks))).toBe(false);
+  });
+});
+
+describe("taskMeta: the second line of a Task row", () => {
+  it("shows how many days an open Overdue Task is overdue", () => {
+    expect(taskMeta(task({ date: "2026-10-03" }), "overdue", now)).toEqual({ kind: "overdue", days: 1 });
+    expect(taskMeta(task({ date: "2026-09-25", time: "09:00" }), "overdue", now)).toEqual({ kind: "overdue", days: 9 });
+  });
+
+  it("shows the date of an Overdue Task Completed today instead of its age", () => {
+    const completed = task({ date: "2026-10-03", completedAt: now.toISOString() });
+    expect(taskMeta(completed, "overdue", now)).toEqual({ kind: "date", date: "2026-10-03", time: null });
+  });
+
+  it("shows only the time in Today and Tomorrow, and marks Late in Today", () => {
+    expect(taskMeta(task({ date: today }), "today", now)).toBeNull();
+    expect(taskMeta(task({ date: today, time: "13:00" }), "today", now)).toEqual({ kind: "time", time: "13:00", late: true });
+    expect(taskMeta(task({ date: today, time: "18:00" }), "today", now)).toEqual({ kind: "time", time: "18:00", late: false });
+    expect(taskMeta(task({ date: "2026-10-05", time: "08:00" }), "tomorrow", now)).toEqual({ kind: "time", time: "08:00", late: false });
+    expect(taskMeta(task({ date: "2026-10-05" }), "tomorrow", now)).toBeNull();
+  });
+
+  it("shows the date (and time) in the later Buckets, and nothing in the Inbox", () => {
+    expect(taskMeta(task({ date: "2026-10-07" }), "nextDays", now)).toEqual({ kind: "date", date: "2026-10-07", time: null });
+    expect(taskMeta(task({ date: "2026-11-20", time: "10:30" }), "later", now)).toEqual({ kind: "date", date: "2026-11-20", time: "10:30" });
+    expect(taskMeta(task(), "inbox", now)).toBeNull();
   });
 });

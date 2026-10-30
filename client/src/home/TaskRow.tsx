@@ -1,8 +1,7 @@
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
-import { isLate, type BucketKind } from "./buckets";
-import { dayOf } from "./days";
-import { daysBetween, formatShortDay, formatTime } from "./format";
+import { taskMeta, type BucketKind } from "./buckets";
+import { formatShortDay, formatTime } from "./format";
 
 interface TaskRowProps {
   task: Task;
@@ -14,21 +13,21 @@ interface TaskRowProps {
 export function TaskRow({ task, bucket, now, onComplete }: TaskRowProps) {
   const { language, t } = useI18n();
   const completed = task.completedAt !== null;
-  const overdue = bucket === "overdue" && !completed;
-  const late = isLate(task, now);
+  const meta = taskMeta(task, bucket, now);
 
-  const time = task.time === null ? null : formatTime(task.time, language);
-  let meta: string | null = null;
-  if (overdue) {
-    const days = daysBetween(task.date!, dayOf(now));
-    meta = days === 1 ? t("task.overdueOne") : t("task.overdueMany", { count: String(days) });
-  } else if (bucket === "today" || bucket === "tomorrow") {
-    meta = late ? `${time} · ${t("task.late")}` : time;
-  } else if (task.date !== null) {
-    meta = [formatShortDay(task.date, language), time].filter(Boolean).join(" · ");
+  let metaText: string | null = null;
+  let warning = false;
+  if (meta?.kind === "overdue") {
+    metaText = meta.days === 1 ? t("task.overdueOne") : t("task.overdueMany", { count: String(meta.days) });
+    warning = true;
+  } else if (meta?.kind === "time") {
+    metaText = formatTime(meta.time, language) + (meta.late ? ` · ${t("task.late")}` : "");
+    warning = meta.late;
+  } else if (meta?.kind === "date") {
+    metaText = [formatShortDay(meta.date, language), meta.time && formatTime(meta.time, language)].filter(Boolean).join(" · ");
   }
 
-  const classes = ["task", completed && "completed", overdue && "overdue"].filter(Boolean).join(" ");
+  const classes = ["task", completed && "completed", meta?.kind === "overdue" && "overdue"].filter(Boolean).join(" ");
   return (
     <li className={classes}>
       <input
@@ -41,7 +40,7 @@ export function TaskRow({ task, bucket, now, onComplete }: TaskRowProps) {
       />
       <div className="task-text">
         <span className="task-title">{task.title}</span>
-        {meta && <span className={overdue || late ? "task-meta warning" : "task-meta"}>{meta}</span>}
+        {metaText && <span className={warning ? "task-meta warning" : "task-meta"}>{metaText}</span>}
         {completed && <span className="visually-hidden">{t("task.completed")}</span>}
       </div>
     </li>

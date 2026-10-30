@@ -26,8 +26,3 @@ export function formatTime(time: TimeOfDay, language: Language): string {
   const date = new Date(2000, 0, 1, hours, minutes);
   return new Intl.DateTimeFormat(language, { hour: "numeric", minute: "2-digit" }).format(date);
 }
-
-/** Whole days from `from` to `to`. */
-export function daysBetween(from: Day, to: Day): number {
-  return Math.round((dateAtNoon(to).getTime() - dateAtNoon(from).getTime()) / 86_400_000);
-}

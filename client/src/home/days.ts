@@ -27,3 +27,8 @@ export function addDays(day: Day, days: number): Day {
   date.setDate(date.getDate() + days);
   return dayOf(date);
 }
+
+/** Whole days from `from` to `to`; negative when `to` is earlier. */
+export function daysBetween(from: Day, to: Day): number {
+  return Math.round((dateAtNoon(to).getTime() - dateAtNoon(from).getTime()) / 86_400_000);
+}

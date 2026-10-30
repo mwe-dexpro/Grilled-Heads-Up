@@ -1,5 +1,5 @@
 import type { Task } from "../tasks/taskStore";
-import { addDays, dayOf, timeOf, type Day } from "./days";
+import { addDays, daysBetween, dayOf, timeOf, type Day, type TimeOfDay } from "./days";
 
 export type BucketKind = "overdue" | "today" | "tomorrow" | "nextDays" | "later" | "inbox";
 
@@ -21,6 +21,35 @@ export interface Bucket {
 }
 
 const nextDaysCount = 3;
+
+/** The Overdue badge gets stronger emphasis from this many open Tasks. */
+export const overdueEmphasisFrom = 5;
+
+export function isOverdueEmphasised(overdue: Pick<Bucket, "open">): boolean {
+  return overdue.open >= overdueEmphasisFrom;
+}
+
+/** What the second line of a Task row says, before translation. */
+export type TaskMeta =
+  | { kind: "overdue"; days: number }
+  | { kind: "time"; time: TimeOfDay; late: boolean }
+  | { kind: "date"; date: Day; time: TimeOfDay | null }
+  | null;
+
+/**
+ * Open Overdue Tasks show how long they are overdue; Today and Tomorrow show the time (if any) and Late;
+ * the later Buckets show the date. Inbox Tasks have no date to show.
+ */
+export function taskMeta(task: Task, bucket: BucketKind, now: Date): TaskMeta {
+  if (task.date === null) return null;
+  if (bucket === "overdue" && task.completedAt === null) {
+    return { kind: "overdue", days: daysBetween(task.date, dayOf(now)) };
+  }
+  if (bucket === "today" || bucket === "tomorrow") {
+    return task.time === null ? null : { kind: "time", time: task.time, late: isLate(task, now) };
+  }
+  return { kind: "date", date: task.date, time: task.time };
+}
 
 export function bucketOf(task: Pick<Task, "date">, today: Day): BucketKind {
   if (task.date === null) return "inbox";

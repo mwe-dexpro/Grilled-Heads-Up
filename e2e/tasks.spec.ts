@@ -86,7 +86,11 @@ test("groups Tasks into the home screen Buckets", async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 9, 4, 13, 5));
   await page.goto("/");
 
+  await expect(page.getByText("Nothing overdue.")).toBeVisible();
+  await expect(page.getByText("Nothing planned for today.")).toBeVisible();
+
   await addTask(page, "Pay dentist invoice", { date: "2026-10-01" });
+  await addTask(page, "Buy gift for Mom", { date: "2026-10-03" });
   await addTask(page, "Order cake", { date: "2026-10-04" });
   await addTask(page, "Call the plumber", { date: "2026-10-04", time: "13:00" });
   await addTask(page, "Sort boxes in the basement", { date: "2026-10-05" });
@@ -97,13 +101,14 @@ test("groups Tasks into the home screen Buckets", async ({ page }) => {
 
   const bucket = (name: string) => page.getByRole("region", { name, exact: true });
   await expect(bucket("Overdue")).toContainText("Pay dentist invoice");
-  await expect(bucket("Overdue")).toContainText("3 days overdue");
-  await expect(bucket("Overdue").getByLabel("1 overdue")).toBeVisible();
+  await expect(bucket("Overdue").getByRole("listitem")).toHaveText([/Pay dentist invoice.*3 days overdue/, /Buy gift for Mom.*1 day overdue/]);
+  await expect(bucket("Overdue").getByLabel("2 overdue")).toBeVisible();
   await expect(bucket("Today").getByRole("listitem")).toHaveText([/Order cake/, /Call the plumber.*Late/]);
   await expect(page.getByText("1 left")).toBeVisible();
   await expect(page.getByText("1 of 2 done")).toBeVisible();
   await expect(bucket("Tomorrow")).toContainText("Sort boxes in the basement");
-  await expect(bucket("Next 3 days")).toContainText("Wash Leo's jersey");
+  await expect(bucket("Next 3 days")).toContainText(/Wash Leo's jersey.*Wed, Oct 7/);
+  await expect(page.getByText("Tue – Thu · 1")).toBeVisible();
   await expect(bucket("Later")).toContainText("Renew passport");
   await expect(bucket("Inbox")).toContainText("Birthday card for Jonas");
   await completeTask(page, "Birthday card for Jonas");

@@ -3,13 +3,10 @@ import { useI18n } from "../i18n/I18nProvider";
 import { languages, type Language } from "../i18n/i18n";
 import type { Task } from "../tasks/taskStore";
 import { ProgressRing } from "../ui/ProgressRing";
-import { arrangeHome, type Bucket } from "./buckets";
+import { arrangeHome, isOverdueEmphasised, type Bucket } from "./buckets";
 import { dayOf } from "./days";
 import { formatLongDay, formatShortDay, formatWeekday } from "./format";
 import { TaskRow } from "./TaskRow";
-
-/** Overdue becomes louder from this many Tasks. */
-const overdueEmphasisFrom = 5;
 
 interface HomeScreenProps {
   ready: boolean;
@@ -69,7 +66,7 @@ export function HomeScreen({ ready, tasks, now, onComplete }: HomeScreenProps) {
                 </h2>
                 {overdue.open > 0 && (
                   <span
-                    className={overdue.open >= overdueEmphasisFrom ? "count-pill strong" : "count-pill"}
+                    className={isOverdueEmphasised(overdue) ? "count-pill strong" : "count-pill"}
                     aria-label={t("bucket.overdueCount", { count: String(overdue.open) })}
                   >
                     {overdue.open}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysBetween, formatLongDay, formatShortDay, formatTime, formatWeekday } from "./format";
+import { formatLongDay, formatShortDay, formatTime, formatWeekday } from "./format";
 
 describe("date and time formats follow the selected language", () => {
   it("formats days", () => {
@@ -15,11 +15,5 @@ describe("date and time formats follow the selected language", () => {
     expect(formatTime("13:00", "en")).toBe("1:00 PM");
     expect(formatTime("09:05", "en")).toBe("9:05 AM");
     expect(formatTime("13:00", "de")).toBe("13:00");
-  });
-
-  it("counts whole days, also across a daylight-saving change", () => {
-    expect(daysBetween("2026-10-01", "2026-10-04")).toBe(3);
-    expect(daysBetween("2026-10-24", "2026-10-26")).toBe(2);
-    expect(daysBetween("2026-10-04", "2026-10-04")).toBe(0);
   });
 });
