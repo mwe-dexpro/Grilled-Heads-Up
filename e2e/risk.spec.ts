@@ -51,7 +51,10 @@ test("an Event turns At risk, then Critical, then passes with its open Preparati
   await page.getByLabel("Sprache").selectOption("en");
 
   // Sunday the 11th, the gift bought: one Preparation task is left the day before, so the birthday is Critical.
-  await page.getByRole("checkbox", { name: "Complete Buy gift" }).click();
+  const buyGift = page.getByRole("checkbox", { name: "Complete Buy gift" });
+  await buyGift.click();
+  // Checked only once it is saved; moving the clock before that would lose it on reload.
+  await expect(buyGift).toBeChecked();
   await openOn(page, new Date(2026, 9, 11, 9, 0));
   await expect(bucket(page, "Tomorrow")).toContainText(/Mom's birthday.*Critical: Tomorrow · 1 open/);
   await page.goto(eventUrl);
