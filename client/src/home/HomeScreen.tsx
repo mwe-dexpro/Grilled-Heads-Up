@@ -41,7 +41,7 @@ export function HomeScreen({ ready, tasks, events, now, onComplete }: HomeScreen
   const taskList = (bucket: Bucket) => (
     <ul className="card task-list">
       {bucket.events.map((event) => (
-        <EventRow key={event.id} event={event} tasks={tasks} />
+        <EventRow key={event.id} event={event} tasks={tasks} now={now} />
       ))}
       {taskRows(bucket)}
     </ul>

@@ -4,9 +4,11 @@ import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
 import { eventProgress, type Event } from "./event";
 import { formatEventTime } from "./formatEvent";
+import { RiskBadge } from "./RiskBadge";
+import { eventRisk } from "./risk";
 
-/** An Event inside a home-screen Bucket: title, time and Progress; opens the Event view. */
-export function EventRow({ event, tasks }: { event: Event; tasks: Task[] }) {
+/** An Event inside a home-screen Bucket: title, time, Progress and risk status; opens the Event view. */
+export function EventRow({ event, tasks, now }: { event: Event; tasks: Task[]; now: Date }) {
   const { language, t } = useI18n();
   const progress = eventProgress(event.id, tasks);
   const meta = [
@@ -25,6 +27,7 @@ export function EventRow({ event, tasks }: { event: Event; tasks: Task[] }) {
         <span className="task-text">
           <span className="event-title">{event.title}</span>
           <span className="task-meta">{meta}</span>
+          <RiskBadge risk={eventRisk(event, tasks, now)} />
         </span>
         <ChevronRight className="chevron" size={16} strokeWidth={1.5} aria-hidden="true" />
       </a>

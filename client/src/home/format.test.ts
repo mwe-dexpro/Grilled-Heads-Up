@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatLongDay, formatShortDay, formatTime, formatWeekday } from "./format";
+import { formatLongDay, formatMonthDay, formatShortDay, formatTime, formatWeekday } from "./format";
 
 describe("date and time formats follow the selected language", () => {
   it("formats days", () => {
@@ -9,6 +9,8 @@ describe("date and time formats follow the selected language", () => {
     expect(formatShortDay("2026-10-05", "de")).toBe("Mo., 5. Okt.");
     expect(formatWeekday("2026-10-06", "en")).toBe("Tue");
     expect(formatWeekday("2026-10-06", "de")).toBe("Di");
+    expect(formatMonthDay("2026-10-12", "en")).toBe("Oct 12");
+    expect(formatMonthDay("2026-10-12", "de")).toBe("12. Okt.");
   });
 
   it("formats times", () => {

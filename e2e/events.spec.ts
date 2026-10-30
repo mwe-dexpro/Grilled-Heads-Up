@@ -39,10 +39,10 @@ test("an Event with Linked tasks: Offsets, home screen, moving the Event, unlink
   await addLinkedTask(page, "Buy gift", 7, "before");
   await addLinkedTask(page, "Order cake", 8, "before");
   await addLinkedTask(page, "Thank-you card", 2, "after");
-  const tasks = page.getByRole("region", { name: "Tasks" }).getByRole("listitem");
-  await expect(tasks).toHaveText([
-    /Order cake.*8 days before · Sun, Oct 4/,
-    /Buy gift.*7 days before · Mon, Oct 5/,
+  // Tasks up to the Event's day prepare for it; those after it are Follow-up tasks.
+  const tasks = page.getByRole("region", { name: "Preparation" }).getByRole("listitem");
+  await expect(tasks).toHaveText([/Order cake.*8 days before · Sun, Oct 4/, /Buy gift.*7 days before · Mon, Oct 5/]);
+  await expect(page.getByRole("region", { name: "Follow-up" }).getByRole("listitem")).toHaveText([
     /Thank-you card.*2 days after · Wed, Oct 14/,
   ]);
   await expect(page.getByRole("heading", { name: "Progress: 0 of 3 done" })).toBeVisible();
