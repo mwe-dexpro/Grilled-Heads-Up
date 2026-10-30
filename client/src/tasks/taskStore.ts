@@ -1,14 +1,24 @@
 import { openDB, type DBSchema } from "idb";
+import type { Day, TimeOfDay } from "../home/days";
 
 export interface Task {
   id: string;
   title: string;
+  /** Floating date; null puts the Task in the Inbox. */
+  date: Day | null;
+  /** Floating time of day; only a dated Task can have one. */
+  time: TimeOfDay | null;
   createdAt: string;
   completedAt: string | null;
 }
 
+export interface TaskWhen {
+  date?: Day | null;
+  time?: TimeOfDay | null;
+}
+
 export interface TaskStore {
-  addTask(title: string): Promise<Task>;
+  addTask(title: string, when?: TaskWhen): Promise<Task>;
   completeTask(id: string): Promise<void>;
   /** Tasks in the order they were added. */
   listTasks(): Promise<Task[]>;
@@ -23,6 +33,11 @@ interface TaskDb extends DBSchema {
   tasks: { key: string; value: Task };
 }
 
+/** Tasks saved before dates existed have no date or time fields. */
+function withDefaults(task: Task): Task {
+  return { ...task, date: task.date ?? null, time: task.time ?? null };
+}
+
 export async function openTaskStore(
   dbName = "grilled-heads-up",
   { now = () => new Date() }: TaskStoreOptions = {},
@@ -34,12 +49,15 @@ export async function openTaskStore(
   });
 
   return {
-    async addTask(rawTitle) {
+    async addTask(rawTitle, { date = null, time = null } = {}) {
       const title = rawTitle.trim();
       if (title === "") throw new Error("A Task needs a title");
+      if (time !== null && date === null) throw new Error("Only a dated Task can have a time");
       const task: Task = {
         id: crypto.randomUUID(),
         title,
+        date,
+        time,
         createdAt: now().toISOString(),
         completedAt: null,
       };
@@ -54,7 +72,7 @@ export async function openTaskStore(
     },
 
     async listTasks() {
-      const tasks = await db.getAll("tasks");
+      const tasks = (await db.getAll("tasks")).map(withDefaults);
       return tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
