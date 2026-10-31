@@ -44,14 +44,22 @@ function migrate(db: DatabaseSync) {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
   for (const [index, sql] of migrations.entries()) {
     if (index < version) continue;
-    db.exec("BEGIN");
-    try {
+    transaction(db, () => {
       db.exec(sql);
       db.exec(`PRAGMA user_version = ${index + 1}`);
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
+    });
+  }
+}
+
+/** Runs `change` all or nothing. */
+export function transaction<T>(db: DatabaseSync, change: () => T): T {
+  db.exec("BEGIN");
+  try {
+    const result = change();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
   }
 }

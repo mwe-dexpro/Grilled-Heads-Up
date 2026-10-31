@@ -66,6 +66,11 @@ export async function signInWithRecoveryCode(code: string): Promise<{ recoveryCo
   return (await call("POST", "recover", { code })).json();
 }
 
+/** Replaces the signed-in Owner's recovery code; returns the new code to show once. */
+export async function newRecoveryCode(): Promise<{ recoveryCode: string }> {
+  return (await call("POST", "recovery-code")).json();
+}
+
 export async function signOut(): Promise<void> {
   await call("POST", "sign-out");
 }

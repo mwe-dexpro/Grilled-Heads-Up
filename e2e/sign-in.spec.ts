@@ -85,7 +85,16 @@ test("the synced passkey signs in on a desktop browser", async ({ browser, baseU
 
   // The desktop already has this passkey, so adding it again is refused.
   await desktop.page.getByRole("button", { name: "Add a passkey" }).click();
-  await expect(desktop.page.getByRole("status")).toHaveText("This device already has a passkey for Heads-Up.");
+  await expect(desktop.page.getByRole("status")).toHaveText("This device already has a passkey for Grilled Heads-Up.");
+
+  // A recovery code that got lost before it was stored is replaced from a signed-in session.
+  await desktop.page.getByRole("button", { name: "New recovery code" }).click();
+  await expect(desktop.page.getByRole("heading", { name: "Your recovery code" })).toBeVisible();
+  const replacedCode = (await desktop.page.getByText(recoveryCodeShape).textContent())!;
+  expect(replacedCode).not.toBe(recoveryCode);
+  recoveryCode = replacedCode;
+  await desktop.page.getByRole("button", { name: "I've stored it" }).click();
+  await expect(today(desktop.page)).toBeVisible();
   await desktop.page.context().close();
 });
 
@@ -94,14 +103,14 @@ test("the recovery code signs in on a new phone and registers a new passkey", as
   await newPhone.page.goto("/");
 
   await signInWithRecoveryCode(newPhone.page, recoveryCode.toLowerCase());
-  await expect(newPhone.page.getByRole("heading", { name: "Create a new passkey" })).toBeVisible();
-  await newPhone.page.getByRole("button", { name: "Create passkey" }).click();
 
-  // The used code is spent, so a new one is shown once.
+  // The used code is spent, so the new one is shown first, before anything that could be interrupted.
   await expect(newPhone.page.getByRole("heading", { name: "Your recovery code" })).toBeVisible();
   const newCode = (await newPhone.page.getByText(recoveryCodeShape).textContent())!;
   expect(newCode).not.toBe(recoveryCode);
   await newPhone.page.getByRole("button", { name: "I've stored it" }).click();
+  await expect(newPhone.page.getByRole("heading", { name: "Create a new passkey" })).toBeVisible();
+  await newPhone.page.getByRole("button", { name: "Create passkey" }).click();
   await expect(today(newPhone.page)).toBeVisible();
   expect(await passkeysOf(newPhone.authenticator)).toHaveLength(1);
 

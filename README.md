@@ -50,7 +50,7 @@ The dev server passes `/api` on to the server at port 3000. The service worker o
 
 ### Sign in
 
-The app opens with a sign-in screen (ADR-0006). On first launch, *Create passkey* registers a passkey and makes you the **Owner**; the app then shows a **Recovery code** once, to print or store. After that, nobody else can register: more passkeys (e.g. for a laptop that doesn't share Google Password Manager) are added with *Add a passkey* at the bottom of the home screen, while signed in. If no passkey is at hand, the recovery code signs you in and offers to create one; each use replaces the code with a new one, shown once.
+The app opens with a sign-in screen (ADR-0006). On first launch, *Create passkey* registers a passkey and makes you the **Owner**; the app then shows a **Recovery code** once, to print or store. After that, nobody else can register: more passkeys (e.g. for a laptop that doesn't share Google Password Manager) are added with *Add a passkey* at the bottom of the home screen, while signed in. If no passkey is at hand, the recovery code signs you in, shows its replacement once (each use spends the code) and offers to create a passkey. *New recovery code* replaces a code that got lost. Passkeys must check who holds them (fingerprint, face or screen lock); a security key that only senses a touch is refused.
 
 A device that was signed in keeps working offline (its data is on the device); the server checks the session again when it can be reached. Passkeys only work on `localhost` or HTTPS, and are bound to the address the app is opened at (see `ORIGIN` below).
 
@@ -80,7 +80,7 @@ What is tested where:
 | Routes and formats (`client/src/app/routes.ts`, `*/format*.ts`) | Vitest | screen addresses, dates, times and Offsets in English and German |
 | Translations (`client/src/i18n/i18n.ts`) | Vitest | English and German have the same texts, English default, choice remembered |
 | Start screen (`client/src/auth/session.ts`) | Vitest | setup, sign-in or the app, from the server's answer or, offline, from what the device remembers |
-| Server sign-in (`server/src/auth.ts`) | Vitest + a software passkey (`server/src/testing/`) over HTTP | registration, the owner rule, sign-in, replayed and foreign-site answers, recovery, sign-out, data routes rejecting requests that aren't signed in |
+| Server sign-in (`server/src/auth.ts`) | Vitest + a software passkey (`server/src/testing/`) over HTTP | registration, the owner rule (also two first launches at once), user verification, sign-in, replayed and foreign-site answers, capped waiting sign-ins, recovery and new codes, sign-out, data routes rejecting requests that aren't signed in |
 | The whole app | Playwright | Tasks survive reload and work offline, Buckets, Events with Linked tasks (Offsets, moving, unlinking), tabs, language switch, installable manifest |
 | Sign-in in the browser (`e2e/sign-in.spec.ts`) | Playwright + Chrome's virtual authenticator | first launch with a recovery code, the owner rule, passkey sign-in on Android and (synced) on desktop, recovery on a new phone, data routes |
 

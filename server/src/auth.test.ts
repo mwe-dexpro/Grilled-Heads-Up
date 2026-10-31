@@ -64,6 +64,28 @@ describe("registration", () => {
     expect(await stranger.session()).toEqual({ owner: true, signedIn: false });
   });
 
+  test("of two first launches finishing at once, only one becomes the owner", async () => {
+    const [phone, laptop] = [browser(), browser()];
+    const [phoneOptions, laptopOptions] = [await phone.registrationOptions(), await laptop.registrationOptions()];
+
+    const responses = await Promise.all([
+      phone.post("/api/auth/register/verify", new TestPasskey().register(phoneOptions)),
+      laptop.post("/api/auth/register/verify", new TestPasskey().register(laptopOptions)),
+    ]);
+
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 403]);
+  });
+
+  test("a passkey that doesn't check who holds it is refused", async () => {
+    const phone = browser();
+    const options = await phone.registrationOptions();
+
+    const response = await phone.post("/api/auth/register/verify", new TestPasskey().register(options, { userVerified: false }));
+
+    expect(response.status).toBe(400);
+    expect(await phone.session()).toEqual({ owner: false, signedIn: false });
+  });
+
   test("a signed-in owner adds a second passkey, without a new recovery code, and can sign in with it", async () => {
     const { phone, recoveryCode } = await becomeOwner();
     const laptopPasskey = new TestPasskey();
@@ -125,6 +147,26 @@ describe("sign-in", () => {
     expect(response.status).toBe(401);
   });
 
+  test("a sign-in without checking who holds the passkey is refused", async () => {
+    const { passkey } = await becomeOwner();
+    const laptop = browser();
+    const options = await laptop.signInOptions();
+
+    const response = await laptop.post("/api/auth/sign-in/verify", passkey.signIn(options, { userVerified: false }));
+
+    expect(response.status).toBe(401);
+  });
+
+  test("only so many sign-ins wait at once; the oldest gives way", async () => {
+    const { passkey } = await becomeOwner();
+    const first = browser();
+    const options = await first.signInOptions();
+    for (let i = 0; i < 100; i++) await browser().signInOptions();
+
+    expect((await first.post("/api/auth/sign-in/verify", passkey.signIn(options))).status).toBe(401);
+    expect((await browser().signIn(passkey)).status).toBe(204);
+  });
+
   test("signing out ends the session", async () => {
     const { phone } = await becomeOwner();
 
@@ -175,6 +217,24 @@ describe("recovery", () => {
     expect((await stranger.post("/api/auth/recover", { code: "0000-0000-0000-0000-0000" })).status).toBe(401);
     expect((await stranger.post("/api/auth/recover", {})).status).toBe(401);
     expect(await stranger.session()).toEqual({ owner: true, signedIn: false });
+  });
+
+  test("a signed-in owner can get a new code, which replaces the old one", async () => {
+    const { phone, recoveryCode } = await becomeOwner();
+
+    const response = await phone.post("/api/auth/recovery-code");
+
+    expect(response.status).toBe(200);
+    const { recoveryCode: newCode } = (await response.json()) as { recoveryCode: string };
+    expect(newCode).toMatch(recoveryCodeShape);
+    expect((await browser().post("/api/auth/recover", { code: recoveryCode })).status).toBe(401);
+    expect((await browser().post("/api/auth/recover", { code: newCode })).status).toBe(200);
+  });
+
+  test("nobody signed out gets a new code", async () => {
+    await becomeOwner();
+
+    expect((await browser().post("/api/auth/recovery-code")).status).toBe(401);
   });
 
   test("before an owner exists, no code signs in", async () => {

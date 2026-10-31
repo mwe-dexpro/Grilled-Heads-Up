@@ -1,30 +1,33 @@
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/i18n";
-import { AuthError, fetchSession, registerPasskey, signInWithPasskey, signInWithRecoveryCode, signOut, type AuthProblem } from "./authApi";
+import { fetchSession, newRecoveryCode, registerPasskey, signInWithPasskey, signInWithRecoveryCode, signOut } from "./authApi";
 import { loadSignedIn, saveSignedIn, startScreen } from "./session";
+import { useStep } from "./useStep";
 
 type Stage =
   | { name: "checking" }
   | { name: "setup" }
   | { name: "signIn"; unreachable?: boolean }
-  /** Signed in with the recovery code: offer a passkey for this device, then show the new code. */
-  | { name: "newPasskey"; recoveryCode: string }
-  | { name: "recoveryCode"; code: string }
+  /** Shown first, before anything that could be interrupted, since the server already replaced the old code. */
+  | { name: "recoveryCode"; recoveryCode: string; then: "app" | "newPasskey" }
+  /** Signed in with the recovery code: offer a passkey for this device. */
+  | { name: "newPasskey" }
   | { name: "app" };
 
-interface Account {
-  /** Adds a passkey for this device to the signed-in owner. */
-  addPasskey(): Promise<void>;
+/** What the signed-in Owner can do about signing in, from inside the app. */
+interface SignedIn {
+  /** Replaces the recovery code and shows the new one once. */
+  showNewRecoveryCode(): Promise<void>;
   signOut(): Promise<void>;
 }
 
-const AccountContext = createContext<Account | null>(null);
+const SignedInContext = createContext<SignedIn | null>(null);
 
-export function useAccount(): Account {
-  const account = useContext(AccountContext);
-  if (!account) throw new Error("useAccount must be used inside <AuthGate>");
-  return account;
+export function useSignedIn(): SignedIn {
+  const signedIn = useContext(SignedInContext);
+  if (!signedIn) throw new Error("useSignedIn must be used inside <AuthGate>");
+  return signedIn;
 }
 
 function wasSignedIn(): boolean {
@@ -68,14 +71,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signedIn = useCallback((next: Stage) => {
+  const enter = useCallback((next: Stage) => {
     rememberSignedIn(true);
     setStage(next);
   }, []);
 
-  const account: Account = {
-    async addPasskey() {
-      await registerPasskey();
+  const signedIn: SignedIn = {
+    async showNewRecoveryCode() {
+      const { recoveryCode } = await newRecoveryCode();
+      setStage({ name: "recoveryCode", recoveryCode, then: "app" });
     },
     async signOut() {
       await signOut();
@@ -90,58 +94,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     case "setup":
       return (
         <SetupScreen
-          onRegistered={(recoveryCode) => signedIn(recoveryCode ? { name: "recoveryCode", code: recoveryCode } : { name: "app" })}
+          onRegistered={(recoveryCode) => enter(recoveryCode ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })}
         />
       );
     case "signIn":
       return (
         <SignInScreen
           unreachable={stage.unreachable ?? false}
-          onSignedIn={() => signedIn({ name: "app" })}
-          onRecovered={(recoveryCode) => signedIn({ name: "newPasskey", recoveryCode })}
+          onSignedIn={() => enter({ name: "app" })}
+          onRecovered={(recoveryCode) => enter({ name: "recoveryCode", recoveryCode, then: "newPasskey" })}
         />
       );
-    case "newPasskey":
-      return <NewPasskeyScreen onDone={() => setStage({ name: "recoveryCode", code: stage.recoveryCode })} />;
     case "recoveryCode":
-      return <RecoveryCodeScreen code={stage.code} onDone={() => setStage({ name: "app" })} />;
+      return <RecoveryCodeScreen recoveryCode={stage.recoveryCode} onDone={() => setStage(stage.then === "app" ? { name: "app" } : { name: "newPasskey" })} />;
+    case "newPasskey":
+      return <NewPasskeyScreen onDone={() => setStage({ name: "app" })} />;
     case "app":
-      return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
+      return <SignedInContext.Provider value={signedIn}>{children}</SignedInContext.Provider>;
   }
-}
-
-/** The text for a problem; a cancelled passkey prompt needs none. */
-export function problemKey(problem: AuthProblem, refused: TranslationKey): TranslationKey | null {
-  switch (problem) {
-    case "cancelled":
-      return null;
-    case "exists":
-      return "auth.problem.exists";
-    case "unreachable":
-      return "auth.problem.unreachable";
-    case "refused":
-      return refused;
-  }
-}
-
-/** Runs a sign-in step, keeping track of whether it is under way and what went wrong. */
-function useStep() {
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<TranslationKey | null>(null);
-
-  async function run(step: () => Promise<void>, refused: TranslationKey) {
-    setBusy(true);
-    setProblem(null);
-    try {
-      await step();
-    } catch (error) {
-      setProblem(problemKey(error instanceof AuthError ? error.problem : "refused", refused));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return { busy, problem, run };
 }
 
 function AuthScreen({ title, children }: { title: string; children: ReactNode }) {
@@ -168,7 +138,7 @@ function Problem({ text }: { text: TranslationKey | null }) {
 
 function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | null): void }) {
   const { t } = useI18n();
-  const { busy, problem, run } = useStep();
+  const { busy, message, run } = useStep();
 
   return (
     <AuthScreen title={t("auth.welcome")}>
@@ -178,12 +148,12 @@ function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | nul
           type="button"
           className="button-primary"
           disabled={busy}
-          onClick={() => run(async () => onRegistered((await registerPasskey()).recoveryCode), "auth.problem.setup")}
+          onClick={() => run(async () => onRegistered((await registerPasskey()).recoveryCode), { refused: "auth.problem.createPasskey" })}
         >
           {t("auth.createPasskey")}
         </button>
       </div>
-      <Problem text={problem} />
+      <Problem text={message} />
     </AuthScreen>
   );
 }
@@ -205,7 +175,7 @@ function SignInScreen({
   function handleRecover(event: FormEvent) {
     event.preventDefault();
     if (code.trim() === "") return;
-    recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), "auth.problem.code");
+    recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });
   }
 
   return (
@@ -220,13 +190,13 @@ function SignInScreen({
             passkey.run(async () => {
               await signInWithPasskey();
               onSignedIn();
-            }, "auth.problem.signIn")
+            }, { refused: "auth.problem.signIn" })
           }
         >
           {t("auth.signInWithPasskey")}
         </button>
       </div>
-      <Problem text={passkey.problem} />
+      <Problem text={passkey.message} />
 
       <form className="auth-recovery" onSubmit={handleRecover}>
         <h2 className="section-title">{t("auth.lostPasskey")}</h2>
@@ -249,7 +219,7 @@ function SignInScreen({
             {t("auth.signInWithCode")}
           </button>
         </div>
-        <Problem text={recovery.problem} />
+        <Problem text={recovery.message} />
       </form>
     </AuthScreen>
   );
@@ -257,7 +227,7 @@ function SignInScreen({
 
 function NewPasskeyScreen({ onDone }: { onDone(): void }) {
   const { t } = useI18n();
-  const { busy, problem, run } = useStep();
+  const { busy, message, run } = useStep();
 
   return (
     <AuthScreen title={t("auth.newPasskeyTitle")}>
@@ -271,7 +241,7 @@ function NewPasskeyScreen({ onDone }: { onDone(): void }) {
             run(async () => {
               await registerPasskey();
               onDone();
-            }, "auth.problem.setup")
+            }, { refused: "auth.problem.createPasskey" })
           }
         >
           {t("auth.createPasskey")}
@@ -280,17 +250,17 @@ function NewPasskeyScreen({ onDone }: { onDone(): void }) {
           {t("auth.notNow")}
         </button>
       </div>
-      <Problem text={problem} />
+      <Problem text={message} />
     </AuthScreen>
   );
 }
 
-function RecoveryCodeScreen({ code, onDone }: { code: string; onDone(): void }) {
+function RecoveryCodeScreen({ recoveryCode, onDone }: { recoveryCode: string; onDone(): void }) {
   const { t } = useI18n();
 
   return (
     <AuthScreen title={t("auth.codeTitle")}>
-      <p className="card recovery-code">{code}</p>
+      <p className="card recovery-code">{recoveryCode}</p>
       <p className="auth-text">{t("auth.codeText")}</p>
       <div className="actions no-print">
         <button type="button" className="button-ghost" onClick={() => window.print()}>

@@ -2,7 +2,7 @@ import { isoCBOR } from "@simplewebauthn/server/helpers";
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 
 const userPresent = 0x01;
-const userVerified = 0x04;
+const userVerifiedFlag = 0x04;
 const attestedCredentialData = 0x40;
 
 /**
@@ -20,8 +20,8 @@ export class TestPasskey {
     private readonly rpID = "localhost",
   ) {}
 
-  /** Answers `navigator.credentials.create()`. */
-  register(options: { challenge: string; user: { id: string } }) {
+  /** Answers `navigator.credentials.create()`; `userVerified: false` is a security key that only checks presence. */
+  register(options: { challenge: string; user: { id: string } }, { userVerified = true } = {}) {
     this.userHandle = options.user.id;
     const jwk = this.keys.publicKey.export({ format: "jwk" });
     const publicKey = isoCBOR.encode(
@@ -37,7 +37,7 @@ export class TestPasskey {
     const length = Buffer.alloc(2);
     length.writeUInt16BE(credentialId.length);
     const authData = this.authenticatorData(
-      userPresent | userVerified | attestedCredentialData,
+      userPresent | (userVerified ? userVerifiedFlag : 0) | attestedCredentialData,
       Buffer.concat([Buffer.alloc(16), length, credentialId, publicKey]),
     );
     const attestationObject = isoCBOR.encode(
@@ -61,9 +61,9 @@ export class TestPasskey {
   }
 
   /** Answers `navigator.credentials.get()`. */
-  signIn(options: { challenge: string }, { origin = this.origin } = {}) {
+  signIn(options: { challenge: string }, { origin = this.origin, userVerified = true } = {}) {
     this.counter += 1;
-    const authData = this.authenticatorData(userPresent | userVerified);
+    const authData = this.authenticatorData(userPresent | (userVerified ? userVerifiedFlag : 0));
     const clientData = this.clientData("webauthn.get", options.challenge, origin);
     const signature = sign("sha256", Buffer.concat([authData, sha256(clientData)]), this.keys.privateKey);
     return {

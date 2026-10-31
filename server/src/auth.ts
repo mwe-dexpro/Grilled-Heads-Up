@@ -9,6 +9,7 @@ import {
 import express, { type Request, type RequestHandler, type Response } from "express";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { transaction } from "./database.js";
 
 export interface AuthConfig {
   /** Where the app is served from, e.g. `https://heads-up.example.com`. The first one's host name is the passkeys' RP ID. */
@@ -27,16 +28,16 @@ const sessionCookie = "session";
 const ceremonyCookie = "passkey-ceremony";
 const sessionDays = 180;
 const ceremonyMinutes = 5;
+/** Anyone can start a sign-in, so the waiting ones are capped; the oldest gives way. */
+const maxCeremonies = 100;
 
 /** A passkey registration or sign-in that has handed out a challenge and waits for the browser's answer. */
-interface Ceremony {
-  kind: "register" | "signIn";
-  challenge: string;
-  /** For a registration: the WebAuthn user handle, and whether it is the first passkey, creating the owner. */
-  userId?: string;
-  newOwner?: boolean;
-  expires: number;
-}
+type CeremonyStart =
+  | { kind: "signIn"; challenge: string }
+  /** `userId` is the WebAuthn user handle; `newOwner` when it is the first passkey, creating the owner. */
+  | { kind: "register"; challenge: string; userId: string; newOwner: boolean };
+
+type Ceremony = CeremonyStart & { expires: number };
 
 interface PasskeyRow {
   id: string;
@@ -90,26 +91,27 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   /** Replaces the user's recovery code, so a used or shown code is the only valid one. Returns the new code. */
   function newRecoveryCode(userId: string): string {
     const code = generateRecoveryCode();
-    db.prepare("UPDATE users SET recovery_code_hash = ? WHERE id = ?").run(hash(normalizeRecoveryCode(code)), userId);
+    db.prepare("UPDATE users SET recovery_code_hash = ? WHERE id = ?").run(recoveryCodeHash(code), userId);
     return code;
   }
 
-  function beginCeremony(res: Response, ceremony: Omit<Ceremony, "expires">) {
+  function beginCeremony(res: Response, ceremony: CeremonyStart) {
     const id = randomBytes(16).toString("base64url");
     const expires = Date.now() + ceremonyMinutes * 60 * 1000;
     for (const [key, old] of ceremonies) if (old.expires < Date.now()) ceremonies.delete(key);
+    if (ceremonies.size >= maxCeremonies) ceremonies.delete(ceremonies.keys().next().value!);
     ceremonies.set(id, { ...ceremony, expires });
     res.cookie(ceremonyCookie, id, { httpOnly: true, sameSite: "strict", secure, path: "/api/auth", maxAge: ceremonyMinutes * 60 * 1000 });
   }
 
   /** Each challenge answers once: the ceremony is forgotten as soon as it is looked up. */
-  function takeCeremony(req: Request, res: Response, kind: Ceremony["kind"]): Ceremony | null {
+  function takeCeremony<K extends Ceremony["kind"]>(req: Request, res: Response, kind: K): Extract<Ceremony, { kind: K }> | null {
     const id = readCookie(req, ceremonyCookie);
     res.clearCookie(ceremonyCookie, { path: "/api/auth" });
     if (!id) return null;
     const ceremony = ceremonies.get(id);
     ceremonies.delete(id);
-    return ceremony && ceremony.kind === kind && ceremony.expires >= Date.now() ? ceremony : null;
+    return ceremony?.kind === kind && ceremony.expires >= Date.now() ? (ceremony as Extract<Ceremony, { kind: K }>) : null;
   }
 
   const routes = express.Router();
@@ -136,8 +138,9 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       userDisplayName: rpName,
       userID: new Uint8Array(Buffer.from(handle, "base64url")),
       attestationType: "none",
-      excludeCredentials: existing.map((p) => ({ id: p.id, transports: JSON.parse(p.transports) as string[] })),
-      authenticatorSelection: { residentKey: "required", userVerification: "preferred" },
+      excludeCredentials: existing.map((p) => ({ id: p.id, transports: transportsOf(p) })),
+      // The passkey is the only factor, so it must check who holds it (fingerprint, face, screen lock).
+      authenticatorSelection: { residentKey: "required", userVerification: "required" },
     });
     beginCeremony(res, { kind: "register", challenge: options.challenge, userId: handle, newOwner: !userId });
     res.json(options);
@@ -145,14 +148,8 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
 
   routes.post("/register/verify", async (req, res) => {
     const ceremony = takeCeremony(req, res, "register");
-    if (!ceremony?.userId) {
+    if (!ceremony) {
       res.status(400).json({ error: "No passkey registration is under way." });
-      return;
-    }
-    // Checked again: another browser may have become the owner, or this one signed out, meanwhile.
-    const allowed = ceremony.newOwner ? !ownerExists() : signedInUser(req) === ceremony.userId;
-    if (!allowed) {
-      res.status(403).json({ error: "An owner exists. Sign in to add a passkey." });
       return;
     }
     const verification = await verifyRegistrationResponse({
@@ -160,40 +157,36 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       expectedChallenge: ceremony.challenge,
       expectedOrigin: origins,
       expectedRPID: rpID,
-      requireUserVerification: false,
+      requireUserVerification: true,
     }).catch(() => null);
     if (!verification?.verified) {
       res.status(400).json({ error: "The passkey couldn't be verified." });
       return;
     }
+    // Checked after the await and right before writing, with nothing awaited in between (node:sqlite is
+    // synchronous): another browser may have become the owner meanwhile, or this one signed out.
+    const { userId, newOwner } = ceremony;
+    if (newOwner ? ownerExists() : signedInUser(req) !== userId) {
+      res.status(403).json({ error: "An owner exists. Sign in to add a passkey." });
+      return;
+    }
     const { credential } = verification.registrationInfo;
-    const userId = ceremony.userId;
-    let recoveryCode: string | null = null;
-    db.exec("BEGIN");
-    try {
-      if (ceremony.newOwner) {
-        recoveryCode = generateRecoveryCode();
-        db.prepare("INSERT INTO users (id, recovery_code_hash, created_at) VALUES (?, ?, ?)").run(
-          userId,
-          hash(normalizeRecoveryCode(recoveryCode)),
-          now(),
-        );
+    const recoveryCode = newOwner ? generateRecoveryCode() : null;
+    transaction(db, () => {
+      if (recoveryCode) {
+        db.prepare("INSERT INTO users (id, recovery_code_hash, created_at) VALUES (?, ?, ?)").run(userId, recoveryCodeHash(recoveryCode), now());
       }
       db.prepare(
         "INSERT INTO passkeys (id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       ).run(credential.id, userId, credential.publicKey, credential.counter, JSON.stringify(credential.transports ?? []), now());
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
-    if (ceremony.newOwner) startSession(res, userId);
+    });
+    if (newOwner) startSession(res, userId);
     res.json({ recoveryCode });
   });
 
   routes.post("/sign-in/options", async (_req, res) => {
     // No allowCredentials: the passkey is discoverable, so the browser offers it without a user name.
-    const options = await generateAuthenticationOptions({ rpID, userVerification: "preferred" });
+    const options = await generateAuthenticationOptions({ rpID, userVerification: "required" });
     beginCeremony(res, { kind: "signIn", challenge: options.challenge });
     res.json(options);
   });
@@ -218,9 +211,9 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
         id: passkey.id,
         publicKey: new Uint8Array(passkey.public_key),
         counter: passkey.counter,
-        transports: JSON.parse(passkey.transports) as string[],
+        transports: transportsOf(passkey),
       },
-      requireUserVerification: false,
+      requireUserVerification: true,
     }).catch(() => null);
     if (!verification?.verified) {
       res.status(401).json({ error: "Sign-in didn't work." });
@@ -239,7 +232,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const code = (req.body as { code?: unknown } | undefined)?.code;
     const user =
       typeof code === "string"
-        ? (db.prepare("SELECT id FROM users WHERE recovery_code_hash = ?").get(hash(normalizeRecoveryCode(code))) as
+        ? (db.prepare("SELECT id FROM users WHERE recovery_code_hash = ?").get(recoveryCodeHash(code)) as
             | { id: string }
             | undefined)
         : undefined;
@@ -251,6 +244,16 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const recoveryCode = newRecoveryCode(user.id);
     startSession(res, user.id);
     res.json({ recoveryCode });
+  });
+
+  // A new code while signed in, for when the shown one got lost before it was stored.
+  routes.post("/recovery-code", (req, res) => {
+    const userId = signedInUser(req);
+    if (!userId) {
+      res.status(401).json({ error: "Sign in first." });
+      return;
+    }
+    res.json({ recoveryCode: newRecoveryCode(userId) });
   });
 
   routes.post("/sign-out", (req, res) => {
@@ -287,6 +290,14 @@ export function normalizeRecoveryCode(code: string): string {
     .replace(/[\s-]/g, "")
     .replace(/O/g, "0")
     .replace(/[IL]/g, "1");
+}
+
+function recoveryCodeHash(code: string): string {
+  return hash(normalizeRecoveryCode(code));
+}
+
+function transportsOf(passkey: { transports: string }): string[] {
+  return JSON.parse(passkey.transports) as string[];
 }
 
 function hash(secret: string): string {

@@ -319,9 +319,9 @@ a.task-title {
   color: var(--ink);
 }
 
-/* Account (in the footer until Settings exist) */
+/* Sign-in settings (in the footer until Settings exist) */
 
-.account {
+.sign-in-settings {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -329,13 +329,13 @@ a.task-title {
   margin-top: 12px;
 }
 
-.account .button-text {
+.sign-in-settings .button-text {
   margin-right: 0;
   padding: 6px 0;
   font-size: 15px;
 }
 
-.account-message {
+.sign-in-settings-message {
   flex-basis: 100%;
   margin: 0;
   font-size: 14px;

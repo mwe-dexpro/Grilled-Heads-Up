@@ -157,6 +157,6 @@ _German UI_: Passkey
 _Avoid_: Password, login
 
 **Recovery code**:
-A code shown once when the Owner is created, to print or store. It signs in when no Passkey is at hand; each use replaces it with a new one, also shown once.
+A code shown once when the Owner is created, to print or store. It signs in when no Passkey is at hand; each use replaces it with a new one, also shown once, and the signed-in Owner can replace it any time.
 _German UI_: Wiederherstellungscode
 _Avoid_: Backup code, master password

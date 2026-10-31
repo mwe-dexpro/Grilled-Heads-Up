@@ -25,6 +25,7 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
   // Every other API route holds the owner's data, so it needs a signed-in session.
   app.use("/api", auth.requireSignIn);
 
+  // The owner's passkeys; the first data route (Tasks and Events follow with sync).
   app.get("/api/passkeys", (_req, res) => {
     const passkeys = db
       .prepare("SELECT created_at AS createdAt, last_used_at AS lastUsedAt FROM passkeys WHERE user_id = ? ORDER BY created_at")
