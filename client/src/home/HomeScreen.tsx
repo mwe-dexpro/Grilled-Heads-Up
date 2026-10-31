@@ -4,6 +4,7 @@ import { EventRow } from "../events/EventRow";
 import { useI18n } from "../i18n/I18nProvider";
 import { languages, type Language } from "../i18n/i18n";
 import type { Task } from "../tasks/taskStore";
+import { SignInSettings } from "../auth/SignInSettings";
 import { ProgressRing } from "../ui/ProgressRing";
 import { arrangeHome, isOverdueEmphasised, type Bucket } from "./buckets";
 import { dayOf } from "./days";
@@ -122,6 +123,7 @@ export function HomeScreen({ ready, tasks, events, now, onComplete }: HomeScreen
             ))}
           </select>
         </label>
+        <SignInSettings />
       </footer>
     </div>
   );

@@ -6,7 +6,7 @@ async function addTask(page: Page, title: string, { date = "", time = "" } = {})
   await page.getByLabel("Title").fill(title);
   if (date) await page.getByLabel("Date").fill(date);
   if (time) await page.getByLabel("Time").fill(time);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
 }
 
@@ -77,7 +77,7 @@ test("starts in English and remembers a switch to German", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Heute", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Neue Aufgabe" }).click();
   await page.getByLabel("Titel").fill("Kuchen backen");
-  await page.getByRole("button", { name: "Hinzufügen" }).click();
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: "Kuchen backen erledigen" })).toBeVisible();
 });
 

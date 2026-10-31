@@ -3,6 +3,8 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // `npm run dev` serves the UI; the API (sign-in) comes from the server, started with `npm start`.
+  server: { proxy: { "/api": "http://localhost:3000" } },
   plugins: [
     react(),
     VitePWA({

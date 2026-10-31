@@ -144,3 +144,19 @@ _German UI_: Papierkorb
 **Planning wizard** (after v1):
 A guided flow: brain dump everything into the Inbox first, then assign dates, Lists and Tags in bulk.
 _German UI_: Planungsassistent
+
+## Access
+
+**Owner**:
+The person whose data the app holds. v1 has exactly one; the first Passkey registered creates them, and records carry an owner so sharing can come later.
+_Avoid_: Account, admin
+
+**Passkey**:
+How the Owner signs in: a key kept by the device or Google Password Manager, unlocked with fingerprint, face or screen lock. More can be added from a signed-in session, e.g. for a second device.
+_German UI_: Passkey
+_Avoid_: Password, login
+
+**Recovery code**:
+A code shown once when the Owner is created, to print or store. It signs in when no Passkey is at hand; each use replaces it with a new one, also shown once, and the signed-in Owner can replace it any time.
+_German UI_: Wiederherstellungscode
+_Avoid_: Backup code, master password

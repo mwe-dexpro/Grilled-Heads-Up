@@ -79,6 +79,6 @@ Events
 
 App
 - Quick add **"+" on every screen** (prototype: home only) → Inbox; Android share-sheet target
-- Passkey sign-in + recovery code, push-permission prompt, sync/offline status
+- Passkey sign-in + recovery code (built in #3 without a design, from the detail screens' parts; *Add a passkey*, *New recovery code* and *Sign out* sit in the home footer until Settings exist), push-permission prompt, sync/offline status
 - Settings: language EN/DE, default reminder time, JSON export, Trash
 - Empty states (empty Overdue = a calm "nothing overdue" line, empty day, empty Project)

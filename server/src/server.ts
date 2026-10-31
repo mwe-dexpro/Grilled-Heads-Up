@@ -1,42 +1,25 @@
-import express from "express";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createApp } from "./app.js";
 import { openDatabase } from "./database.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT ?? 3000);
 const clientDir = resolve(process.env.CLIENT_DIR ?? resolve(here, "../../client/dist"));
-const databaseFile = resolve(process.env.DATABASE_FILE ?? resolve(here, "../../data/grilled-heads-up.sqlite"));
+const databaseFile =
+  process.env.DATABASE_FILE === ":memory:"
+    ? ":memory:"
+    : resolve(process.env.DATABASE_FILE ?? resolve(here, "../../data/grilled-heads-up.sqlite"));
+// Passkeys are bound to the address the app is opened at. In development the Vite dev server (port 5173) proxies the API here.
+const origins = process.env.ORIGIN
+  ? process.env.ORIGIN.split(",").map((origin) => origin.trim())
+  : [`http://localhost:${port}`, ...(process.env.NODE_ENV === "production" ? [] : ["http://localhost:5173"])];
 
 const db = openDatabase(databaseFile);
-const app = express();
-
-app.get("/api/health", (_req, res) => {
-  const { ok } = db.prepare("SELECT 1 AS ok").get() as { ok: number };
-  res.json({ status: "ok", database: ok === 1 ? "ready" : "unavailable" });
-});
-
-app.use(
-  express.static(clientDir, {
-    setHeaders(res, path) {
-      // Hashed build assets never change; everything else (index.html, sw.js, manifest) must revalidate
-      // so a new deploy reaches installed apps.
-      res.setHeader(
-        "Cache-Control",
-        path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
-      );
-    },
-  }),
-);
-
-// Client-side routes fall back to the app shell.
-app.get(/^\/(?!api\/).*/, (_req, res) => {
-  res.setHeader("Cache-Control", "no-cache");
-  res.sendFile(resolve(clientDir, "index.html"));
-});
+const app = createApp({ db, clientDir, origins });
 
 const server = app.listen(port, () => {
-  console.log(`Grilled Heads-Up listening on http://localhost:${port} (database: ${databaseFile})`);
+  console.log(`Grilled Heads-Up listening on http://localhost:${port} (database: ${databaseFile}, passkeys for ${origins.join(", ")})`);
 });
 
 function shutdown() {

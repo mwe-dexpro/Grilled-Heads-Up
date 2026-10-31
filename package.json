@@ -12,7 +12,7 @@
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "npm run test -w client",
+    "test:unit": "npm run test -w client && npm run test -w server",
     "test:e2e": "npm run build && playwright test",
     "test:mutation": "npm run test:mutation -w client"
   },
