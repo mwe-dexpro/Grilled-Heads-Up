@@ -126,8 +126,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const raw = (await tx.objectStore(storeName).get(record.id)) as (Partial<T> & { id: string }) | undefined;
       const prev = raw && withDefaults(raw);
       if (prev && prev.deletedAt !== null) {
-        tx.abort();
-        await tx.done.catch(() => {});
+        await tx.done;
         throw new Error(`Record ${record.id} is deleted`);
       }
       // Only `delete` writes the tombstone, so a copy read before a deletion arrived can't undo it.

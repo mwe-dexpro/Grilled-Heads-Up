@@ -431,6 +431,22 @@ describe("Sync between two devices", () => {
       expect(events[0]).toMatchObject({ title: "Party", allDay: true, startTime: null, endTime: null, timeZone: null });
     });
 
+    it.each([
+      ["a timed Event without its start time", { allDay: false, startTime: null, endTime: "10:00", timeZone: "Europe/Berlin" }],
+      ["a timed Event without its end time", { allDay: false, startTime: "09:00", endTime: null, timeZone: "Europe/Berlin" }],
+      ["an all-day Event with only a start time left", { allDay: true, startTime: "09:00", endTime: null, timeZone: null }],
+      ["an all-day Event with only an end time left", { allDay: true, startTime: null, endTime: "10:00", timeZone: null }],
+      ["an all-day Event with only a time zone left", { allDay: true, startTime: null, endTime: null, timeZone: "Europe/Berlin" }],
+    ])("shows %s as an all-day Event", async (_name, times) => {
+      const { server, a } = await twoDevices();
+      server.inject(arrived("event", "e1", { ...party, ...times }));
+
+      await a.sync();
+
+      const { events } = await useEveryScreen(a);
+      expect(events[0]).toMatchObject({ allDay: true, startTime: null, endTime: null, timeZone: null });
+    });
+
     it("shows a complete timed Event as it is", async () => {
       const { server, a } = await twoDevices();
       const timed = { ...party, allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" };
@@ -772,6 +788,7 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       expect(a.engine.state().status).toBe("offline");
+      expect(server.requests).toBe(1);
       expect(await titles(a)).toEqual(["Mine"]);
     });
 
@@ -782,6 +799,7 @@ describe("Sync between two devices", () => {
 
       await a.sync();
       expect(a.engine.state().status).toBe("signedOut");
+      expect(server.requests).toBe(1);
       expect(await titles(a)).toEqual(["Mine"]);
 
       server.signedIn = true;
@@ -823,6 +841,7 @@ describe("Sync between two devices", () => {
 
       expect(a.engine.state().status).toBe("idle");
       expect(server.pushRequests).toBeGreaterThan(1);
+      expect(server.refusedPushes).toBe(0);
       expect(await b.events.listEvents()).toHaveLength(60);
     });
 

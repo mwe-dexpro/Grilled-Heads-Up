@@ -28,6 +28,10 @@ export class MemoryServer {
   pulledChanges = 0;
   /** How many changes pushes have carried, to see what a device sent. */
   pushedChanges = 0;
+  /** How many pushes it refused as too big or malformed. */
+  refusedPushes = 0;
+  /** Every request that reached it, answered or not. */
+  requests = 0;
 
   private readonly fields = new Map<string, { change: Change; seq: number }>();
   private seq = 0;
@@ -64,10 +68,11 @@ export class MemoryServer {
         this.check();
         this.pushRequests++;
         if (this.failPushes) throw new TransportError("failed");
-        if (changes.length > 500 || new TextEncoder().encode(JSON.stringify({ changes })).length > this.maxPushBytes) {
+        const tooBig = changes.length > 500 || new TextEncoder().encode(JSON.stringify({ changes })).length > this.maxPushBytes;
+        if (tooBig || (this.rejects && changes.some(this.rejects))) {
+          this.refusedPushes++;
           throw new TransportError("rejected");
         }
-        if (this.rejects && changes.some(this.rejects)) throw new TransportError("rejected");
         this.pushedChanges += changes.length;
         this.accept(changes);
         const hook = this.afterPushStored;
@@ -93,6 +98,7 @@ export class MemoryServer {
   }
 
   private check() {
+    this.requests++;
     if (!this.online) throw new TransportError("offline");
     if (!this.signedIn) throw new TransportError("signedOut");
   }
