@@ -20,6 +20,8 @@ export class MemoryServer {
   pullRequests = 0;
   /** How many changes pulls have handed out, to see what a device downloaded again. */
   pulledChanges = 0;
+  /** How many changes pushes have carried, to see what a device sent. */
+  pushedChanges = 0;
 
   private readonly fields = new Map<string, { change: Change; seq: number }>();
   private seq = 0;
@@ -36,6 +38,13 @@ export class MemoryServer {
     return this.fields.get(JSON.stringify([type, id, field]))?.change;
   }
 
+  /** What the server holds for a record: the winning change of each of its fields. */
+  record(type: string, id: string): Record<string, Change> {
+    const fields: Record<string, Change> = {};
+    for (const { change } of this.fields.values()) if (change.type === type && change.id === id) fields[change.field] = change;
+    return fields;
+  }
+
   /** Puts changes into the feed as another device would, bypassing any client. */
   inject(changes: Change[]): void {
     this.accept(changes);
@@ -47,6 +56,7 @@ export class MemoryServer {
         this.check();
         if (changes.length > 500) throw new TransportError("failed");
         this.pushRequests++;
+        this.pushedChanges += changes.length;
         this.accept(changes);
         const hook = this.afterPushStored;
         this.afterPushStored = null;

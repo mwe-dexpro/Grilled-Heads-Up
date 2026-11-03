@@ -4,8 +4,13 @@ import { validateEvent, type Event, type EventFields } from "./event";
 
 export interface EventStore {
   addEvent(fields: EventFields): Promise<Event>;
-  /** Changes what a person can edit; Linked tasks follow because their dates come from the Event. */
-  updateEvent(id: string, fields: EventFields): Promise<Event>;
+  /**
+   * Changes what a person can edit; Linked tasks follow because their dates come from the Event. Only fields that
+   * differ from `base` are written (`base` defaults to the stored Event), so a form opened before another
+   * device's edit arrived doesn't write that edit's fields back with its stale values: pass the fields the form
+   * was opened with.
+   */
+  updateEvent(id: string, fields: EventFields, base?: EventFields): Promise<Event>;
   /** Events in the order they were created; deleted ones are left out. */
   listEvents(): Promise<Event[]>;
   close(): void;
@@ -68,11 +73,14 @@ export async function openEventStore(
       return event;
     },
 
-    async updateEvent(id, fields) {
-      const existing = await events.get(id);
-      if (!existing) throw new Error(`No Event with id ${id}`);
-      const event: Event = { ...existing, ...checked(fields) };
-      await events.put(event);
+    async updateEvent(id, fields, base) {
+      const clean = checked(fields);
+      const event = await events.update(id, (current) => {
+        const from: EventFields = base ?? current;
+        const changed = (Object.keys(clean) as Array<keyof EventFields>).filter((field) => clean[field] !== from[field]);
+        return Object.fromEntries(changed.map((field) => [field, clean[field]]));
+      });
+      if (!event) throw new Error(`No Event with id ${id}`);
       return event;
     },
 

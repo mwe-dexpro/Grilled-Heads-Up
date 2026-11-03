@@ -10,7 +10,8 @@ interface EventFormProps {
   /** The Event to edit; a new Event when missing. */
   event?: Event;
   now: Date;
-  onSave(fields: EventFields): Promise<void>;
+  /** `base` is what the form was opened with (editing only); the fields that differ from it are what the person changed. */
+  onSave(fields: EventFields, base?: EventFields): Promise<void>;
 }
 
 function newEventFields(now: Date): EventFields {
@@ -36,7 +37,9 @@ function fieldsOf(event: Event): EventFields {
 /** Creates or edits an Event. Changing its dates moves its Linked tasks with it (they keep their Offsets). */
 export function EventForm({ event, now, onSave }: EventFormProps) {
   const { t } = useI18n();
-  const [fields, setFields] = useState<EventFields>(() => (event ? fieldsOf(event) : newEventFields(now)));
+  // Kept as they were when the form opened: an Event changed by a sync meanwhile doesn't reset the form (nor this).
+  const [base] = useState<EventFields | undefined>(() => (event ? fieldsOf(event) : undefined));
+  const [fields, setFields] = useState<EventFields>(() => base ?? newEventFields(now));
   const [showProblem, setShowProblem] = useState(false);
   const problem = validateEvent(fields);
 
@@ -62,7 +65,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
       setShowProblem(true);
       return;
     }
-    await onSave(fields);
+    await onSave(fields, base);
   }
 
   return (

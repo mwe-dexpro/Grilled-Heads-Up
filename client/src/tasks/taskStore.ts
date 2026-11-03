@@ -1,6 +1,6 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
 import type { Day, TimeOfDay } from "../home/days";
-import { openTable, type RecordType } from "../sync/replica";
+import { openTable, type Patch, type RecordType } from "../sync/replica";
 
 export interface Task {
   id: string;
@@ -69,10 +69,9 @@ export async function openTaskStore(
   const db = await openAppDb(dbName);
   const tasks = await openTable(db, taskRecordType, now);
 
-  async function existing(id: string): Promise<Task> {
-    const task = await tasks.get(id);
-    if (!task) throw new Error(`No Task with id ${id}`);
-    return task;
+  /** Changes a live Task in one transaction (see `Table.update`), so a sync landing meanwhile is not overwritten. */
+  async function change(id: string, patch: Patch<Task>): Promise<void> {
+    if (!(await tasks.update(id, patch))) throw new Error(`No Task with id ${id}`);
   }
 
   return {
@@ -98,19 +97,19 @@ export async function openTaskStore(
     },
 
     async completeTask(id) {
-      await tasks.put({ ...(await existing(id)), completedAt: now().toISOString() });
+      await change(id, { completedAt: now().toISOString() });
     },
 
     async linkTask(id, eventId, offsetDays) {
-      await tasks.put({ ...(await existing(id)), eventId, offsetDays, date: null });
+      await change(id, { eventId, offsetDays, date: null });
     },
 
     async unlinkTask(id, date) {
-      await tasks.put({ ...(await existing(id)), eventId: null, offsetDays: null, date });
+      await change(id, { eventId: null, offsetDays: null, date });
     },
 
     async deleteTask(id) {
-      await existing(id);
+      if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
       await tasks.delete(id);
     },
 

@@ -23,27 +23,39 @@ export interface Table<T extends Synced> {
   get(id: string): Promise<T | undefined>;
   /** Live records only, in no particular order. */
   list(): Promise<T[]>;
-  /** Saves the record; fields that differ from the stored record are synced, each under one shared clock. */
+  /**
+   * Saves a record that is new, or replaces a live one wholesale: the fields that differ from the stored record
+   * are synced, each under one shared clock. Never changes `deletedAt` and never touches a deleted record (it
+   * throws); to change a stored record from what it was read as, use `update`.
+   */
   put(record: T): Promise<void>;
+  /**
+   * Changes a live record: reads it, applies the change and writes it in one transaction, so a sync that lands
+   * meanwhile is never overwritten. Every field the change names is synced under one shared clock, also when its
+   * value stays the same, so that fields set together are won or lost together. Returns the record as saved,
+   * or undefined when there is none (missing or deleted). `change` can compute the fields from the stored record.
+   */
+  update(id: string, change: Patch<T> | ((current: T) => Patch<T>)): Promise<T | undefined>;
   /** Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. */
   delete(id: string): Promise<void>;
 }
 
+/** Fields of a record that a store operation sets; never the id, and not `deletedAt`, which only `delete` writes. */
+export type Patch<T extends Synced> = Partial<Omit<T, "id" | "deletedAt">>;
+
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * Stores `next` and records what changed: one new clock for all changed fields, their per-field clocks, and one
- * outbox entry each. Everything happens in the caller's transaction. A record never seen before changes entirely.
+ * Stores `next` and records what was written: one new clock for the `changed` fields, their per-field clocks, and
+ * one outbox entry each. Everything happens in the caller's transaction.
  */
 async function writeRecord<T extends Synced>(
   tx: SyncTransaction,
   { type, storeName }: RecordType<T>,
-  prev: T | undefined,
   next: T,
+  changed: Array<keyof T & string>,
   now: Date,
 ): Promise<void> {
-  const fields = Object.keys(next).filter((field) => field !== "id") as Array<keyof T & string>;
-  const changed = prev ? fields.filter((field) => !sameValue(prev[field], next[field])) : fields;
   if (changed.length === 0) return;
 
   const hlc = encode(await stampLocalChange(tx, now));
@@ -57,6 +69,12 @@ async function writeRecord<T extends Synced>(
   await tx.objectStore("fieldClocks").put(clocks);
 }
 
+const fieldsOf = <T extends Synced>(record: T) => Object.keys(record).filter((field) => field !== "id") as Array<keyof T & string>;
+
+/** A record never seen before changes entirely; of a known one, the fields that differ count. */
+const differing = <T extends Synced>(prev: T | undefined, next: T) =>
+  prev ? fieldsOf(next).filter((field) => !sameValue(prev[field], next[field])) : fieldsOf(next);
+
 /**
  * Opens the table of a record type. Records saved before sync existed have no field clocks yet; they are
  * given clocks and outbox entries here, so that they reach the other devices too.
@@ -66,7 +84,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
 
   const tx = transactionOver(db, [storeName]);
   for (const raw of (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>) {
-    if (!(await tx.objectStore("fieldClocks").get([type, raw.id]))) await writeRecord(tx, recordType, undefined, withDefaults(raw), now());
+    if (!(await tx.objectStore("fieldClocks").get([type, raw.id]))) await writeRecord(tx, recordType, withDefaults(raw), fieldsOf(withDefaults(raw)), now());
   }
   await tx.done;
 
@@ -89,8 +107,31 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
     async put(record) {
       const tx = transactionOver(db, [storeName]);
       const raw = (await tx.objectStore(storeName).get(record.id)) as (Partial<T> & { id: string }) | undefined;
-      await writeRecord(tx, recordType, raw && withDefaults(raw), withDefaults(record), now());
+      const prev = raw && withDefaults(raw);
+      if (prev && prev.deletedAt !== null) {
+        tx.abort();
+        await tx.done.catch(() => {});
+        throw new Error(`Record ${record.id} is deleted`);
+      }
+      // Only `delete` writes the tombstone, so a copy read before a deletion arrived can't undo it.
+      const next = { ...withDefaults(record), deletedAt: prev ? prev.deletedAt : null };
+      await writeRecord(tx, recordType, next, differing(prev, next), now());
       await tx.done;
+    },
+
+    async update(id, change) {
+      const tx = transactionOver(db, [storeName]);
+      const raw = (await tx.objectStore(storeName).get(id)) as (Partial<T> & { id: string }) | undefined;
+      const prev = raw && withDefaults(raw);
+      if (!prev || prev.deletedAt !== null) {
+        await tx.done;
+        return undefined;
+      }
+      const patch = typeof change === "function" ? change(prev) : change;
+      const next = { ...prev, ...patch };
+      await writeRecord(tx, recordType, next, Object.keys(patch) as Array<keyof T & string>, now());
+      await tx.done;
+      return next;
     },
 
     async delete(id) {
@@ -98,7 +139,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const raw = (await tx.objectStore(storeName).get(id)) as (Partial<T> & { id: string }) | undefined;
       const prev = raw && withDefaults(raw);
       const at = now();
-      if (prev && prev.deletedAt === null) await writeRecord(tx, recordType, prev, { ...prev, deletedAt: at.toISOString() }, at);
+      if (prev && prev.deletedAt === null) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
       await tx.done;
     },
   };

@@ -85,8 +85,8 @@ function Screen({ route, data, now }: { route: Route; data: ReturnType<typeof us
           key={event.id}
           event={event}
           now={now}
-          onSave={async (fields) => {
-            await data.updateEvent(event.id, fields);
+          onSave={async (fields, base) => {
+            await data.updateEvent(event.id, fields, base);
             goBack();
           }}
         />

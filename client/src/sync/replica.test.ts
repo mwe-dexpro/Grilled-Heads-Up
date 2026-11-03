@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import { taskRecordType, type Task } from "../tasks/taskStore";
+import { createSyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { openTable } from "./replica";
-import type { FieldClocks, OutboxEntry } from "./syncDb";
+import { MemoryServer } from "./testing/memoryServer";
 
 let dbCounter = 0;
 
@@ -13,12 +14,17 @@ function tickingClock() {
   return () => new Date(Date.UTC(2026, 9, 1, 9, 0, seconds++));
 }
 
-async function open() {
+/** A table whose changes can be pushed to an in-memory server, which is where its effects are looked at. */
+async function open(now: () => Date = tickingClock()) {
   const db = await openAppDb(`replica-test-${dbCounter++}`);
-  const tasks = await openTable(db, taskRecordType, tickingClock());
-  const outbox = async () => ((await db.getAll("outbox")) as OutboxEntry[]).map(({ field, value, hlc }) => ({ field, value, hlc }));
-  const clocksOf = async (id: string) => ((await db.get("fieldClocks", ["task", id])) as FieldClocks | undefined)?.clocks;
-  return { db, tasks, outbox, clocksOf };
+  const tasks = await openTable(db, taskRecordType, now);
+  const server = new MemoryServer({ time: () => Date.UTC(2026, 9, 1, 9, 0, 0) });
+  const engine = await createSyncEngine({ db, types: [taskRecordType], transport: server.transport(), now });
+  const push = async () => {
+    await engine.syncNow();
+    return server.record("task", "t1");
+  };
+  return { db, tasks, server, push };
 }
 
 const task = (fields: Partial<Task> = {}): Task => ({
@@ -34,81 +40,78 @@ const task = (fields: Partial<Task> = {}): Task => ({
   ...fields,
 });
 
+const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "time", "title"];
+
 describe("Replica table", () => {
-  it("queues every field of a new record, all under one clock, and none for the id", async () => {
-    const { tasks, outbox, clocksOf } = await open();
+  it("sends every field of a new record, all under one clock, and none for the id", async () => {
+    const { tasks, push } = await open();
 
     await tasks.put(task());
 
-    const entries = await outbox();
-    expect(entries.map((e) => e.field).sort()).toEqual(["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "time", "title"]);
-    expect(new Set(entries.map((e) => e.hlc)).size).toBe(1);
-    expect(entries.find((e) => e.field === "title")?.value).toBe("Buy gift");
-    expect(Object.keys((await clocksOf("t1"))!)).toHaveLength(8);
+    const sent = await push();
+    expect(Object.keys(sent).sort()).toEqual(everyField);
+    expect(new Set(Object.values(sent).map((change) => change.hlc)).size).toBe(1);
+    expect(sent.title.value).toBe("Buy gift");
   });
 
-  it("queues only the fields that changed, and a newer edit of a field replaces its pending one", async () => {
-    const { tasks, outbox, clocksOf } = await open();
+  it("sends only the fields that changed, and only the latest edit of a field", async () => {
+    const { tasks, server, push } = await open();
     await tasks.put(task());
-    const first = await clocksOf("t1");
+    const first = await push();
+    const pushed = server.pushedChanges;
 
     await tasks.put(task({ completedAt: "2026-10-01T10:00:00.000Z" }));
     await tasks.put(task({ completedAt: "2026-10-01T11:00:00.000Z" }));
+    const second = await push();
 
-    const entries = await outbox();
-    expect(entries.filter((e) => e.field === "completedAt")).toEqual([{ field: "completedAt", value: "2026-10-01T11:00:00.000Z", hlc: expect.any(String) }]);
-    expect(entries).toHaveLength(8);
-    const clocks = (await clocksOf("t1"))!;
-    expect(clocks.title).toBe(first!.title);
-    expect(clocks.completedAt > first!.title).toBe(true);
-    expect(entries.find((e) => e.field === "completedAt")!.hlc).toBe(clocks.completedAt);
+    expect(server.pushedChanges - pushed).toBe(1);
+    expect(second.completedAt.value).toBe("2026-10-01T11:00:00.000Z");
+    expect(second.title.hlc).toBe(first.title.hlc);
+    expect(second.completedAt.hlc > first.title.hlc).toBe(true);
   });
 
   it("stamps a later change later even when the device clock stands still or runs backwards", async () => {
-    const db = await openAppDb(`replica-test-${dbCounter++}`);
     let seconds = 100;
-    const tasks = await openTable(db, taskRecordType, () => new Date(Date.UTC(2026, 9, 1, 9, 0, seconds)));
+    const { tasks, push } = await open(() => new Date(Date.UTC(2026, 9, 1, 9, 0, seconds)));
     await tasks.put(task());
-    const stampOf = async (field: string) => (((await db.get("fieldClocks", ["task", "t1"])) as FieldClocks).clocks[field]);
-    const first = await stampOf("title");
+    const first = (await push()).title.hlc;
 
     await tasks.put(task({ title: "Same instant" }));
-    const second = await stampOf("title");
+    const second = (await push()).title.hlc;
     seconds = 50;
     await tasks.put(task({ title: "Clock went back" }));
-    const third = await stampOf("title");
+    const third = (await push()).title.hlc;
 
     expect(second > first).toBe(true);
     expect(third > second).toBe(true);
-    expect(decode(third).counter).toBe(2);
+    expect(decode(third).wall).toBeGreaterThanOrEqual(decode(second).wall);
   });
 
-  it("does nothing for a save that changes nothing", async () => {
-    const { tasks, outbox, db } = await open();
+  it("sends nothing for a save that changes nothing", async () => {
+    const { tasks, server, push } = await open();
     await tasks.put(task());
-    const before = await outbox();
-    const clock = await db.get("syncInfo", "clock");
+    await push();
+    const pushed = server.pushedChanges;
 
     await tasks.put(task());
+    await push();
 
-    expect(await outbox()).toEqual(before);
-    expect(await db.get("syncInfo", "clock")).toEqual(clock);
+    expect(server.pushedChanges).toBe(pushed);
   });
 
   it("stamps later changes later, and keeps one device id", async () => {
-    const { tasks, db, clocksOf } = await open();
+    const { tasks, push } = await open();
     await tasks.put(task());
     await tasks.put(task({ title: "Buy a gift" }));
 
-    const clocks = (await clocksOf("t1"))!;
+    const sent = await push();
 
-    expect(clocks.title > clocks.date).toBe(true);
-    expect(decode(clocks.title).node).toBe(await db.get("syncInfo", "deviceId"));
-    expect(decode(clocks.date).node).toBe(decode(clocks.title).node);
+    expect(sent.title.hlc > sent.date.hlc).toBe(true);
+    expect(decode(sent.date.hlc).node).toBe(decode(sent.title.hlc).node);
   });
 
   it("deletes by setting deletedAt, keeps the record stored and leaves it out of get and list", async () => {
-    const { tasks, outbox, db, clocksOf } = await open();
+    const { tasks, db, push } = await open();
     await tasks.put(task());
 
     await tasks.delete("t1");
@@ -116,20 +119,24 @@ describe("Replica table", () => {
     expect(await tasks.get("t1")).toBeUndefined();
     expect(await tasks.list()).toEqual([]);
     expect(((await db.get("tasks", "t1")) as Task).deletedAt).toBe("2026-10-01T09:00:01.000Z");
-    expect((await outbox()).find((e) => e.field === "deletedAt")?.value).toBe("2026-10-01T09:00:01.000Z");
-    expect((await clocksOf("t1"))!.deletedAt > (await clocksOf("t1"))!.title).toBe(true);
+    const sent = await push();
+    expect(sent.deletedAt.value).toBe("2026-10-01T09:00:01.000Z");
+    expect(sent.deletedAt.hlc > sent.title.hlc).toBe(true);
   });
 
   it("ignores deleting a record that is missing or already deleted", async () => {
-    const { tasks, outbox } = await open();
+    const { tasks, server, push } = await open();
 
     await tasks.delete("missing");
     await tasks.put(task());
     await tasks.delete("t1");
-    const after = await outbox();
+    const before = await push();
+    const pushed = server.pushedChanges;
     await tasks.delete("t1");
+    const after = await push();
 
-    expect(await outbox()).toEqual(after);
+    expect(server.pushedChanges).toBe(pushed);
+    expect(after).toEqual(before);
   });
 
   it("gets a record and lists live ones", async () => {
@@ -140,5 +147,78 @@ describe("Replica table", () => {
 
     expect(await tasks.get("t1")).toEqual(task());
     expect((await tasks.list()).map((t) => t.id)).toEqual(["t1"]);
+  });
+
+  describe("update", () => {
+    it("changes the named fields of the stored record, and returns the record as saved", async () => {
+      const { tasks } = await open();
+      await tasks.put(task({ date: "2026-10-04" }));
+
+      const saved = await tasks.update("t1", { completedAt: "2026-10-01T10:00:00.000Z" });
+
+      expect(saved).toEqual(task({ date: "2026-10-04", completedAt: "2026-10-01T10:00:00.000Z" }));
+      expect(await tasks.get("t1")).toEqual(saved);
+    });
+
+    it("works out the change from the stored record", async () => {
+      const { tasks } = await open();
+      await tasks.put(task({ title: "Gift" }));
+
+      await tasks.update("t1", (current) => ({ title: `${current.title}!` }));
+
+      expect((await tasks.get("t1"))?.title).toBe("Gift!");
+    });
+
+    it("sends the fields it names even when their value stays the same, so they win or lose together", async () => {
+      const { tasks, push } = await open();
+      await tasks.put(task());
+      const first = await push();
+
+      await tasks.update("t1", { date: null, completedAt: "2026-10-01T10:00:00.000Z" });
+      const second = await push();
+
+      expect(second.date.hlc).toBe(second.completedAt.hlc);
+      expect(second.date.hlc > first.date.hlc).toBe(true);
+      expect(second.title.hlc).toBe(first.title.hlc);
+    });
+
+    it("does nothing for an empty change, a missing record or a deleted one", async () => {
+      const { tasks, server, push } = await open();
+      await tasks.put(task());
+      await tasks.put(task({ id: "t2" }));
+      await tasks.delete("t2");
+      await push();
+      const pushed = server.pushedChanges;
+
+      expect(await tasks.update("t1", {})).toEqual(task());
+      expect(await tasks.update("missing", { title: "x" })).toBeUndefined();
+      expect(await tasks.update("t2", { title: "Back from the dead" })).toBeUndefined();
+
+      await push();
+      expect(server.pushedChanges).toBe(pushed);
+      expect(await tasks.list()).toEqual([task()]);
+    });
+  });
+
+  describe("put", () => {
+    it("refuses a record that is deleted, and a copy read before the deletion can't bring it back", async () => {
+      const { tasks, push } = await open();
+      await tasks.put(task());
+      const staleCopy = (await tasks.get("t1"))!;
+      await tasks.delete("t1");
+
+      await expect(tasks.put({ ...staleCopy, completedAt: "2026-10-01T10:00:00.000Z" })).rejects.toThrow("is deleted");
+
+      expect(await tasks.list()).toEqual([]);
+      expect((await push()).deletedAt.value).not.toBeNull();
+    });
+
+    it("never writes deletedAt: only a deletion does", async () => {
+      const { tasks, push } = await open();
+      await tasks.put(task({ deletedAt: "2026-10-01T10:00:00.000Z" }));
+
+      expect(await tasks.get("t1")).toEqual(task());
+      expect((await push()).deletedAt.value).toBeNull();
+    });
   });
 });

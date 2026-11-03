@@ -270,6 +270,105 @@ describe("Sync between two devices", () => {
     expect(await titles(b)).toEqual([]);
   });
 
+  describe("a local change racing a pull", () => {
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+    // The Complete lands at some point while the pull is being applied; wherever it lands, the other device's
+    // changes to the same Tasks must survive and a Task deleted there must stay deleted.
+    it.each([0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30])("keeps what another device changed when Complete is tapped %i ticks into a sync", async (ticks) => {
+      const { world, a, b } = await twoDevices();
+      const event = await a.events.addEvent(party);
+      const relinked = await a.tasks.addTask("Unlinked elsewhere", { eventId: event.id, offsetDays: -7 });
+      const doomed = await a.tasks.addTask("Deleted elsewhere");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.tasks.unlinkTask(relinked.id, "2026-10-11");
+      await a.tasks.deleteTask(doomed.id);
+      await a.sync();
+      world.advance();
+
+      const syncing = b.sync();
+      for (let i = 0; i < ticks; i++) await tick();
+      const completing = Promise.allSettled([b.tasks.completeTask(relinked.id), b.tasks.completeTask(doomed.id)]);
+      await Promise.all([syncing, completing]);
+      await b.sync();
+      await a.sync();
+      await b.sync();
+
+      for (const device of [a, b]) {
+        const tasks = await device.tasks.listTasks();
+        expect(tasks.map((task) => task.title)).toEqual(["Unlinked elsewhere"]);
+        expect(tasks[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
+        expect(tasks[0].completedAt).not.toBeNull();
+      }
+    });
+  });
+
+  it("keeps another device's edit of a field the form never touched, when a form opened before it is saved", async () => {
+    const { world, a, b } = await twoDevices();
+    const event = await a.events.addEvent(party);
+    await a.sync();
+    await b.sync();
+    world.advance();
+    const { id, createdAt, externalSource, externalId, deletedAt, ...opened } = (await a.events.listEvents())[0];
+
+    await b.events.updateEvent(event.id, { ...party, location: "Garden" });
+    await b.sync();
+    await a.sync();
+    world.advance();
+    await a.events.updateEvent(event.id, { ...opened, title: "Birthday party" }, opened);
+    await a.sync();
+    await b.sync();
+    await a.sync();
+
+    for (const device of [a, b]) {
+      expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday party", location: "Garden" });
+    }
+  });
+
+  it("settles a link against an unlink as a unit, also when the Task is already linked", async () => {
+    const { world, a, b } = await twoDevices();
+    const first = await a.events.addEvent(party);
+    const second = await a.events.addEvent({ ...party, title: "Other" });
+    const task = await a.tasks.addTask("Gift", { eventId: first.id, offsetDays: -7 });
+    await a.sync();
+    await b.sync();
+    world.advance();
+
+    await a.tasks.unlinkTask(task.id, "2026-10-11");
+    world.advance();
+    await b.tasks.linkTask(task.id, second.id, -3);
+    await a.sync();
+    await b.sync();
+    await a.sync();
+
+    for (const device of [a, b]) {
+      expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: second.id, offsetDays: -3, date: null });
+    }
+  });
+
+  it("settles an unlink against a later link the other way round too: the later one wins as a unit", async () => {
+    const { world, a, b } = await twoDevices();
+    const first = await a.events.addEvent(party);
+    const second = await a.events.addEvent({ ...party, title: "Other" });
+    const task = await a.tasks.addTask("Gift", { eventId: first.id, offsetDays: -7 });
+    await a.sync();
+    await b.sync();
+    world.advance();
+
+    await b.tasks.linkTask(task.id, second.id, -3);
+    world.advance();
+    await a.tasks.unlinkTask(task.id, "2026-10-11");
+    await b.sync();
+    await a.sync();
+    await b.sync();
+
+    for (const device of [a, b]) {
+      expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
+    }
+  });
+
   describe("with a wrong device clock", () => {
     it("lets an edit made after seeing another device's change win, even if the clock is 10 minutes behind", async () => {
       const tenMinutes = 10 * 60 * 1000;

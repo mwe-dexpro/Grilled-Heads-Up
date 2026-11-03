@@ -75,9 +75,9 @@ export function useAppData() {
     [stores, syncSoon],
   );
   const updateEvent = useCallback(
-    async (id: string, fields: EventFields) => {
+    async (id: string, fields: EventFields, base?: EventFields) => {
       if (!stores) return;
-      await stores.events.updateEvent(id, fields);
+      await stores.events.updateEvent(id, fields, base);
       setEvents(await stores.events.listEvents());
       syncSoon();
     },
