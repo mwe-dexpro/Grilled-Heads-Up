@@ -1063,27 +1063,76 @@ describe("Sync between two devices", () => {
       expect((await a.events.listEvents())[0].notes).toHaveLength(1_200_000);
     });
 
-    it("halves a request refused as too big until the value that is too big stands alone", async () => {
-      const world = new World();
-      const server = new MemoryServer({ time: () => world.ms, maxPushBytes: 200_000 });
-      const a = await openDevice(world, server);
-      const b = await openDevice(world, server);
-      const events = [];
-      for (const title of ["One", "Two", "Three"]) {
-        events.push(await a.events.addEvent({ ...party, title }));
+    describe("a refusal as too big", () => {
+      /** A device whose Event is already on the server, so that a note written next is a request of one change. */
+      async function withSyncedEvent(maxPushBytes: number) {
+        const world = new World();
+        const server = new MemoryServer({ time: () => world.ms, maxPushBytes });
+        const a = await openDevice(world, server, { transport: createHttpTransport(server.fetch) });
+        const b = await openDevice(world, server);
+        const event = await a.events.addEvent(party);
+        await a.sync();
         world.advance();
+        return { server, a, b, event };
       }
-      await writeNotesUnchecked(a, events[0].id, note(150_000));
-      await writeNotesUnchecked(a, events[1].id, note(250_000));
-      await writeNotesUnchecked(a, events[2].id, note(150_000));
 
-      await a.sync();
-      await b.sync();
+      it("sets aside a single value over 100 KB, and nothing else", async () => {
+        const { server, a, b, event } = await withSyncedEvent(50_000);
+        await writeNotesUnchecked(a, event.id, note(101_000));
 
-      expect(server.refusedPushes).toBeGreaterThan(0);
-      expect(a.engine.state().status).toBe("rejected");
-      const arrived = new Map((await b.events.listEvents()).map((event) => [event.title, event.notes.length]));
-      expect(arrived).toEqual(new Map([["One", 150_000], ["Two", 0], ["Three", 150_000]]));
+        await a.sync();
+        await b.sync();
+
+        expect(server.refusedPushes).toBe(1);
+        expect(a.engine.state().status).toBe("rejected");
+        expect(((await a.db.getAll("outbox")) as OutboxEntry[]).filter((entry) => entry.rejectedAt !== undefined)).toHaveLength(1);
+        expect((await b.events.listEvents())[0]).toMatchObject({ title: "Party", notes: "" });
+      });
+
+      it("takes a single value under 100 KB as the server's trouble: failed, nothing set aside, sent once the server is well", async () => {
+        const { server, a, b, event } = await withSyncedEvent(50_000);
+        await writeNotesUnchecked(a, event.id, note(99_000));
+
+        await a.sync();
+
+        expect(server.refusedPushes).toBe(1);
+        expect(a.engine.state().status).toBe("failed");
+        expect(((await a.db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined)).toBe(false);
+
+        server.maxPushBytes = 1024 * 1024;
+        await a.sync();
+        await b.sync();
+
+        expect(a.engine.state().status).toBe("idle");
+        expect((await b.events.listEvents())[0].notes).toHaveLength(99_000);
+      });
+
+      it("takes a refusal of a request with several changes as the server's trouble, however big, and sets nothing aside", async () => {
+        const world = new World();
+        const server = new MemoryServer({ time: () => world.ms, maxPushBytes: 200_000 });
+        const a = await openDevice(world, server, { transport: createHttpTransport(server.fetch) });
+        const b = await openDevice(world, server);
+        const events = [];
+        for (const title of ["One", "Two"]) {
+          events.push(await a.events.addEvent({ ...party, title }));
+          world.advance();
+        }
+        await writeNotesUnchecked(a, events[0].id, note(150_000));
+        await writeNotesUnchecked(a, events[1].id, note(150_000));
+
+        await a.sync();
+
+        expect(server.refusedPushes).toBe(1);
+        expect(a.engine.state().status).toBe("failed");
+        expect(((await a.db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined)).toBe(false);
+
+        server.maxPushBytes = 1024 * 1024;
+        await a.sync();
+        await b.sync();
+
+        expect(a.engine.state().status).toBe("idle");
+        expect((await b.events.listEvents()).map((event) => event.notes.length).sort()).toEqual([150_000, 150_000]);
+      });
     });
 
     it("sends the value again once the person has made it smaller", async () => {
@@ -1178,7 +1227,7 @@ describe("Sync between two devices", () => {
       expect((await b.events.listEvents())[0].title).toBe("Better title");
     });
 
-    it("tries a set-aside change again when the app is started again, and it arrives if the server has been fixed", async () => {
+    it("keeps a change set aside across a restart, and tries it again once the hour is over, when the server has been fixed", async () => {
       const { world, server, a, b } = await twoDevices();
       server.rejects = (change) => change.field === "title" && change.value === "Poison";
       await a.tasks.addTask("Poison");
@@ -1186,9 +1235,14 @@ describe("Sync between two devices", () => {
       expect(a.engine.state().status).toBe("rejected");
       server.rejects = null;
       a.close();
-      world.advance();
+      world.advance(30 * 60_000);
 
       const restarted = await openDevice(world, server, { name: a.name });
+      const requests = server.pushRequests;
+      await restarted.sync();
+      expect(server.pushRequests).toBe(requests);
+      expect(restarted.engine.state().status).toBe("rejected");
+      world.advance(30 * 60_000);
       await restarted.sync();
       await b.sync();
 
@@ -1196,7 +1250,7 @@ describe("Sync between two devices", () => {
       expect(await titles(b)).toEqual(["Poison"]);
     });
 
-    it("tries a set-aside change again after an hour, without a restart", async () => {
+    it("tries a set-aside change again after an hour, in an app that stays open", async () => {
       const { world, server, a, b } = await twoDevices();
       server.rejects = (change) => change.field === "title" && change.value === "Poison";
       await a.tasks.addTask("Poison");

@@ -8,11 +8,11 @@ const batchSize = 500;
 /** The server takes 1 MB of JSON per request; stay well below it, whatever the values weigh. */
 const batchBytes = 400_000;
 /**
- * No server we know refuses a request below this size as "too big", and the app caps what a person can type
- * far below it. A refusal of a smaller request says something about the server, not about the changes in it.
+ * No server we know refuses a single value below this size as "too big", and the app caps what a person can type
+ * far below it. A refusal of anything smaller says something about the server, not about the change.
  */
 const tooBigForAnyServer = 100_000;
-/** How long a change the server refused as certainly bad waits before it is tried again (it is also tried at each app start). */
+/** How long a change the server refused as certainly bad waits before it is tried again (checked at every push, also after a restart). */
 const retrySetAsideAfterMs = 60 * 60 * 1000;
 
 const byteLength = (text: string) => new TextEncoder().encode(text).length;
@@ -57,12 +57,6 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   const storeNames = types.map((recordType) => recordType.storeName);
 
   let state: SyncState = { status: "idle", lastSyncedAt: ((await db.get("syncInfo", "lastSyncedAt")) as number | undefined) ?? null };
-  // Each start of the app tries again what was set aside as bad, in case the server's refusal was its own mistake.
-  const release = transactionOver(db, []);
-  for (const { rejectedAt, ...entry } of (await release.objectStore("outbox").getAll()) as OutboxEntry[]) {
-    if (rejectedAt !== undefined) await release.objectStore("outbox").put(entry);
-  }
-  await release.done;
 
   const stateListeners = new Set<(state: SyncState) => void>();
   const remoteListeners = new Set<() => void>();
@@ -115,9 +109,11 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
 
   /**
    * Sends a batch. Only a change that is certainly bad is set aside: one the server names as malformed (the
-   * rest of the batch is sent again), or one too big to be sent alone. Any other refusal, such as a request
-   * refused as a whole without a reason or a small one refused as too big, says the server is unwell, not the
-   * changes: it ends the push and everything is tried again at the next sync.
+   * rest of the batch is sent again), or a single value over 100 KB that the server refuses as too big. Any
+   * other refusal, such as a request refused as a whole without a reason, a small one refused as too big, or
+   * several changes refused as too big, says the server is unwell, not the changes: it ends the push and
+   * everything is tried again at the next sync. (A proxy with a limit below 400 KB in front of the server would
+   * end every large push that way; `batchBytes` is what to lower then.)
    */
   async function sendOrSplit(batch: OutboxEntry[]) {
     try {
@@ -133,11 +129,9 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         if (rest.length > 0) await sendOrSplit(rest);
         return;
       }
-      if (batch.reduce((bytes, entry) => bytes + sizeOf(entry), 0) <= tooBigForAnyServer) throw new TransportError("failed");
-      if (batch.length === 1) return setAside(batch[0]);
-      const half = batch.length >> 1;
-      await sendOrSplit(batch.slice(0, half));
-      await sendOrSplit(batch.slice(half));
+      // `batchesOf` keeps a batch far below the server's limit, so only one value alone can be too big for it.
+      if (batch.length !== 1 || sizeOf(batch[0]) <= tooBigForAnyServer) throw new TransportError("failed");
+      await setAside(batch[0]);
     }
   }
 

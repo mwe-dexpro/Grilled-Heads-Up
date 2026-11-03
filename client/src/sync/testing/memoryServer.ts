@@ -42,7 +42,8 @@ export class MemoryServer {
   private seq = 0;
   private readonly time: () => number;
   private readonly pageSize: number;
-  private readonly maxPushBytes: number;
+  /** The largest push it takes, in bytes of JSON; a test may change it to make the server well again. */
+  maxPushBytes: number;
 
   constructor({ time = Date.now, pageSize = 500, maxPushBytes = 1024 * 1024 }: MemoryServerOptions = {}) {
     this.time = time;

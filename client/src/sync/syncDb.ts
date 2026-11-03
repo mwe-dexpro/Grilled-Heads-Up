@@ -26,8 +26,8 @@ export interface OutboxEntry {
   hlc: string;
   /**
    * When (ms since the epoch) the server refused this change as certainly bad (malformed, or too big for any
-   * request). It stays here, unsent, until a newer edit replaces it, the app is started again or an hour has
-   * passed: then it is tried once more, in case the refusal was the server's mistake.
+   * request). It stays here, unsent, until a newer edit replaces it or an hour has passed (also across an app
+   * restart): then it is tried once more, in case the refusal was the server's mistake.
    */
   rejectedAt?: number;
 }
