@@ -29,10 +29,12 @@ export interface Event {
   externalSource: string | null;
   externalId: string | null;
   createdAt: string;
+  /** When the Event was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  deletedAt: string | null;
 }
 
 /** What a person enters for an Event. */
-export type EventFields = Omit<Event, "id" | "createdAt" | "externalSource" | "externalId">;
+export type EventFields = Omit<Event, "id" | "createdAt" | "externalSource" | "externalId" | "deletedAt">;
 
 export type EventProblem = "title" | "end" | "shape";
 

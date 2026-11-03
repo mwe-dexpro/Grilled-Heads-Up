@@ -79,6 +79,31 @@ describe("Task store", () => {
   });
 });
 
+describe("Deleting a Task", () => {
+  it("takes the Task out of the list, also after a reload", async () => {
+    const dbName = freshDbName();
+    const before = await openTaskStore(dbName, { now: tickingClock() });
+    const doomed = await before.addTask("Doomed");
+    await before.addTask("Kept");
+
+    await before.deleteTask(doomed.id);
+    before.close();
+
+    const after = await openTaskStore(dbName);
+    expect((await after.listTasks()).map((t) => t.title)).toEqual(["Kept"]);
+  });
+
+  it("refuses to delete, or otherwise change, a Task that is gone", async () => {
+    const store = await openTaskStore(freshDbName());
+    const task = await store.addTask("Doomed");
+    await store.deleteTask(task.id);
+
+    await expect(store.deleteTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
+    await expect(store.completeTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
+    await expect(store.deleteTask("missing")).rejects.toThrow("No Task with id missing");
+  });
+});
+
 describe("Task dates", () => {
   it("adds a Task to the Inbox by default, or with a date and an optional time", async () => {
     const store = await openTaskStore(freshDbName(), { now: tickingClock() });
@@ -120,6 +145,7 @@ describe("Task dates", () => {
         offsetDays: null,
         createdAt: "2026-09-28T09:00:00.000Z",
         completedAt: null,
+        deletedAt: null,
       },
     ]);
   });

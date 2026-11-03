@@ -37,6 +37,7 @@ describe("Event store", () => {
         createdAt: "2026-10-04T11:05:00.000Z",
         externalSource: null,
         externalId: null,
+        deletedAt: null,
       },
     ]);
   });

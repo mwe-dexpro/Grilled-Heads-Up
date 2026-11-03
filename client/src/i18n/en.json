@@ -135,5 +135,13 @@
   "settings.signOut": "Sign out",
   "settings.problem.signOut": "Couldn't sign out. Try again.",
   "settings.newRecoveryCode": "New recovery code",
-  "settings.problem.recoveryCode": "Couldn't make a new recovery code. Try again."
+  "settings.problem.recoveryCode": "Couldn't make a new recovery code. Try again.",
+  "sync.synced": "Synced {time}",
+  "sync.never": "Not synced yet",
+  "sync.syncing": "Syncing…",
+  "sync.offline": "Offline",
+  "sync.offlineSince": "Offline · last synced {time}",
+  "sync.failed": "Sync failed",
+  "sync.signedOut": "Signed out – sign in to sync",
+  "sync.now": "Sync now"
 }

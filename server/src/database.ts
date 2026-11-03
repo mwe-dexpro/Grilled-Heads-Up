@@ -25,6 +25,18 @@ const migrations = [
      created_at TEXT NOT NULL,
      expires_at TEXT NOT NULL
    );`,
+  // 2: sync. The winning value of every field of every record, per owner (ADR-0004); the server knows no record types.
+  `CREATE TABLE sync_fields (
+     owner_id TEXT NOT NULL REFERENCES users (id),
+     record_type TEXT NOT NULL,
+     record_id TEXT NOT NULL,
+     field TEXT NOT NULL,
+     value TEXT NOT NULL,
+     hlc TEXT NOT NULL,
+     seq INTEGER NOT NULL,
+     PRIMARY KEY (owner_id, record_type, record_id, field)
+   );
+   CREATE INDEX sync_fields_feed ON sync_fields (owner_id, seq);`,
 ];
 
 /**

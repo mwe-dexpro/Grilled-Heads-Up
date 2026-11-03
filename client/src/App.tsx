@@ -45,7 +45,17 @@ function Screen({ route, data, now }: { route: Route; data: ReturnType<typeof us
   const { t } = useI18n();
   switch (route.name) {
     case "today":
-      return <HomeScreen ready={data.ready} tasks={data.tasks} events={data.events} now={now} onComplete={data.completeTask} />;
+      return (
+        <HomeScreen
+          ready={data.ready}
+          tasks={data.tasks}
+          events={data.events}
+          now={now}
+          sync={data.sync}
+          onSyncNow={data.syncNow}
+          onComplete={data.completeTask}
+        />
+      );
     case "calendar":
     case "projects":
       return (

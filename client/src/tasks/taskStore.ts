@@ -1,5 +1,6 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
 import type { Day, TimeOfDay } from "../home/days";
+import { openTable, type RecordType } from "../sync/replica";
 
 export interface Task {
   id: string;
@@ -14,6 +15,8 @@ export interface Task {
   offsetDays: number | null;
   createdAt: string;
   completedAt: string | null;
+  /** When the Task was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  deletedAt: string | null;
 }
 
 export interface TaskWhen {
@@ -31,7 +34,9 @@ export interface TaskStore {
   linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
   unlinkTask(id: string, date: Day | null): Promise<void>;
-  /** Tasks in the order they were added. */
+  /** Deletes a Task (it leaves every list and syncs as deleted); the swipe, undo and Trash come later. */
+  deleteTask(id: string): Promise<void>;
+  /** Tasks in the order they were added; deleted ones are left out. */
   listTasks(): Promise<Task[]>;
   close(): void;
 }
@@ -40,27 +45,34 @@ export interface TaskStoreOptions {
   now?: () => Date;
 }
 
-/** Tasks saved by earlier versions lack the fields added since. */
-function withDefaults(task: Task): Task {
-  return {
+/** How Tasks sync. Tasks saved by earlier versions, or arriving in part, lack some fields. */
+export const taskRecordType: RecordType<Task> = {
+  type: "task",
+  storeName: "tasks",
+  withDefaults: (task) => ({
     ...task,
+    title: task.title ?? "",
     date: task.date ?? null,
     time: task.time ?? null,
     eventId: task.eventId ?? null,
     offsetDays: task.offsetDays ?? null,
-  };
-}
+    createdAt: task.createdAt ?? "",
+    completedAt: task.completedAt ?? null,
+    deletedAt: task.deletedAt ?? null,
+  }),
+};
 
 export async function openTaskStore(
   dbName = defaultDatabaseName,
   { now = () => new Date() }: TaskStoreOptions = {},
 ): Promise<TaskStore> {
   const db = await openAppDb(dbName);
+  const tasks = await openTable(db, taskRecordType, now);
 
   async function existing(id: string): Promise<Task> {
-    const task = await db.get("tasks", id);
+    const task = await tasks.get(id);
     if (!task) throw new Error(`No Task with id ${id}`);
-    return withDefaults(task);
+    return task;
   }
 
   return {
@@ -79,26 +91,31 @@ export async function openTaskStore(
         offsetDays,
         createdAt: now().toISOString(),
         completedAt: null,
+        deletedAt: null,
       };
-      await db.put("tasks", task);
+      await tasks.put(task);
       return task;
     },
 
     async completeTask(id) {
-      await db.put("tasks", { ...(await existing(id)), completedAt: now().toISOString() });
+      await tasks.put({ ...(await existing(id)), completedAt: now().toISOString() });
     },
 
     async linkTask(id, eventId, offsetDays) {
-      await db.put("tasks", { ...(await existing(id)), eventId, offsetDays, date: null });
+      await tasks.put({ ...(await existing(id)), eventId, offsetDays, date: null });
     },
 
     async unlinkTask(id, date) {
-      await db.put("tasks", { ...(await existing(id)), eventId: null, offsetDays: null, date });
+      await tasks.put({ ...(await existing(id)), eventId: null, offsetDays: null, date });
+    },
+
+    async deleteTask(id) {
+      await existing(id);
+      await tasks.delete(id);
     },
 
     async listTasks() {
-      const tasks = (await db.getAll("tasks")).map(withDefaults);
-      return tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await tasks.list()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {

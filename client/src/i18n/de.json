@@ -135,5 +135,13 @@
   "settings.signOut": "Abmelden",
   "settings.problem.signOut": "Abmelden hat nicht geklappt. Versuch es noch einmal.",
   "settings.newRecoveryCode": "Neuer Wiederherstellungscode",
-  "settings.problem.recoveryCode": "Ein neuer Wiederherstellungscode hat nicht geklappt. Versuch es noch einmal."
+  "settings.problem.recoveryCode": "Ein neuer Wiederherstellungscode hat nicht geklappt. Versuch es noch einmal.",
+  "sync.synced": "Synchronisiert {time}",
+  "sync.never": "Noch nicht synchronisiert",
+  "sync.syncing": "Synchronisiere …",
+  "sync.offline": "Offline",
+  "sync.offlineSince": "Offline · zuletzt synchronisiert {time}",
+  "sync.failed": "Synchronisierung fehlgeschlagen",
+  "sync.signedOut": "Abgemeldet – zum Synchronisieren anmelden",
+  "sync.now": "Jetzt synchronisieren"
 }

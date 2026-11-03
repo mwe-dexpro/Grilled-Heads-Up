@@ -37,7 +37,7 @@ const allDay: EventFields = {
 };
 
 function event(fields: Partial<EventFields> = {}, id = "e1"): Event {
-  return { ...timed, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null };
+  return { ...timed, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null, deletedAt: null };
 }
 
 let counter = 0;
@@ -52,6 +52,7 @@ function task(fields: Partial<Task> = {}): Task {
     offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    deletedAt: null,
     ...fields,
   };
 }

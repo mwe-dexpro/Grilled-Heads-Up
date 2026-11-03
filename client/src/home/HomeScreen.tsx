@@ -3,6 +3,8 @@ import type { Event } from "../events/event";
 import { EventRow } from "../events/EventRow";
 import { useI18n } from "../i18n/I18nProvider";
 import { languages, type Language } from "../i18n/i18n";
+import { formatSyncState } from "../sync/formatSync";
+import type { SyncState } from "../sync/engine";
 import type { Task } from "../tasks/taskStore";
 import { SignInSettings } from "../auth/SignInSettings";
 import { ProgressRing } from "../ui/ProgressRing";
@@ -16,10 +18,12 @@ interface HomeScreenProps {
   tasks: Task[];
   events: Event[];
   now: Date;
+  sync: SyncState;
+  onSyncNow(): void;
   onComplete(id: string): void;
 }
 
-export function HomeScreen({ ready, tasks, events, now, onComplete }: HomeScreenProps) {
+export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onComplete }: HomeScreenProps) {
   const { language, setLanguage, t } = useI18n();
   const buckets = arrangeHome(tasks, now, events);
   const [overdue, today, ...rest] = buckets;
@@ -113,6 +117,14 @@ export function HomeScreen({ ready, tasks, events, now, onComplete }: HomeScreen
       )}
 
       <footer className="screen-footer">
+        <div className="sync-line">
+          <p className="sync-status" role="status">
+            {formatSyncState(sync, now, language, t)}
+          </p>
+          <button type="button" className="button-text" onClick={onSyncNow}>
+            {t("sync.now")}
+          </button>
+        </div>
         <label className="language">
           {t("language.label")}
           <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
