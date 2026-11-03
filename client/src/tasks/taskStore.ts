@@ -62,6 +62,16 @@ export const taskRecordType: RecordType<Task> = {
   }),
 };
 
+/**
+ * A Linked task has both its Event and its Offset. One of them can be missing for a while after a sync (the
+ * fields arrive one by one); the Task then shows as a Task without an Event. Only the reading is changed.
+ */
+function wholeLink(task: Task): Task {
+  if (task.eventId !== null && task.offsetDays === null) return { ...task, eventId: null };
+  if (task.eventId === null && task.offsetDays !== null) return { ...task, offsetDays: null };
+  return task;
+}
+
 export async function openTaskStore(
   dbName = defaultDatabaseName,
   { now = () => new Date() }: TaskStoreOptions = {},
@@ -114,7 +124,7 @@ export async function openTaskStore(
     },
 
     async listTasks() {
-      return (await tasks.list()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await tasks.list()).map(wholeLink).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {

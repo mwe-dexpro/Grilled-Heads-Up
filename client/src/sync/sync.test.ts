@@ -2,7 +2,10 @@ import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import type { EventFields } from "../events/event";
+import { eventDays, eventEnd, eventStart } from "../events/event";
 import { openEventStore, type EventStore } from "../events/eventStore";
+import { formatEventWhen } from "../events/formatEvent";
+import { arrangeHome } from "../home/buckets";
 import { openTaskStore, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
@@ -367,6 +370,80 @@ describe("Sync between two devices", () => {
     for (const device of [a, b]) {
       expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
     }
+  });
+
+  describe("when a record has arrived only in part", () => {
+    const hlc = "000000000000001-00000-other-device";
+    const arrived = (type: string, id: string, fields: Record<string, unknown>) =>
+      Object.entries(fields).map(([field, value]) => ({ type, id, field, value, hlc }));
+
+    /** Everything the screens do with Events, which must not throw for any Event the store lists. */
+    async function useEveryScreen(device: Device) {
+      const now = new Date(Date.UTC(2026, 9, 1, 9, 0, 0));
+      const events = await device.events.listEvents();
+      const tasks = await device.tasks.listTasks();
+      arrangeHome(tasks, now, events);
+      for (const event of events) {
+        eventStart(event);
+        eventEnd(event);
+        eventDays(event);
+        formatEventWhen(event, "en");
+      }
+      return { events, tasks };
+    }
+
+    it.each([
+      ["a timed Event whose times and zone are still to come", { title: "Party", allDay: false }],
+      ["a timed Event whose zone is still to come", { title: "Party", allDay: false, startDate: "2026-10-12", startTime: "09:00", endDate: "2026-10-12", endTime: "10:00" }],
+      ["an all-day Event that still has the times of its timed past", { title: "Party", allDay: true, startDate: "2026-10-12", endDate: "2026-10-12", startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }],
+    ])("shows %s without breaking a screen", async (_name, fields) => {
+      const { server, a } = await twoDevices();
+      server.inject(arrived("event", "e1", fields));
+
+      await a.sync();
+
+      const { events } = await useEveryScreen(a);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ title: "Party", allDay: true, startTime: null, endTime: null, timeZone: null });
+    });
+
+    it("shows a complete timed Event as it is", async () => {
+      const { server, a } = await twoDevices();
+      const timed = { ...party, allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" };
+      server.inject(arrived("event", "e1", timed));
+
+      await a.sync();
+
+      expect((await useEveryScreen(a)).events[0]).toMatchObject(timed);
+    });
+
+    it("shows a Linked task whose Offset has not arrived as a Task without an Event, and the other way round", async () => {
+      const { server, a } = await twoDevices();
+      server.inject(arrived("task", "t1", { title: "No offset yet", eventId: "e1" }));
+      server.inject(arrived("task", "t2", { title: "No event yet", offsetDays: -3 }));
+      server.inject(arrived("task", "t3", { title: "Complete", eventId: "e1", offsetDays: -3 }));
+
+      await a.sync();
+
+      const { tasks } = await useEveryScreen(a);
+      expect(tasks.map(({ title, eventId, offsetDays }) => ({ title, eventId, offsetDays }))).toEqual([
+        { title: "No offset yet", eventId: null, offsetDays: null },
+        { title: "No event yet", eventId: null, offsetDays: null },
+        { title: "Complete", eventId: "e1", offsetDays: -3 },
+      ]);
+    });
+
+    it("lets the rest of the Event arrive later, and then shows it as it is", async () => {
+      const { server, a } = await twoDevices();
+      server.inject(arrived("event", "e1", { title: "Party", allDay: false }));
+      await a.sync();
+      expect((await a.events.listEvents())[0].allDay).toBe(true);
+
+      server.inject(arrived("event", "e1", { startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }).map((c) => ({ ...c, hlc: "000000000000002-00000-other-device" })));
+      await a.sync();
+
+      expect((await useEveryScreen(a)).events[0]).toMatchObject({ allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" });
+    });
   });
 
   describe("with a wrong device clock", () => {

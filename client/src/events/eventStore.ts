@@ -45,6 +45,18 @@ export const eventRecordType: RecordType<Event> = {
   }),
 };
 
+/**
+ * What screens may rely on: a timed Event has a start time, an end time and a time zone, an all-day Event has none.
+ * A synced Event can break that for a while (its fields arrive one by one, and two devices can edit them at once);
+ * until it is whole it shows as an all-day Event. Only the reading is changed, never what is stored or synced.
+ */
+function wholeShape(event: Event): Event {
+  const timed = !event.allDay && event.startTime !== null && event.endTime !== null && event.timeZone !== null;
+  return timed || (event.allDay && event.startTime === null && event.endTime === null && event.timeZone === null)
+    ? event
+    : { ...event, allDay: true, startTime: null, endTime: null, timeZone: null };
+}
+
 function checked(fields: EventFields): EventFields {
   const clean = { ...fields, title: fields.title.trim(), location: fields.location.trim(), notes: fields.notes.trim() };
   const problem = validateEvent(clean);
@@ -85,7 +97,7 @@ export async function openEventStore(
     },
 
     async listEvents() {
-      return (await events.list()).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await events.list()).map(wholeShape).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {
