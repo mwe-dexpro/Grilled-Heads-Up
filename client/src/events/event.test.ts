@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import type { Task } from "../tasks/taskStore";
 import {
   eventDays,
@@ -114,6 +115,15 @@ describe("validateEvent", () => {
 
   it("needs a title", () => {
     expect(validateEvent({ ...timed, title: "  " })).toBe("title");
+  });
+
+  it("refuses a title, location or notes over the limit, and accepts ones of exactly the limit", () => {
+    expect(validateEvent({ ...timed, title: "x".repeat(maxTitleLength) })).toBeNull();
+    expect(validateEvent({ ...timed, location: "x".repeat(maxLocationLength) })).toBeNull();
+    expect(validateEvent({ ...timed, notes: "x".repeat(maxNotesLength) })).toBeNull();
+    expect(validateEvent({ ...timed, title: "x".repeat(maxTitleLength + 1) })).toBe("tooLong");
+    expect(validateEvent({ ...timed, location: "x".repeat(maxLocationLength + 1) })).toBe("tooLong");
+    expect(validateEvent({ ...timed, notes: "x".repeat(maxNotesLength + 1) })).toBe("tooLong");
   });
 
   it("refuses an end before the start", () => {

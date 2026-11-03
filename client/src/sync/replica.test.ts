@@ -60,8 +60,8 @@ describe("Replica table", () => {
     const first = await push();
     const pushed = server.pushedChanges;
 
-    await tasks.put(task({ completedAt: "2026-10-01T10:00:00.000Z" }));
-    await tasks.put(task({ completedAt: "2026-10-01T11:00:00.000Z" }));
+    await tasks.update("t1", { completedAt: "2026-10-01T10:00:00.000Z" });
+    await tasks.update("t1", { completedAt: "2026-10-01T11:00:00.000Z" });
     const second = await push();
 
     expect(server.pushedChanges - pushed).toBe(1);
@@ -76,10 +76,10 @@ describe("Replica table", () => {
     await tasks.put(task());
     const first = (await push()).title.hlc;
 
-    await tasks.put(task({ title: "Same instant" }));
+    await tasks.update("t1", { title: "Same instant" });
     const second = (await push()).title.hlc;
     seconds = 50;
-    await tasks.put(task({ title: "Clock went back" }));
+    await tasks.update("t1", { title: "Clock went back" });
     const third = (await push()).title.hlc;
 
     expect(second > first).toBe(true);
@@ -87,13 +87,13 @@ describe("Replica table", () => {
     expect(decode(third).wall).toBeGreaterThanOrEqual(decode(second).wall);
   });
 
-  it("sends nothing for a save that changes nothing", async () => {
+  it("sends nothing for an update that names no field", async () => {
     const { tasks, server, push } = await open();
     await tasks.put(task());
     await push();
     const pushed = server.pushedChanges;
 
-    await tasks.put(task());
+    await tasks.update("t1", {});
     await push();
 
     expect(server.pushedChanges).toBe(pushed);
@@ -102,7 +102,7 @@ describe("Replica table", () => {
   it("stamps later changes later, and keeps one device id", async () => {
     const { tasks, push } = await open();
     await tasks.put(task());
-    await tasks.put(task({ title: "Buy a gift" }));
+    await tasks.update("t1", { title: "Buy a gift" });
 
     const sent = await push();
 
@@ -201,16 +201,20 @@ describe("Replica table", () => {
   });
 
   describe("put", () => {
-    it("refuses a record that is deleted, and a copy read before the deletion can't bring it back", async () => {
+    it("refuses an id that is taken, also by a deleted record, and leaves the stored record alone", async () => {
       const { tasks, push } = await open();
       await tasks.put(task());
       const staleCopy = (await tasks.get("t1"))!;
-      await tasks.delete("t1");
 
-      await expect(tasks.put({ ...staleCopy, completedAt: "2026-10-01T10:00:00.000Z" })).rejects.toThrow("is deleted");
+      await expect(tasks.put({ ...staleCopy, title: "Written from a copy" })).rejects.toThrow("exists already");
+      await tasks.delete("t1");
+      await expect(tasks.put({ ...staleCopy, completedAt: "2026-10-01T10:00:00.000Z" })).rejects.toThrow("exists already");
 
       expect(await tasks.list()).toEqual([]);
-      expect((await push()).deletedAt.value).not.toBeNull();
+      const sent = await push();
+      expect(sent.deletedAt.value).not.toBeNull();
+      expect(sent.title.value).toBe("Buy gift");
+      expect(sent.completedAt.value).toBeNull();
     });
 
     it("never writes deletedAt: only a deletion does", async () => {

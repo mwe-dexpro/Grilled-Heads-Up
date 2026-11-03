@@ -1,4 +1,5 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
+import { maxTitleLength } from "../data/limits";
 import type { Day, TimeOfDay } from "../home/days";
 import { openTable, type Patch, type RecordType } from "../sync/replica";
 
@@ -29,6 +30,7 @@ export interface TaskWhen {
 
 export interface TaskStore {
   addTask(title: string, when?: TaskWhen): Promise<Task>;
+  /** Completes a Task; one that is missing or deleted (say, by a sync a moment ago) is ignored. */
   completeTask(id: string): Promise<void>;
   /** Attaches a Task to an Event at an Offset; from then on its date comes from the Event. */
   linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
@@ -88,6 +90,7 @@ export async function openTaskStore(
     async addTask(rawTitle, { date = null, time = null, eventId = null, offsetDays = null } = {}) {
       const title = rawTitle.trim();
       if (title === "") throw new Error("A Task needs a title");
+      if (title.length > maxTitleLength) throw new Error(`A Task's title can have up to ${maxTitleLength} characters`);
       if ((eventId === null) !== (offsetDays === null)) throw new Error("A Linked task needs both an Event and an Offset");
       if (eventId !== null && date !== null) throw new Error("A Linked task gets its date from its Event");
       if (time !== null && date === null && eventId === null) throw new Error("Only a dated Task can have a time");
@@ -107,7 +110,8 @@ export async function openTaskStore(
     },
 
     async completeTask(id) {
-      await change(id, { completedAt: now().toISOString() });
+      // A Task that a sync has just deleted is gone anyway; completing it is a tap on a stale row, not an error.
+      await tasks.update(id, { completedAt: now().toISOString() });
     },
 
     async linkTask(id, eventId, offsetDays) {

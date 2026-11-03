@@ -2,18 +2,23 @@ import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import type { EventFields } from "../events/event";
-import { eventDays, eventEnd, eventStart } from "../events/event";
-import { openEventStore, type EventStore } from "../events/eventStore";
-import { formatEventWhen } from "../events/formatEvent";
+import { eventDays, eventEnd, eventStart, validateEvent, withEventDates } from "../events/event";
+import { eventRecordType, openEventStore, type EventStore } from "../events/eventStore";
+import { formatEventTime, formatEventWhen, formatOffset, formatRelativeDay, inOtherTimeZone } from "../events/formatEvent";
+import { formatRiskExplanation, formatRiskStatus } from "../events/formatRisk";
+import { countdown, eventRisk, isOverdue, linkedRole } from "../events/risk";
 import { arrangeHome } from "../home/buckets";
+import { dayOf } from "../home/days";
+import { translate } from "../i18n/i18n";
+import { maxNotesLength } from "../data/limits";
 import { openTaskStore, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { recordTypes } from "./recordTypes";
 import { openTable, type RecordType, type Synced } from "./replica";
-import { createSyncStores } from "./syncDb";
+import { createSyncStores, type OutboxEntry, type SyncDb } from "./syncDb";
 import { MemoryServer } from "./testing/memoryServer";
-import { TransportError } from "./transport";
+import { createHttpTransport, TransportError, type Transport } from "./transport";
 
 let dbCounter = 0;
 const freshDbName = () => `sync-test-${dbCounter++}`;
@@ -31,6 +36,8 @@ class World {
 
 interface Device {
   name: string;
+  db: SyncDb;
+  now: () => Date;
   tasks: TaskStore;
   events: EventStore;
   engine: SyncEngine;
@@ -39,14 +46,23 @@ interface Device {
   close(): void;
 }
 
-async function openDevice(world: World, server: MemoryServer, { name = freshDbName(), clockOffsetMs = 0 } = {}): Promise<Device> {
+interface DeviceOptions {
+  name?: string;
+  clockOffsetMs?: number;
+  /** How the device reaches the server; the in-memory server's transport unless a test runs the real HTTP one. */
+  transport?: Transport;
+}
+
+async function openDevice(world: World, server: MemoryServer, { name = freshDbName(), clockOffsetMs = 0, transport = server.transport() }: DeviceOptions = {}): Promise<Device> {
   const now = world.clock(clockOffsetMs);
   const tasks = await openTaskStore(name, { now });
   const events = await openEventStore(name, { now });
   const db = await openAppDb(name);
-  const engine = await createSyncEngine({ db, types: recordTypes, transport: server.transport(), now });
+  const engine = await createSyncEngine({ db, types: recordTypes, transport, now });
   return {
     name,
+    db,
+    now,
     tasks,
     events,
     engine,
@@ -60,13 +76,19 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
 }
 
 /** Two phones' worth of setup: a shared world and server, and devices A and B. */
-async function twoDevices(options: { serverPageSize?: number; bClockOffsetMs?: number } = {}) {
+async function twoDevices(options: { serverPageSize?: number; bClockOffsetMs?: number; viaHttp?: boolean } = {}) {
   const world = new World();
   const server = new MemoryServer({ time: () => world.ms, pageSize: options.serverPageSize });
-  const a = await openDevice(world, server);
-  const b = await openDevice(world, server, { clockOffsetMs: options.bClockOffsetMs });
+  // `viaHttp` runs the real transport against the server's HTTP answers, so what it makes of each status counts.
+  const transport = options.viaHttp ? createHttpTransport(server.fetch) : undefined;
+  const a = await openDevice(world, server, { transport });
+  const b = await openDevice(world, server, { clockOffsetMs: options.bClockOffsetMs, transport });
   return { world, server, a, b };
 }
+
+/** Writes an Event's notes as an app version without the length limit would, past the store's checks. */
+const writeNotesUnchecked = async (device: Device, id: string, notes: string) =>
+  (await openTable(device.db, eventRecordType, device.now)).update(id, { notes });
 
 const party: EventFields = {
   title: "Party",
@@ -245,7 +267,26 @@ describe("Sync between two devices", () => {
 
     expect(await titles(a)).toEqual([]);
     expect(await titles(b)).toEqual([]);
-    await expect(b.tasks.completeTask(task.id)).rejects.toThrow("No Task with id");
+  });
+
+  it("ignores Complete for a Task that a sync has just deleted, and sends nothing for it", async () => {
+    const { world, server, a, b } = await twoDevices();
+    const task = await a.tasks.addTask("Doomed");
+    await a.sync();
+    await b.sync();
+    world.advance();
+    await a.tasks.deleteTask(task.id);
+    await a.sync();
+    await b.sync();
+    world.advance();
+
+    await expect(b.tasks.completeTask(task.id)).resolves.toBeUndefined();
+    await b.sync();
+    await a.sync();
+
+    expect(await titles(b)).toEqual([]);
+    expect(server.stored("task", task.id, "completedAt")?.value).toBeNull();
+    expect(server.stored("task", task.id, "deletedAt")?.value).not.toBeNull();
   });
 
   it("does not bring a deleted Task back through an older edit from another device", async () => {
@@ -354,6 +395,96 @@ describe("Sync between two devices", () => {
     }
   });
 
+  describe("an Event's time, which belongs together", () => {
+    const timedParty: EventFields = { ...party, allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" };
+
+    async function syncedEvent(fields: EventFields) {
+      const devices = await twoDevices();
+      const event = await devices.a.events.addEvent(fields);
+      await devices.a.sync();
+      await devices.b.sync();
+      devices.world.advance();
+      return { ...devices, id: event.id };
+    }
+
+    async function settle(a: Device, b: Device) {
+      await a.sync();
+      await b.sync();
+      await a.sync();
+    }
+
+    it("is won as a unit: a later change of the start time from an older form doesn't leave an all-day Event with a time", async () => {
+      const { world, a, b, id } = await syncedEvent(timedParty);
+
+      await b.events.updateEvent(id, { ...party, startTime: null, endTime: null, timeZone: null }, timedParty);
+      world.advance();
+      await a.events.updateEvent(id, { ...timedParty, startTime: "09:30" }, timedParty);
+      await settle(a, b);
+
+      for (const device of [a, b]) {
+        const [event] = await device.events.listEvents();
+        expect(event).toMatchObject({ allDay: false, startTime: "09:30", endTime: "10:00", timeZone: "Europe/Berlin" });
+        expect(validateEvent(event)).toBeNull();
+      }
+    });
+
+    it("is won as a unit the other way round: a later switch to all-day takes the earlier start time with it", async () => {
+      const { world, a, b, id } = await syncedEvent(timedParty);
+
+      await a.events.updateEvent(id, { ...timedParty, startTime: "09:30" }, timedParty);
+      world.advance();
+      await b.events.updateEvent(id, { ...party, startTime: null, endTime: null, timeZone: null }, timedParty);
+      await settle(a, b);
+
+      for (const device of [a, b]) {
+        const [event] = await device.events.listEvents();
+        expect(event).toMatchObject({ allDay: true, startTime: null, endTime: null, timeZone: null });
+        expect(validateEvent(event)).toBeNull();
+      }
+    });
+
+    it("keeps the end from landing before the start: a later change of the end from an older form wins with the start it was made for", async () => {
+      const { world, a, b, id } = await syncedEvent(party);
+
+      await a.events.updateEvent(id, { ...party, startDate: "2026-10-20", endDate: "2026-10-20" }, party);
+      world.advance();
+      await b.events.updateEvent(id, { ...party, endDate: "2026-10-13" }, party);
+      await settle(a, b);
+
+      for (const device of [a, b]) {
+        const [event] = await device.events.listEvents();
+        expect(event).toMatchObject({ startDate: "2026-10-12", endDate: "2026-10-13" });
+        expect(validateEvent(event)).toBeNull();
+      }
+    });
+
+    it("keeps the other device's edit of the title, location and notes, which are not part of it", async () => {
+      const { world, a, b, id } = await syncedEvent(timedParty);
+
+      await b.events.updateEvent(id, { ...timedParty, title: "Birthday", location: "Garden", notes: "Cake" }, timedParty);
+      world.advance();
+      await a.events.updateEvent(id, { ...timedParty, endTime: "11:00" }, timedParty);
+      await settle(a, b);
+
+      for (const device of [a, b]) {
+        expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday", location: "Garden", notes: "Cake", endTime: "11:00" });
+      }
+    });
+
+    it("writes none of it for an edit of something else", async () => {
+      const { world, server, a, id } = await syncedEvent(timedParty);
+      const before = server.record("event", id);
+      world.advance();
+
+      await a.events.updateEvent(id, { ...timedParty, title: "Birthday" }, timedParty);
+      await a.sync();
+
+      const after = server.record("event", id);
+      for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"]) expect(after[field].hlc).toBe(before[field].hlc);
+      expect(after.title.hlc > before.title.hlc).toBe(true);
+    });
+  });
+
   it("settles a link against an unlink as a unit, also when the Task is already linked", async () => {
     const { world, a, b } = await twoDevices();
     const first = await a.events.addEvent(party);
@@ -401,23 +532,41 @@ describe("Sync between two devices", () => {
     const arrived = (type: string, id: string, fields: Record<string, unknown>) =>
       Object.entries(fields).map(([field, value]) => ({ type, id, field, value, hlc }));
 
-    /** Everything the screens do with Events, which must not throw for any Event the store lists. */
+    /**
+     * What the screens do with Events and their Linked tasks (EventRow, EventScreen, the home screen), in both
+     * languages: none of it may throw for what the stores list, nor make up days from what has not arrived.
+     */
     async function useEveryScreen(device: Device) {
       const now = new Date(Date.UTC(2026, 9, 1, 9, 0, 0));
+      const today = dayOf(now);
       const events = await device.events.listEvents();
       const tasks = await device.tasks.listTasks();
-      arrangeHome(tasks, now, events);
-      for (const event of events) {
-        eventStart(event);
-        eventEnd(event);
-        eventDays(event);
-        formatEventWhen(event, "en");
+      const home = arrangeHome(tasks, now, events);
+      for (const language of ["en", "de"] as const) {
+        const t = (key: Parameters<typeof translate>[1], params?: Record<string, string>) => translate(language, key, params);
+        for (const event of events) {
+          eventStart(event);
+          eventEnd(event);
+          formatEventWhen(event, language);
+          formatEventTime(event, language, t);
+          inOtherTimeZone(event);
+          formatRelativeDay(eventDays(event).first, today, t);
+          const risk = eventRisk(event, tasks, now);
+          countdown(event, tasks, now);
+          formatRiskStatus(risk, t);
+          formatRiskExplanation(event, risk, now, t);
+          for (const task of withEventDates(tasks.filter((linked) => linked.eventId === event.id), [event])) {
+            formatOffset(task.offsetDays!, t);
+            isOverdue(task, today);
+            linkedRole(task, event);
+          }
+        }
       }
-      return { events, tasks };
+      return { events, tasks, home };
     }
 
     it.each([
-      ["a timed Event whose times and zone are still to come", { title: "Party", allDay: false }],
+      ["a timed Event whose times and zone are still to come", { title: "Party", allDay: false, startDate: "2026-10-12", endDate: "2026-10-12" }],
       ["a timed Event whose zone is still to come", { title: "Party", allDay: false, startDate: "2026-10-12", startTime: "09:00", endDate: "2026-10-12", endTime: "10:00" }],
       ["an all-day Event that still has the times of its timed past", { title: "Party", allDay: true, startDate: "2026-10-12", endDate: "2026-10-12", startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }],
     ])("shows %s without breaking a screen", async (_name, fields) => {
@@ -473,9 +622,44 @@ describe("Sync between two devices", () => {
       ]);
     });
 
+    it.each([
+      ["title", { ...party, title: undefined }],
+      ["start date", { ...party, startDate: undefined }],
+      ["end date", { ...party, endDate: undefined }],
+      ["start and end date", { ...party, startDate: undefined, endDate: undefined }],
+    ])("leaves an Event out until its %s has arrived, and shows its Linked tasks as undated, not overdue", async (_name, fields) => {
+      const { server, a } = await twoDevices();
+      const present = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+      server.inject(arrived("event", "e1", present));
+      server.inject(arrived("task", "t1", { title: "Buy suit", eventId: "e1", offsetDays: -7 }));
+      server.inject(arrived("task", "t2", { title: "Thank them", eventId: "e1", offsetDays: 1 }));
+
+      await a.sync();
+
+      const { events, tasks, home } = await useEveryScreen(a);
+      expect(events).toEqual([]);
+      expect(tasks.map((task) => task.title)).toEqual(["Buy suit", "Thank them"]);
+      expect(home.filter((bucket) => bucket.tasks.length + bucket.events.length > 0).map((bucket) => [bucket.kind, bucket.tasks.length, bucket.events.length, bucket.open])).toEqual([["inbox", 2, 0, 2]]);
+    });
+
+    it("shows the Event, and its Linked tasks on their days, once the missing field has arrived", async () => {
+      const { server, a } = await twoDevices();
+      server.inject(arrived("event", "e1", { title: "Wedding", endDate: "2026-10-20" }));
+      server.inject(arrived("task", "t1", { title: "Buy suit", eventId: "e1", offsetDays: -7 }));
+      await a.sync();
+      expect((await a.events.listEvents())).toEqual([]);
+
+      server.inject(arrived("event", "e1", { startDate: "2026-10-19", allDay: true }).map((change) => ({ ...change, hlc: "000000000000002-00000-other-device" })));
+      await a.sync();
+
+      const { events, tasks } = await useEveryScreen(a);
+      expect(events.map((event) => [event.title, event.startDate, event.endDate])).toEqual([["Wedding", "2026-10-19", "2026-10-20"]]);
+      expect(withEventDates(tasks, events)[0].date).toBe("2026-10-12");
+    });
+
     it("lets the rest of the Event arrive later, and then shows it as it is", async () => {
       const { server, a } = await twoDevices();
-      server.inject(arrived("event", "e1", { title: "Party", allDay: false }));
+      server.inject(arrived("event", "e1", { title: "Party", allDay: false, startDate: "2026-10-12", endDate: "2026-10-12" }));
       await a.sync();
       expect((await a.events.listEvents())[0].allDay).toBe(true);
 
@@ -832,7 +1016,7 @@ describe("Sync between two devices", () => {
     it("sends changes in batches that fit the server's limit, however big the values are", async () => {
       const { world, server, a, b } = await twoDevices();
       for (let i = 0; i < 60; i++) {
-        await a.events.addEvent({ ...party, title: `Event ${i}`, notes: note(50_000) });
+        await a.events.addEvent({ ...party, title: `Event ${i}`, notes: note(maxNotesLength) });
         world.advance();
       }
 
@@ -845,9 +1029,10 @@ describe("Sync between two devices", () => {
       expect(await b.events.listEvents()).toHaveLength(60);
     });
 
-    it("sets aside a value the server refuses as too big, reports it, and carries on with everything else", async () => {
+    it("sets aside a value too big for any request, reports it, and carries on with everything else", async () => {
       const { world, a, b } = await twoDevices();
-      const event = await a.events.addEvent({ ...party, notes: note(1_200_000) });
+      const event = await a.events.addEvent(party);
+      await writeNotesUnchecked(a, event.id, note(1_200_000));
       await a.tasks.addTask("Fine");
       world.advance();
       await b.tasks.addTask("From B");
@@ -859,14 +1044,37 @@ describe("Sync between two devices", () => {
       expect(a.engine.state().status).toBe("rejected");
       expect(await titles(b)).toEqual(["Fine", "From B"]);
       expect(await titles(a)).toEqual(["Fine", "From B"]);
-      const arrived = (await b.events.listEvents())[0];
-      expect(arrived).toMatchObject({ id: event.id, title: "Party", notes: "" });
+      expect((await b.events.listEvents())[0]).toMatchObject({ id: event.id, title: "Party", notes: "" });
       expect((await a.events.listEvents())[0].notes).toHaveLength(1_200_000);
+    });
+
+    it("halves a request refused as too big until the value that is too big stands alone", async () => {
+      const world = new World();
+      const server = new MemoryServer({ time: () => world.ms, maxPushBytes: 200_000 });
+      const a = await openDevice(world, server);
+      const b = await openDevice(world, server);
+      const events = [];
+      for (const title of ["One", "Two", "Three"]) {
+        events.push(await a.events.addEvent({ ...party, title }));
+        world.advance();
+      }
+      await writeNotesUnchecked(a, events[0].id, note(150_000));
+      await writeNotesUnchecked(a, events[1].id, note(250_000));
+      await writeNotesUnchecked(a, events[2].id, note(150_000));
+
+      await a.sync();
+      await b.sync();
+
+      expect(server.refusedPushes).toBeGreaterThan(0);
+      expect(a.engine.state().status).toBe("rejected");
+      const arrived = new Map((await b.events.listEvents()).map((event) => [event.title, event.notes.length]));
+      expect(arrived).toEqual(new Map([["One", 150_000], ["Two", 0], ["Three", 150_000]]));
     });
 
     it("sends the value again once the person has made it smaller", async () => {
       const { world, a, b } = await twoDevices();
-      const event = await a.events.addEvent({ ...party, notes: note(1_200_000) });
+      const event = await a.events.addEvent(party);
+      await writeNotesUnchecked(a, event.id, note(1_200_000));
       await a.sync();
       expect(a.engine.state().status).toBe("rejected");
       world.advance();
@@ -879,7 +1087,7 @@ describe("Sync between two devices", () => {
       expect((await b.events.listEvents())[0].notes).toBe("Short");
     });
 
-    it("finds the one change the server refuses as malformed and sends the rest", async () => {
+    it("sets aside only the change the server names as malformed, and sends the rest in one more request", async () => {
       const { server, a, b } = await twoDevices();
       server.rejects = (change) => change.field === "title" && change.value === "Poison";
       await a.tasks.addTask("Fine");
@@ -891,9 +1099,11 @@ describe("Sync between two devices", () => {
 
       expect(a.engine.state().status).toBe("rejected");
       expect((await titles(b)).sort()).toEqual(["", "Also fine", "Fine"]);
+      expect(server.refusedPushes).toBe(1);
+      expect(server.pushRequests).toBe(2);
     });
 
-    it("does not send a refused change again on every sync", async () => {
+    it("does not send a set-aside change again on every sync", async () => {
       const { server, a } = await twoDevices();
       server.rejects = (change) => change.field === "title" && change.value === "Poison";
       await a.tasks.addTask("Poison");
@@ -904,6 +1114,101 @@ describe("Sync between two devices", () => {
 
       expect(server.pushRequests).toBe(requests);
       expect(a.engine.state().status).toBe("rejected");
+    });
+
+    it("tries a set-aside change again when the app is started again, and it arrives if the server has been fixed", async () => {
+      const { world, server, a, b } = await twoDevices();
+      server.rejects = (change) => change.field === "title" && change.value === "Poison";
+      await a.tasks.addTask("Poison");
+      await a.sync();
+      expect(a.engine.state().status).toBe("rejected");
+      server.rejects = null;
+      a.close();
+      world.advance();
+
+      const restarted = await openDevice(world, server, { name: a.name });
+      await restarted.sync();
+      await b.sync();
+
+      expect(restarted.engine.state().status).toBe("idle");
+      expect(await titles(b)).toEqual(["Poison"]);
+    });
+
+    it("tries a set-aside change again after an hour, without a restart", async () => {
+      const { world, server, a, b } = await twoDevices();
+      server.rejects = (change) => change.field === "title" && change.value === "Poison";
+      await a.tasks.addTask("Poison");
+      await a.sync();
+      server.rejects = null;
+      const requests = server.pushRequests;
+
+      world.advance(59 * 60_000);
+      await a.sync();
+      expect(server.pushRequests).toBe(requests);
+      world.advance(60_000);
+      await a.sync();
+      await b.sync();
+
+      expect(a.engine.state().status).toBe("idle");
+      expect(await titles(b)).toEqual(["Poison"]);
+    });
+
+    it("sets a change aside again, for another hour, when the server still refuses it", async () => {
+      const { world, server, a } = await twoDevices();
+      server.rejects = (change) => change.field === "title" && change.value === "Poison";
+      await a.tasks.addTask("Poison");
+      await a.sync();
+      world.advance(60 * 60_000);
+      await a.sync();
+      const requests = server.pushRequests;
+
+      world.advance(59 * 60_000);
+      await a.sync();
+
+      expect(server.pushRequests).toBe(requests);
+      expect(a.engine.state().status).toBe("rejected");
+    });
+
+    describe.each([
+      ["a 400 that names no change, like a proxy's or a server bug's", 400],
+      ["a 413 for a request far below any real limit", 413],
+    ])("when the server refuses every push with %s", (_name, status) => {
+      it("sets nothing aside, stops after one request, and sends everything once the server is well again", async () => {
+        const { server, a, b } = await twoDevices({ viaHttp: true });
+        for (let i = 0; i < 16; i++) await a.tasks.addTask(`Task ${i}`);
+        server.pushStatus = status;
+
+        await a.sync();
+
+        expect(a.engine.state().status).toBe("failed");
+        expect(server.refusedPushes).toBe(1);
+
+        server.pushStatus = null;
+        await a.sync();
+        await b.sync();
+
+        expect(a.engine.state().status).toBe("idle");
+        expect(await b.tasks.listTasks()).toHaveLength(16);
+        expect((await b.tasks.listTasks()).every((task) => task.title !== "")).toBe(true);
+      });
+    });
+
+    it("treats a refusal that names a change it never sent as a failure, and sets nothing aside", async () => {
+      const world = new World();
+      const server = new MemoryServer({ time: () => world.ms });
+      const confused: Transport = {
+        ...server.transport(),
+        push: async () => {
+          throw new TransportError("rejected", { badChange: 99 });
+        },
+      };
+      const a = await openDevice(world, server, { transport: confused });
+      await a.tasks.addTask("Fine");
+
+      await a.sync();
+
+      expect(a.engine.state().status).toBe("failed");
+      expect(((await a.db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined)).toBe(false);
     });
 
     it("still pulls when the push fails for another reason, and reports the failure", async () => {

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { goBack } from "../app/navigation";
+import { maxNotesLength, maxTitleLength } from "../data/limits";
 import { dayOf } from "../home/days";
 import { useI18n } from "../i18n/I18nProvider";
 import { NavBar } from "../ui/NavBar";
@@ -150,7 +151,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
 
       {showProblem && problem && (
         <p className="problem" role="alert">
-          {t(`eventForm.problem.${problem}`)}
+          {t(`eventForm.problem.${problem}`, { title: String(maxTitleLength), notes: String(maxNotesLength) })}
         </p>
       )}
     </form>

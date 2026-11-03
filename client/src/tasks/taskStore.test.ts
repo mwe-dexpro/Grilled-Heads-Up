@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openDB } from "idb";
+import { openAppDb } from "../data/database";
+import { maxTitleLength } from "../data/limits";
 import { openTaskStore, taskRecordType } from "./taskStore";
 
 let dbCounter = 0;
@@ -72,10 +74,21 @@ describe("Task store", () => {
     expect(await store.listTasks()).toHaveLength(1);
   });
 
-  it("refuses to Complete a Task that does not exist", async () => {
+  it("ignores Complete for a Task that does not exist", async () => {
     const store = await openTaskStore(freshDbName());
 
-    await expect(store.completeTask("missing")).rejects.toThrow("No Task with id missing");
+    await expect(store.completeTask("missing")).resolves.toBeUndefined();
+
+    expect(await store.listTasks()).toEqual([]);
+  });
+
+  it("refuses a title longer than the limit, and takes one of exactly that length", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await expect(store.addTask("x".repeat(maxTitleLength + 1))).rejects.toThrow("up to 200 characters");
+    const task = await store.addTask("x".repeat(maxTitleLength));
+
+    expect(await store.listTasks()).toEqual([task]);
   });
 });
 
@@ -115,14 +128,19 @@ describe("Deleting a Task", () => {
     expect((await after.listTasks()).map((t) => t.title)).toEqual(["Kept"]);
   });
 
-  it("refuses to delete, or otherwise change, a Task that is gone", async () => {
-    const store = await openTaskStore(freshDbName());
+  it("refuses to delete a Task that is gone, and ignores Complete for it", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName);
     const task = await store.addTask("Doomed");
     await store.deleteTask(task.id);
 
     await expect(store.deleteTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
-    await expect(store.completeTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
+    await expect(store.completeTask(task.id)).resolves.toBeUndefined();
     await expect(store.deleteTask("missing")).rejects.toThrow("No Task with id missing");
+
+    expect(await store.listTasks()).toEqual([]);
+    const raw = await (await openAppDb(dbName)).get("tasks", task.id);
+    expect(raw).toMatchObject({ completedAt: null });
   });
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TaskWhen } from "../tasks/taskStore";
 
@@ -49,6 +50,7 @@ export function NewTaskSheet({ open, onAdd, onNewEvent, onClose }: NewTaskSheetP
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("newTask.placeholder")}
               autoComplete="off"
+              maxLength={maxTitleLength}
               enterKeyHint="done"
               autoFocus
             />

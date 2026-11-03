@@ -59,8 +59,12 @@ export function useAppData() {
   const changeTasks = useCallback(
     async (change: (store: TaskStore) => Promise<unknown>) => {
       if (!stores.current) return;
-      await change(stores.current.tasks);
-      await reload();
+      try {
+        await change(stores.current.tasks);
+      } finally {
+        // Also when the change failed: what the screen shows may be stale, say, a Task a sync has just deleted.
+        await reload();
+      }
       syncSoon();
     },
     [reload, syncSoon],

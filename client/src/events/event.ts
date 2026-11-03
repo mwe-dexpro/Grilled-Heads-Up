@@ -1,3 +1,4 @@
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import type { Progress } from "../home/buckets";
 import { addDays, dayOf, type Day, type TimeOfDay } from "../home/days";
 import type { Task } from "../tasks/taskStore";
@@ -36,7 +37,7 @@ export interface Event {
 /** What a person enters for an Event. */
 export type EventFields = Omit<Event, "id" | "createdAt" | "externalSource" | "externalId" | "deletedAt">;
 
-export type EventProblem = "title" | "end" | "shape";
+export type EventProblem = "title" | "tooLong" | "end" | "shape";
 
 export function deviceTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -95,6 +96,7 @@ export function eventDays(event: EventFields): { first: Day; last: Day } {
 
 export function validateEvent(fields: EventFields): EventProblem | null {
   if (fields.title.trim() === "") return "title";
+  if (fields.title.length > maxTitleLength || fields.location.length > maxLocationLength || fields.notes.length > maxNotesLength) return "tooLong";
   const timesGiven = [fields.startTime, fields.endTime, fields.timeZone].map((value) => value !== null);
   if (fields.allDay ? timesGiven.some(Boolean) : !timesGiven.every(Boolean)) return "shape";
   if (fields.allDay ? fields.endDate < fields.startDate : eventEnd(fields) < eventStart(fields)) return "end";

@@ -73,6 +73,7 @@
   "eventForm.location": "Location",
   "eventForm.notes": "Notes",
   "eventForm.problem.title": "Give the event a title.",
+  "eventForm.problem.tooLong": "That is too long: the title and the location can have up to {title} characters, the notes up to {notes}.",
   "eventForm.problem.end": "The end can't be before the start.",
   "eventForm.problem.shape": "Fill in the start and end times.",
   "linkedTask.heading": "Add task",

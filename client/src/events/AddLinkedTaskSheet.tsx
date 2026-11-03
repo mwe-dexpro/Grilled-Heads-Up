@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { maxTitleLength } from "../data/limits";
 import { formatShortDay } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
 import { linkedTaskDate, type Event } from "./event";
@@ -54,6 +55,7 @@ export function AddLinkedTaskSheet({ event, open, onAdd, onClose }: AddLinkedTas
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("newTask.placeholder")}
               autoComplete="off"
+              maxLength={maxTitleLength}
               autoFocus
             />
           </label>

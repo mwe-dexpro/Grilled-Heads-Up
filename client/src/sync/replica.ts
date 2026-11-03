@@ -24,9 +24,10 @@ export interface Table<T extends Synced> {
   /** Live records only, in no particular order. */
   list(): Promise<T[]>;
   /**
-   * Saves a record that is new, or replaces a live one wholesale: the fields that differ from the stored record
-   * are synced, each under one shared clock. Never changes `deletedAt` and never touches a deleted record (it
-   * throws); to change a stored record from what it was read as, use `update`.
+   * Saves a record that is new: every field is synced, under one shared clock. It throws when the id is taken
+   * (also by a deleted record), because replacing a stored record from a copy read earlier would write that
+   * copy's stale fields over what a sync brought meanwhile; to change a stored record, use `update`. A new record
+   * is always live: only `delete` writes the tombstone.
    */
   put(record: T): Promise<void>;
   /**
@@ -42,8 +43,6 @@ export interface Table<T extends Synced> {
 
 /** Fields of a record that a store operation sets; never the id, and not `deletedAt`, which only `delete` writes. */
 export type Patch<T extends Synced> = Partial<Omit<T, "id" | "deletedAt">>;
-
-const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * Stores `next` and records what was written: one new clock for the `changed` fields, their per-field clocks, and
@@ -70,10 +69,6 @@ async function writeRecord<T extends Synced>(
 }
 
 const fieldsOf = <T extends Synced>(record: T) => Object.keys(record).filter((field) => field !== "id") as Array<keyof T & string>;
-
-/** A record never seen before changes entirely; of a known one, the fields that differ count. */
-const differing = <T extends Synced>(prev: T | undefined, next: T) =>
-  prev ? fieldsOf(next).filter((field) => !sameValue(prev[field], next[field])) : fieldsOf(next);
 
 /**
  * Records saved before sync existed have no field clocks yet; they are given clocks and outbox entries here,
@@ -123,15 +118,12 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
 
     async put(record) {
       const tx = transactionOver(db, [storeName]);
-      const raw = (await tx.objectStore(storeName).get(record.id)) as (Partial<T> & { id: string }) | undefined;
-      const prev = raw && withDefaults(raw);
-      if (prev && prev.deletedAt !== null) {
+      if (await tx.objectStore(storeName).get(record.id)) {
         await tx.done;
-        throw new Error(`Record ${record.id} is deleted`);
+        throw new Error(`Record ${record.id} exists already; use update to change it`);
       }
-      // Only `delete` writes the tombstone, so a copy read before a deletion arrived can't undo it.
-      const next = { ...withDefaults(record), deletedAt: prev ? prev.deletedAt : null };
-      await writeRecord(tx, recordType, next, differing(prev, next), now());
+      const next = { ...withDefaults(record), deletedAt: null };
+      await writeRecord(tx, recordType, next, fieldsOf(next), now());
       await tx.done;
     },
 
