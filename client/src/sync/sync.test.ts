@@ -11,7 +11,7 @@ import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { recordTypes } from "./recordTypes";
 import { openTable, type RecordType, type Synced } from "./replica";
-import { createSyncStores, type FieldClocks } from "./syncDb";
+import { createSyncStores } from "./syncDb";
 import { MemoryServer } from "./testing/memoryServer";
 import { TransportError } from "./transport";
 
@@ -166,6 +166,29 @@ describe("Sync between two devices", () => {
 
     for (const device of [a, b]) {
       expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday party", startDate: "2026-10-14", endDate: "2026-10-14" });
+    }
+  });
+
+  it("keeps a Task's date as set on one device and its Completion on the other", async () => {
+    // A Task has no title edit yet, so the Task side of "different fields of one record" is the date and Completion.
+    const { world, a, b } = await twoDevices();
+    const event = await a.events.addEvent(party);
+    const task = await a.tasks.addTask("Gift", { eventId: event.id, offsetDays: -7 });
+    await a.sync();
+    await b.sync();
+    world.advance();
+
+    await a.tasks.unlinkTask(task.id, "2026-10-11");
+    world.advance();
+    await b.tasks.completeTask(task.id);
+    await a.sync();
+    await b.sync();
+    await a.sync();
+
+    for (const device of [a, b]) {
+      const [synced] = await device.tasks.listTasks();
+      expect(synced).toMatchObject({ date: "2026-10-11", eventId: null, offsetDays: null });
+      expect(synced.completedAt).not.toBeNull();
     }
   });
 
@@ -498,18 +521,24 @@ describe("Sync between two devices", () => {
     expect(server.stored("event", event.id, "title")?.value).toBe("Edited during the push");
   });
 
-  it("saves the clock of every field it applies, so older changes arriving later can't win", async () => {
+  it("remembers the clock of every field it applies, so an older change arriving later can't win", async () => {
     const { server, a, b } = await twoDevices();
     const task = await a.tasks.addTask("Buy gift", { date: "2026-10-04" });
     await a.sync();
-
     await b.sync();
+    // Later, a feed delivers older changes of every field of that Task (a replay, or a slow path through the server).
+    const older = Object.values(server.record("task", task.id)).map((change) => ({ ...change, value: "stale", hlc: "000000000000001-00000-old" }));
+    const real = server.transport();
+    const replay = await createSyncEngine({
+      db: await openAppDb(b.name),
+      types: recordTypes,
+      now: () => new Date(),
+      transport: { push: real.push, pull: async (after, limit) => ({ ...(await real.pull(after, limit)), changes: older }) },
+    });
 
-    const db = await openAppDb(b.name);
-    const { clocks } = (await db.get("fieldClocks", ["task", task.id])) as FieldClocks;
-    expect(Object.keys(clocks).sort()).toEqual(["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "time", "title"]);
-    expect(clocks.title).toBe(server.stored("task", task.id, "title")!.hlc);
-    db.close();
+    await replay.syncNow();
+
+    expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
   });
 
   it("drops an edit still waiting in the outbox when a later change to the same field arrives", async () => {
