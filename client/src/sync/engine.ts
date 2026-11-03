@@ -1,5 +1,5 @@
 import { decode } from "./hlc";
-import type { RecordType, Synced } from "./replica";
+import { queuePreSyncRecords, type RecordType, type Synced } from "./replica";
 import { receiveTimestamps, transactionOver, type FieldClocks, type OutboxEntry, type SyncDb } from "./syncDb";
 import { TransportError, type Change, type FailureKind, type Transport } from "./transport";
 
@@ -23,9 +23,10 @@ export interface SyncEngine {
   /**
    * Pushes local changes, then pulls what other devices did. Runs at once, or, while a run is under way,
    * once more right after it (any number of requests during a run share that one follow-up). Never rejects:
-   * the outcome shows in `state()`.
+   * the outcome shows in `state()`. The status is "syncing" only for a run someone asked to see
+   * (`showProgress`, for the Sync now button); background runs change it only to report how they ended.
    */
-  syncNow(): Promise<void>;
+  syncNow(options?: { showProgress?: boolean }): Promise<void>;
   state(): SyncState;
   /** Called whenever the status or the time of the last sync changes. Returns how to stop listening. */
   subscribe(listener: (state: SyncState) => void): () => void;
@@ -147,7 +148,9 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
 
     for (const key of touched) await tx.objectStore("fieldClocks").put(clocksOf.get(key)!);
     await receiveTimestamps(tx, [...changes.map(({ hlc }) => decode(hlc)), { wall: serverTime, counter: 0 }], now());
-    await tx.objectStore("syncInfo").put(cursor, "cursor");
+    // Another tab may have read further meanwhile; never move the position back.
+    const saved = ((await tx.objectStore("syncInfo").get("cursor")) as number | undefined) ?? 0;
+    await tx.objectStore("syncInfo").put(Math.max(saved, cursor), "cursor");
     await tx.done;
     return applied;
   }
@@ -163,13 +166,19 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     }
   }
 
+  /** Set by a request that wants to see "syncing"; the next run to start shows it. */
+  let progressWanted = false;
+
   async function run() {
-    setState({ status: "syncing" });
+    if (progressWanted) setState({ status: "syncing" });
+    progressWanted = false;
     let applied = false;
     try {
       // A push that fails for another reason than the connection or the session doesn't keep the pull from running.
       let pushFailure: unknown = null;
       try {
+        // The stores do this when they open; here too, since the first run can come before they are done.
+        for (const recordType of types) await queuePreSyncRecords(db, recordType, now);
         await push();
       } catch (error) {
         if (error instanceof TransportError && (error.kind === "offline" || error.kind === "signedOut")) throw error;
@@ -190,7 +199,8 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   let current: Promise<void> | null = null;
   let followUp: Promise<void> | null = null;
 
-  function syncNow(): Promise<void> {
+  function syncNow({ showProgress = false } = {}): Promise<void> {
+    if (showProgress) progressWanted = true;
     if (current === null) {
       current = run().finally(() => {
         current = null;

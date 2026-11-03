@@ -45,7 +45,8 @@ export function useSync(onRemoteChanges: () => void) {
     };
   }, []);
 
-  const syncNow = useCallback(() => void engine.current?.syncNow(), []);
+  /** For the Sync now button: shows "Syncing…" while it runs. */
+  const syncNow = useCallback(() => void engine.current?.syncNow({ showProgress: true }), []);
   /** To call after each local change. */
   const syncSoon = useCallback(() => auto.current?.afterChange(), []);
 

@@ -13,6 +13,7 @@ import { recordTypes } from "./recordTypes";
 import { openTable, type RecordType, type Synced } from "./replica";
 import { createSyncStores, type FieldClocks } from "./syncDb";
 import { MemoryServer } from "./testing/memoryServer";
+import { TransportError } from "./transport";
 
 let dbCounter = 0;
 const freshDbName = () => `sync-test-${dbCounter++}`;
@@ -589,6 +590,43 @@ describe("Sync between two devices", () => {
     });
   });
 
+  it("never moves the saved position back when a slower tab finishes after a faster one", async () => {
+    const { world, server, a, b } = await twoDevices({ serverPageSize: 2 });
+    for (let i = 0; i < 3; i++) {
+      await a.tasks.addTask(`Task ${i}`);
+      world.advance();
+    }
+    await a.sync();
+    // A second tab of B reads the first page, then stalls until the first tab has read everything and the connection drops.
+    const real = server.transport();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let pulls = 0;
+    const slowTab = await createSyncEngine({
+      db: await openAppDb(b.name),
+      types: recordTypes,
+      now: world.clock(),
+      transport: {
+        push: real.push,
+        pull: async (after, limit) => {
+          if (++pulls > 1) throw new TransportError("offline");
+          const page = await real.pull(after, limit);
+          await held;
+          return page;
+        },
+      },
+    });
+    const slow = slowTab.syncNow();
+    await b.sync();
+    release();
+    await slow;
+    const downloaded = server.pulledChanges;
+
+    await b.sync();
+
+    expect(server.pulledChanges).toBe(downloaded);
+  });
+
   it("brings Tasks and Events saved before sync existed to the other device", async () => {
     const world = new World();
     const server = new MemoryServer({ time: () => world.ms });
@@ -640,6 +678,46 @@ describe("Sync between two devices", () => {
     await again.sync();
 
     expect(server.pushRequests).toBe(pushedBefore);
+  });
+
+  it("brings pre-sync records to the other device when the engine runs before any store was opened", async () => {
+    const world = new World();
+    const server = new MemoryServer({ time: () => world.ms });
+    const oldName = freshDbName();
+    const old = await openDB(oldName, 2, {
+      upgrade(db) {
+        db.createObjectStore("tasks", { keyPath: "id" });
+        db.createObjectStore("events", { keyPath: "id" });
+      },
+    });
+    await old.put("tasks", { id: "old-task", title: "Saved by the skeleton", createdAt: "2026-09-28T09:00:00.000Z", completedAt: null });
+    old.close();
+    // Opening the database upgrades it, but no store (and so no queuing of old records) comes first, as in the app.
+    const db = await openAppDb(oldName);
+    const engine = await createSyncEngine({ db, types: recordTypes, transport: server.transport(), now: world.clock() });
+    const other = await openDevice(world, server);
+
+    await engine.syncNow();
+    await other.sync();
+
+    expect(await titles(other)).toEqual(["Saved by the skeleton"]);
+  });
+
+  it("looks at old records only when a record type is first opened, not again at every start", async () => {
+    const world = new World();
+    const server = new MemoryServer({ time: () => world.ms });
+    const name = freshDbName();
+    (await openDevice(world, server, { name })).close();
+    const raw = await openAppDb(name);
+    await raw.put("tasks", { id: "stray", title: "Put there without sync", createdAt: "2026-09-28T09:00:00.000Z", completedAt: null } as never);
+    raw.close();
+
+    const again = await openDevice(world, server, { name });
+    await again.sync();
+    const other = await openDevice(world, server);
+    await other.sync();
+
+    expect(await titles(other)).toEqual([]);
   });
 
   it("skips a change of a record type it doesn't know, and moves on", async () => {
@@ -817,12 +895,35 @@ describe("Sync between two devices", () => {
       a.engine.subscribe((state) => seen.push(`${state.status}:${state.lastSyncedAt}`));
       expect(a.engine.state()).toEqual({ status: "idle", lastSyncedAt: null });
 
-      await a.sync();
+      await a.engine.syncNow({ showProgress: true });
 
       expect(seen).toEqual(["syncing:null", `idle:${world.ms}`]);
       a.close();
       const reopened = await openDevice(world, server, { name: a.name });
       expect(reopened.engine.state()).toEqual({ status: "idle", lastSyncedAt: world.ms });
+    });
+
+    it("does not report syncing during a background run, so the status line stays calm", async () => {
+      const { world, a } = await twoDevices();
+      await a.sync();
+      world.advance();
+      const seen: string[] = [];
+      a.engine.subscribe((state) => seen.push(state.status));
+
+      await a.sync();
+      await a.sync();
+
+      expect(seen).toEqual(["idle", "idle"]);
+    });
+
+    it("reports syncing for a run that someone asked for while a background run was under way", async () => {
+      const { a } = await twoDevices();
+      const seen: string[] = [];
+      a.engine.subscribe((state) => seen.push(state.status));
+
+      await Promise.all([a.sync(), a.engine.syncNow({ showProgress: true })]);
+
+      expect(seen).toEqual(["idle", "syncing", "idle"]);
     });
 
     it("keeps the last sync time when a later sync fails", async () => {

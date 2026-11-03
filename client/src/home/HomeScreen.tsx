@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Event } from "../events/event";
 import { EventRow } from "../events/EventRow";
 import { useI18n } from "../i18n/I18nProvider";
@@ -118,9 +118,7 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onCompl
 
       <footer className="screen-footer">
         <div className="sync-line">
-          <p className="sync-status" role="status">
-            {formatSyncState(sync, now, language, t)}
-          </p>
+          <SyncStatus sync={sync} line={formatSyncState(sync, now, language, t)} />
           <button type="button" className="button-text" onClick={onSyncNow}>
             {t("sync.now")}
           </button>
@@ -138,6 +136,30 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onCompl
         <SignInSettings />
       </footer>
     </div>
+  );
+}
+
+/**
+ * The footer's sync line. Syncs run in the background about once a minute and each one moves the time in
+ * "Synced 14:32", so that text is not a live region: screen readers would speak it every minute. A separate,
+ * hidden live region announces the line only when it means something new: anything but "synced" (syncing,
+ * offline, failed…), and "synced" again after one of those.
+ */
+function SyncStatus({ sync, line }: { sync: SyncState; line: string }) {
+  const [announcement, setAnnouncement] = useState("");
+  const before = useRef(sync.status);
+  useEffect(() => {
+    if (sync.status !== "idle" || before.current !== "idle") setAnnouncement(line);
+    before.current = sync.status;
+  }, [sync.status, line]);
+
+  return (
+    <>
+      <p className="sync-status">{line}</p>
+      <p className="visually-hidden" role="status">
+        {announcement}
+      </p>
+    </>
   );
 }
 

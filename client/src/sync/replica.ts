@@ -76,17 +76,34 @@ const differing = <T extends Synced>(prev: T | undefined, next: T) =>
   prev ? fieldsOf(next).filter((field) => !sameValue(prev[field], next[field])) : fieldsOf(next);
 
 /**
- * Opens the table of a record type. Records saved before sync existed have no field clocks yet; they are
- * given clocks and outbox entries here, so that they reach the other devices too.
+ * Records saved before sync existed have no field clocks yet; they are given clocks and outbox entries here,
+ * so that they reach the other devices too. Done once per record type (a flag in `syncInfo` says so), before
+ * anything else writes to the type: a later write to such a record would give clocks to the fields it changed
+ * only. Safe to call from several places and tabs.
  */
-export async function openTable<T extends Synced>(db: SyncDb, recordType: RecordType<T>, now: () => Date): Promise<Table<T>> {
+export async function queuePreSyncRecords<T extends Synced>(db: SyncDb, recordType: RecordType<T>, now: () => Date): Promise<void> {
   const { type, storeName, withDefaults } = recordType;
+  const done = `queued:${type}`;
+  if (await db.get("syncInfo", done)) return;
 
   const tx = transactionOver(db, [storeName]);
-  for (const raw of (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>) {
-    if (!(await tx.objectStore("fieldClocks").get([type, raw.id]))) await writeRecord(tx, recordType, withDefaults(raw), fieldsOf(withDefaults(raw)), now());
+  // Checked again inside the transaction: another tab may have finished between the two.
+  if (!(await tx.objectStore("syncInfo").get(done))) {
+    for (const raw of (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>) {
+      if (!(await tx.objectStore("fieldClocks").get([type, raw.id]))) {
+        const record = withDefaults(raw);
+        await writeRecord(tx, recordType, record, fieldsOf(record), now());
+      }
+    }
+    await tx.objectStore("syncInfo").put(true, done);
   }
   await tx.done;
+}
+
+/** Opens the table of a record type; its records saved before sync existed are queued first. */
+export async function openTable<T extends Synced>(db: SyncDb, recordType: RecordType<T>, now: () => Date): Promise<Table<T>> {
+  const { storeName, withDefaults } = recordType;
+  await queuePreSyncRecords(db, recordType, now);
 
   async function stored(id: string): Promise<T | undefined> {
     const raw = (await db.get(storeName, id)) as (Partial<T> & { id: string }) | undefined;
