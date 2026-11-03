@@ -1,7 +1,21 @@
-import type { CDPSession, Page } from "@playwright/test";
+import { expect, type CDPSession, type Page } from "@playwright/test";
 
 /** The signed-in owner's cookies and storage, saved by `owner.setup.ts` for the app's tests. */
 export const ownerState = "test-results/owner.json";
+/** The same for the sync tests, which have a server and an owner of their own. */
+export const syncOwnerState = "test-results/sync-owner.json";
+
+/** First launch: registers the owner's passkey, confirms the recovery code and saves the signed-in state. */
+export async function registerOwner(page: Page, statePath: string): Promise<void> {
+  await addAuthenticator(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Create passkey" }).click();
+  await page.getByRole("button", { name: "I've stored it" }).click();
+
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await page.context().storageState({ path: statePath });
+}
 
 export interface Authenticator {
   cdp: CDPSession;

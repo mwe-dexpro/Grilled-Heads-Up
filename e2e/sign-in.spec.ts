@@ -85,7 +85,7 @@ test("the synced passkey signs in on a desktop browser", async ({ browser, baseU
 
   // The desktop already has this passkey, so adding it again is refused.
   await desktop.page.getByRole("button", { name: "Add a passkey" }).click();
-  await expect(desktop.page.getByRole("status")).toHaveText("This device already has a passkey for Grilled Heads-Up.");
+  await expect(desktop.page.getByRole("status").filter({ hasText: "passkey" })).toHaveText("This device already has a passkey for Grilled Heads-Up.");
 
   // A recovery code that got lost before it was stored is replaced from a signed-in session.
   await desktop.page.getByRole("button", { name: "New recovery code" }).click();
