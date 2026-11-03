@@ -99,12 +99,39 @@ test("when the session has expired, the next sync leads to the sign-in screen an
   const phone = await device(browser, baseURL!);
   const title = uniqueTitle("Kept while signed out");
   await addTask(phone.page, title);
+  const session = await phone.context.cookies();
 
   await phone.context.clearCookies();
   await phone.page.getByRole("button", { name: "Sync now" }).click();
 
   await expect(phone.page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
   expect(await phone.page.evaluate(() => localStorage.getItem("signedIn"))).toBeNull();
+  // The Task is still on the device, in the browser's database...
+  const stored = await phone.page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const open = indexedDB.open("grilled-heads-up");
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const request = open.result.transaction("tasks").objectStore("tasks").getAll();
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            open.result.close();
+            resolve((request.result as Array<{ title: string }>).map((task) => task.title));
+          };
+        };
+      }),
+  );
+  expect(stored).toContain(title);
+
+  // ...and after signing in again (here: the session comes back) it shows, and syncs.
+  await phone.context.addCookies(session);
+  await phone.page.reload();
+  await expect(phone.page.getByText(title)).toBeVisible();
+  await phone.page.getByRole("button", { name: "Sync now" }).click();
+  await expect(syncStatus(phone.page)).toHaveText(/^Synced/);
+  const other = await device(browser, baseURL!);
+  await syncUntil(other.page, (timeout) => expect(other.page.getByText(title)).toBeVisible({ timeout }));
 });
 
 test("a tab that another tab's database upgrade waits for lets go and asks to be reloaded", async ({ browser, baseURL }) => {

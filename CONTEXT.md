@@ -162,6 +162,6 @@ _German UI_: Wiederherstellungscode
 _Avoid_: Backup code, master password
 
 **Sync**:
-Keeping the Owner's Tasks and Events the same on every device, with or without a connection in between. Each field of a Task or Event syncs on its own; when two devices changed the same field, the later change wins.
+Keeping the Owner's Tasks and Events the same on every device, with or without a connection in between. Each field of a Task or Event syncs on its own; when two devices changed the same field, the later change wins. Fields that belong together (an Event's time, a Linked task's Event and Offset) are changed together, so the later edit of them wins as a whole.
 _German UI_: Synchronisieren
 _Avoid_: Backup, upload
