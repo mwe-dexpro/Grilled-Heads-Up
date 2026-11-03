@@ -471,6 +471,21 @@ describe("Sync between two devices", () => {
       }
     });
 
+    it("writes all of it when the same save also changes the title", async () => {
+      const { world, server, a, id } = await syncedEvent(timedParty);
+      const before = server.record("event", id);
+      world.advance();
+
+      await a.events.updateEvent(id, { ...timedParty, title: "Birthday", startTime: "09:30" }, timedParty);
+      await a.sync();
+
+      const after = server.record("event", id);
+      const clocks = ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"].map((field) => after[field].hlc);
+      expect(new Set(clocks).size).toBe(1);
+      expect(clocks[0] > before.startTime.hlc).toBe(true);
+      expect(after.title.hlc).toBe(after.startTime.hlc);
+    });
+
     it("writes none of it for an edit of something else", async () => {
       const { world, server, a, id } = await syncedEvent(timedParty);
       const before = server.record("event", id);
@@ -1114,6 +1129,53 @@ describe("Sync between two devices", () => {
 
       expect(server.pushRequests).toBe(requests);
       expect(a.engine.state().status).toBe("rejected");
+    });
+
+    it("sends no empty request after setting aside the last change of a batch", async () => {
+      const { server, a } = await twoDevices();
+      server.rejects = () => true;
+      await a.tasks.addTask("Everything is refused");
+      const entries = ((await a.db.getAll("outbox")) as OutboxEntry[]).length;
+
+      await a.sync();
+
+      // One request for each change, since each answer names only the first.
+      expect(server.pushRequests).toBe(entries);
+      expect(a.engine.state().status).toBe("rejected");
+    });
+
+    it("doesn't set aside an edit that replaced the refused change while the request was under way", async () => {
+      const world = new World();
+      const server = new MemoryServer({ time: () => world.ms });
+      let edit: (() => Promise<unknown>) | null = null;
+      const real = server.transport();
+      const racing: Transport = {
+        ...real,
+        push: async (changes) => {
+          const title = changes.findIndex((change) => change.field === "title");
+          if (edit && title !== -1) {
+            const run = edit;
+            edit = null;
+            await run();
+            throw new TransportError("rejected", { badChange: title });
+          }
+          return real.push(changes);
+        },
+      };
+      const a = await openDevice(world, server, { transport: racing });
+      const b = await openDevice(world, server);
+      const event = await a.events.addEvent(party);
+      edit = async () => {
+        world.advance();
+        await a.events.updateEvent(event.id, { ...party, title: "Better title" });
+      };
+
+      await a.sync();
+      expect(a.engine.state().status).toBe("idle");
+      await a.sync();
+      await b.sync();
+
+      expect((await b.events.listEvents())[0].title).toBe("Better title");
     });
 
     it("tries a set-aside change again when the app is started again, and it arrives if the server has been fixed", async () => {
