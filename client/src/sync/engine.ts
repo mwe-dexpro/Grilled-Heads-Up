@@ -82,12 +82,11 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         clocks = ((await tx.objectStore("fieldClocks").get([change.type, change.id])) as FieldClocks | undefined) ?? { type: change.type, id: change.id, clocks: {} };
         clocksOf.set(key, clocks);
       }
-      const local = clocks.clocks[change.field];
-      // Equal means our own change coming back; older means we already know better.
-      if (local !== undefined && change.hlc <= local) continue;
+      // Equal means our own change coming back; older means we already know better. A clock text is never empty.
+      if (change.hlc <= (clocks.clocks[change.field] ?? "")) continue;
 
       const store = tx.objectStore(recordType.storeName);
-      const base = ((await store.get(change.id)) as Partial<Synced> | undefined) ?? { id: change.id };
+      const base = ((await store.get(change.id)) as Partial<Synced> | undefined) ?? {};
       await store.put(recordType.withDefaults({ ...base, id: change.id, [change.field]: change.value }));
       clocks.clocks[change.field] = change.hlc;
       touched.add(key);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openTaskStore } from "../tasks/taskStore";
 import type { EventFields } from "./event";
-import { openEventStore } from "./eventStore";
+import { eventRecordType, openEventStore } from "./eventStore";
 
 let dbCounter = 0;
 const freshDbName = () => `events-test-${dbCounter++}`;
@@ -17,6 +17,33 @@ const birthday: EventFields = {
   location: " Café Luise, Berlin ",
   notes: " Table for 8 ",
 };
+
+describe("Events that arrive in part", () => {
+  it("show as an empty all-day placeholder on a valid day until the rest arrives", () => {
+    expect(eventRecordType.withDefaults({ id: "e1" })).toEqual({
+      id: "e1",
+      title: "",
+      allDay: true,
+      startDate: "1970-01-01",
+      startTime: null,
+      endDate: "1970-01-01",
+      endTime: null,
+      timeZone: null,
+      location: "",
+      notes: "",
+      externalSource: null,
+      externalId: null,
+      createdAt: "",
+      deletedAt: null,
+    });
+  });
+
+  it("keep the fields they have, including false and null ones", () => {
+    const partial = { id: "e1", title: "Party", allDay: false, timeZone: "Europe/Berlin", externalSource: "outlook", externalId: "AAMk", fromNewerVersion: 5 };
+
+    expect(eventRecordType.withDefaults(partial)).toMatchObject(partial);
+  });
+});
 
 describe("Event store", () => {
   it("saves an Event created in the app, with no external source, and reads it back after a reopen", async () => {

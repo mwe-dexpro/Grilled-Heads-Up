@@ -51,7 +51,7 @@ describe("sync routes", () => {
     const page = await pull(phone);
 
     expect(pushed.status).toBe(200);
-    expect((await pushed.json()).serverTime).toBeGreaterThanOrEqual(before);
+    expect(((await pushed.json()) as { serverTime: number }).serverTime).toBeGreaterThanOrEqual(before);
     expect(page.changes).toEqual([change("title", "Buy gift", hlc(10)), change("date", null, hlc(10))]);
     expect(page.cursor).toBe(2);
     expect(page.more).toBe(false);

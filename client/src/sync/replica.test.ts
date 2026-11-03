@@ -64,6 +64,25 @@ describe("Replica table", () => {
     expect(entries.find((e) => e.field === "completedAt")!.hlc).toBe(clocks.completedAt);
   });
 
+  it("stamps a later change later even when the device clock stands still or runs backwards", async () => {
+    const db = await openAppDb(`replica-test-${dbCounter++}`);
+    let seconds = 100;
+    const tasks = await openTable(db, taskRecordType, () => new Date(Date.UTC(2026, 9, 1, 9, 0, seconds)));
+    await tasks.put(task());
+    const stampOf = async (field: string) => (((await db.get("fieldClocks", ["task", "t1"])) as FieldClocks).clocks[field]);
+    const first = await stampOf("title");
+
+    await tasks.put(task({ title: "Same instant" }));
+    const second = await stampOf("title");
+    seconds = 50;
+    await tasks.put(task({ title: "Clock went back" }));
+    const third = await stampOf("title");
+
+    expect(second > first).toBe(true);
+    expect(third > second).toBe(true);
+    expect(decode(third).counter).toBe(2);
+  });
+
   it("does nothing for a save that changes nothing", async () => {
     const { tasks, outbox, db } = await open();
     await tasks.put(task());

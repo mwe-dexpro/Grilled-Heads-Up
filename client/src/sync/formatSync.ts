@@ -13,7 +13,6 @@ function formatSyncedAt(at: number, now: Date, language: Language): string {
 
 /** The footer's sync line: "Synced 14:32", "Offline · last synced 14:32", "Sync failed" and so on. */
 export function formatSyncState({ status, lastSyncedAt }: SyncState, now: Date, language: Language, t: Translate): string {
-  const time = lastSyncedAt === null ? "" : formatSyncedAt(lastSyncedAt, now, language);
   switch (status) {
     case "syncing":
       return t("sync.syncing");
@@ -22,8 +21,8 @@ export function formatSyncState({ status, lastSyncedAt }: SyncState, now: Date, 
     case "failed":
       return t("sync.failed");
     case "offline":
-      return lastSyncedAt === null ? t("sync.offline") : t("sync.offlineSince", { time });
+      return lastSyncedAt === null ? t("sync.offline") : t("sync.offlineSince", { time: formatSyncedAt(lastSyncedAt, now, language) });
     case "idle":
-      return lastSyncedAt === null ? t("sync.never") : t("sync.synced", { time });
+      return lastSyncedAt === null ? t("sync.never") : t("sync.synced", { time: formatSyncedAt(lastSyncedAt, now, language) });
   }
 }

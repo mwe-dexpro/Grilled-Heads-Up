@@ -8,7 +8,7 @@ import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { recordTypes } from "./recordTypes";
 import { openTable, type RecordType, type Synced } from "./replica";
-import { createSyncStores } from "./syncDb";
+import { createSyncStores, type FieldClocks } from "./syncDb";
 import { MemoryServer } from "./testing/memoryServer";
 
 let dbCounter = 0;
@@ -319,6 +319,42 @@ describe("Sync between two devices", () => {
 
     expect((await b.events.listEvents())[0].title).toBe("Edited during the push");
     expect(server.stored("event", event.id, "title")?.value).toBe("Edited during the push");
+  });
+
+  it("saves the clock of every field it applies, so older changes arriving later can't win", async () => {
+    const { server, a, b } = await twoDevices();
+    const task = await a.tasks.addTask("Buy gift", { date: "2026-10-04" });
+    await a.sync();
+
+    await b.sync();
+
+    const db = await openAppDb(b.name);
+    const { clocks } = (await db.get("fieldClocks", ["task", task.id])) as FieldClocks;
+    expect(Object.keys(clocks).sort()).toEqual(["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "time", "title"]);
+    expect(clocks.title).toBe(server.stored("task", task.id, "title")!.hlc);
+    db.close();
+  });
+
+  it("drops an edit still waiting in the outbox when a later change to the same field arrives", async () => {
+    const { world, server, a } = await twoDevices();
+    const event = await a.events.addEvent(party);
+    await a.sync();
+    // This device's clock runs an hour ahead, so its edit is later than anything A does now.
+    const ahead = await openDevice(world, server, { clockOffsetMs: 60 * 60 * 1000 });
+    await ahead.sync();
+    await ahead.events.updateEvent(event.id, { ...party, title: "From the device with the fast clock" });
+    await ahead.sync();
+    await a.events.updateEvent(event.id, { ...party, notes: "A note" });
+    server.afterPushStored = async () => {
+      await a.events.updateEvent(event.id, { ...party, notes: "A note", title: "Edited on A while syncing" });
+    };
+
+    await a.sync();
+    const pushedBefore = server.pushRequests;
+    await a.sync();
+
+    expect((await a.events.listEvents())[0]).toMatchObject({ title: "From the device with the fast clock", notes: "A note" });
+    expect(server.pushRequests).toBe(pushedBefore);
   });
 
   describe("paging", () => {

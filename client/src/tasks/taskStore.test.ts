@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openDB } from "idb";
-import { openTaskStore } from "./taskStore";
+import { openTaskStore, taskRecordType } from "./taskStore";
 
 let dbCounter = 0;
 const freshDbName = () => `tasks-test-${dbCounter++}`;
@@ -76,6 +76,28 @@ describe("Task store", () => {
     const store = await openTaskStore(freshDbName());
 
     await expect(store.completeTask("missing")).rejects.toThrow("No Task with id missing");
+  });
+});
+
+describe("Tasks that arrive in part", () => {
+  it("get an empty title, no date, no Event, and are not Completed or deleted until the rest arrives", () => {
+    expect(taskRecordType.withDefaults({ id: "t1" })).toEqual({
+      id: "t1",
+      title: "",
+      date: null,
+      time: null,
+      eventId: null,
+      offsetDays: null,
+      createdAt: "",
+      completedAt: null,
+      deletedAt: null,
+    });
+  });
+
+  it("keep the fields they have, also ones this version doesn't know", () => {
+    const partial = { id: "t1", title: "Known", completedAt: "2026-10-01T09:00:00.000Z", fromNewerVersion: 5 };
+
+    expect(taskRecordType.withDefaults(partial)).toMatchObject(partial);
   });
 });
 
