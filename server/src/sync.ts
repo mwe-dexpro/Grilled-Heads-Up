@@ -16,6 +16,8 @@ interface Change {
 
 export const maxChangesPerRequest = 500;
 
+// The client checks every registered record type against copies of these two patterns
+// (`client/src/sync/recordTypes.test.ts`); change them in both places.
 const typePattern = /^[a-z][a-zA-Z]{0,39}$/;
 const fieldPattern = /^[a-zA-Z][a-zA-Z0-9]{0,63}$/;
 /** Fixed-width wall clock, counter and device id, so comparing the strings compares the timestamps. */

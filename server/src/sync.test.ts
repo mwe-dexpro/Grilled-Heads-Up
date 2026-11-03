@@ -191,6 +191,20 @@ describe("sync routes", () => {
     expect((await pull(phone)).changes).toHaveLength(500);
   });
 
+  test("take a request of the size the client sends at most (400 KB), and refuse one over 1 MB with 413, storing nothing", async () => {
+    const phone = await signedInOwner();
+
+    // The client sets a change aside only for a lone value it sent that is over 100 KB and was answered with 413.
+    const batch = (bytes: number) => [change("notes", "x".repeat(bytes), hlc(1))];
+    expect((await push(phone, batch(400_000))).status).toBe(200);
+    expect((await push(phone, batch(1_100_000))).status).toBe(413);
+    expect((await push(phone, [...batch(600_000), change("title", "y".repeat(600_000), hlc(1))])).status).toBe(413);
+
+    const stored = await pull(phone);
+    expect(stored.changes).toHaveLength(1);
+    expect(stored.changes[0].value).toHaveLength(400_000);
+  });
+
   test("refuse a bad after or limit", async () => {
     const phone = await signedInOwner();
 
