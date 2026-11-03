@@ -144,5 +144,8 @@
   "sync.failed": "Sync failed",
   "sync.signedOut": "Signed out – sign in to sync",
   "sync.rejected": "Some changes could not be synced",
-  "sync.now": "Sync now"
+  "sync.now": "Sync now",
+  "outdated.title": "Reload to continue",
+  "outdated.text": "Another tab has updated Grilled Heads-Up. Reload this page so that your changes are saved again.",
+  "outdated.reload": "Reload"
 }

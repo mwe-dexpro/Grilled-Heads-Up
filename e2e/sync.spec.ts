@@ -15,7 +15,9 @@ async function device(browser: Browser, baseURL: string) {
 }
 
 const uniqueTitle = (title: string) => `${title} ${randomUUID().slice(0, 8)}`;
-const syncStatus = (page: Page) => page.getByRole("status").filter({ hasText: /sync/i });
+/** The footer's sync line as it is shown, and the live region that announces it to screen readers. */
+const syncStatus = (page: Page) => page.locator(".sync-status");
+const announcement = (page: Page) => page.getByRole("status");
 
 async function addTask(page: Page, title: string) {
   await page.getByRole("button", { name: "New Task" }).click();
@@ -36,15 +38,21 @@ test("a Task added offline on one device shows on the other after it is back onl
   const phone = await device(browser, baseURL!);
   const desktop = await device(browser, baseURL!);
   const title = uniqueTitle("Added in airplane mode");
+  // The desktop is up to date before the phone adds anything, so that not seeing the Task later means something.
+  await desktop.page.getByRole("button", { name: "Sync now" }).click();
+  await expect(syncStatus(desktop.page)).toContainText(/^Synced/);
 
   await phone.context.setOffline(true);
   await addTask(phone.page, title);
   await phone.page.getByRole("button", { name: "Sync now" }).click();
   await expect(syncStatus(phone.page)).toContainText("Offline");
+  await desktop.page.getByRole("button", { name: "Sync now" }).click();
+  await expect(syncStatus(desktop.page)).toContainText(/^Synced/);
   await expect(desktop.page.getByText(title)).toBeHidden();
 
+  // Nobody presses Sync now on the phone: coming back online starts the sync by itself.
   await phone.context.setOffline(false);
-  await syncUntil(phone.page, (timeout) => expect(syncStatus(phone.page)).toContainText(/^Synced/, { timeout }));
+  await expect(syncStatus(phone.page)).toHaveText(/^Synced/);
   await syncUntil(desktop.page, (timeout) => expect(desktop.page.getByText(title)).toBeVisible({ timeout }));
 });
 
@@ -74,6 +82,52 @@ test("the footer shows when the last sync happened, also after a reload", async 
   await page.route("**/api/sync/**", (route) => route.abort());
   await page.reload();
   await expect(syncStatus(page)).toHaveText(`Offline · last synced ${synced}`);
+});
+
+test("a screen reader hears the sync line when it means something new, not at every background sync", async ({ page }) => {
+  await page.goto("/");
+  await expect(syncStatus(page)).toHaveText(/^Synced/);
+  // The background sync that ran at start has set the time; nothing was announced for it.
+  await expect(announcement(page)).toHaveText("");
+
+  await page.getByRole("button", { name: "Sync now" }).click();
+
+  await expect(announcement(page)).toHaveText(/^Synced/);
+});
+
+test("when the session has expired, the next sync leads to the sign-in screen and keeps the data", async ({ browser, baseURL }) => {
+  const phone = await device(browser, baseURL!);
+  const title = uniqueTitle("Kept while signed out");
+  await addTask(phone.page, title);
+
+  await phone.context.clearCookies();
+  await phone.page.getByRole("button", { name: "Sync now" }).click();
+
+  await expect(phone.page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
+  expect(await phone.page.evaluate(() => localStorage.getItem("signedIn"))).toBeNull();
+});
+
+test("a tab that another tab's database upgrade waits for lets go and asks to be reloaded", async ({ browser, baseURL }) => {
+  const phone = await device(browser, baseURL!);
+  const other = await phone.context.newPage();
+  await other.goto("/");
+
+  // Like a newer version of the app opening the database with a higher version number.
+  await other.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("grilled-heads-up", 4);
+        request.onsuccess = () => {
+          request.result.close();
+          resolve();
+        };
+        request.onblocked = () => reject(new Error("blocked by the other tab"));
+        request.onerror = () => reject(request.error);
+      }),
+  );
+
+  await expect(phone.page.getByRole("heading", { name: "Reload to continue", level: 1 })).toBeVisible();
+  await expect(phone.page.getByRole("button", { name: "Reload" })).toBeVisible();
 });
 
 test("the sync routes refuse requests without a session", async ({ playwright, baseURL }) => {

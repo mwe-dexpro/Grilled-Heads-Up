@@ -20,6 +20,8 @@ interface SignedIn {
   /** Replaces the recovery code and shows the new one once. */
   showNewRecoveryCode(): Promise<void>;
   signOut(): Promise<void>;
+  /** Asks the server whether this device is still signed in, and shows the sign-in screen if not (e.g. a session that expired). */
+  recheck(): Promise<void>;
 }
 
 const SignedInContext = createContext<SignedIn | null>(null);
@@ -76,7 +78,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setStage(next);
   }, []);
 
+  const recheck = useCallback(async () => {
+    let status;
+    try {
+      status = await fetchSession();
+    } catch {
+      return; // Offline: nothing is known, so nothing changes.
+    }
+    rememberSignedIn(status.signedIn);
+    const screen = startScreen(status, false);
+    setStage((current) => (current.name === "app" ? { name: screen } : current));
+  }, []);
+
   const signedIn: SignedIn = {
+    recheck,
     async showNewRecoveryCode() {
       const { recoveryCode } = await newRecoveryCode();
       setStage({ name: "recoveryCode", recoveryCode, then: "app" });

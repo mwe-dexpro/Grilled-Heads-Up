@@ -1,8 +1,10 @@
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { goBack, navigate, useRoute } from "./app/navigation";
 import type { Route } from "./app/routes";
 import { useAppData } from "./app/useAppData";
+import { useSignedIn } from "./auth/AuthGate";
+import { useDatabaseOutdated } from "./data/useDatabaseOutdated";
 import { EventForm } from "./events/EventForm";
 import { EventScreen } from "./events/EventScreen";
 import { HomeScreen } from "./home/HomeScreen";
@@ -22,6 +24,16 @@ export function App() {
   const [adding, setAdding] = useState(false);
   const currentTab = tabs.find((tab) => tab === route.name);
 
+  // The server no longer knows this session (it expired): go and sign in again. Local data stays; sync resumes after.
+  const { recheck } = useSignedIn();
+  const signedOut = data.sync.status === "signedOut";
+  useEffect(() => {
+    if (signedOut) void recheck();
+  }, [signedOut, recheck]);
+
+  const outdated = useDatabaseOutdated();
+  if (outdated) return <ReloadScreen />;
+
   return (
     <div className="app">
       <main>{data.ready || route.name === "today" ? <Screen route={route} data={data} now={now} /> : null}</main>
@@ -37,6 +49,27 @@ export function App() {
         onClose={() => setAdding(false)}
       />
       <TabBar current={currentTab} onSelect={(tab) => navigate({ name: tab })} />
+    </div>
+  );
+}
+
+/** Another tab upgraded the database and this tab let go of it; nothing could be saved here any more. */
+function ReloadScreen() {
+  const { t } = useI18n();
+  return (
+    <div className="screen auth-screen">
+      <header className="detail-header">
+        <p className="eyebrow">{t("app.title")}</p>
+        <h1 className="large-title">{t("outdated.title")}</h1>
+      </header>
+      <p className="auth-text" role="alert">
+        {t("outdated.text")}
+      </p>
+      <div className="actions">
+        <button type="button" className="button-primary" onClick={() => window.location.reload()}>
+          {t("outdated.reload")}
+        </button>
+      </div>
     </div>
   );
 }

@@ -144,5 +144,8 @@
   "sync.failed": "Synchronisierung fehlgeschlagen",
   "sync.signedOut": "Abgemeldet – zum Synchronisieren anmelden",
   "sync.rejected": "Einige Änderungen konnten nicht synchronisiert werden",
-  "sync.now": "Jetzt synchronisieren"
+  "sync.now": "Jetzt synchronisieren",
+  "outdated.title": "Zum Weitermachen neu laden",
+  "outdated.text": "Ein anderer Tab hat Grilled Heads-Up aktualisiert. Lade diese Seite neu, damit deine Änderungen wieder gespeichert werden.",
+  "outdated.reload": "Neu laden"
 }
