@@ -160,3 +160,8 @@ _Avoid_: Password, login
 A code shown once when the Owner is created, to print or store. It signs in when no Passkey is at hand; each use replaces it with a new one, also shown once, and the signed-in Owner can replace it any time.
 _German UI_: Wiederherstellungscode
 _Avoid_: Backup code, master password
+
+**Sync**:
+Keeping the Owner's Tasks and Events the same on every device, with or without a connection in between. Each field of a Task or Event syncs on its own; when two devices changed the same field, the later change wins.
+_German UI_: Synchronisieren
+_Avoid_: Backup, upload

@@ -9,8 +9,8 @@ A personal calendar and to-do app that links Tasks to the Events they prepare fo
 ## Layout
 
 ```
-client/   React + Vite PWA (TypeScript). Tasks and Events live in the browser's IndexedDB.
-server/   Node + Express server: serves the built PWA, owns the SQLite file.
+client/   React + Vite PWA (TypeScript). Tasks and Events live in the browser's IndexedDB and sync through the server.
+server/   Node + Express server: serves the built PWA, owns the SQLite file (sign-in, sync).
 e2e/      Playwright end-to-end tests, run against the built app served by the server.
 ```
 
@@ -62,7 +62,7 @@ The PWA needs HTTPS (or `localhost`) to be installable. To try it on a phone dur
 
 ```sh
 npm test               # unit tests, then end-to-end tests
-npm run test:unit      # Vitest: domain rules, stores, routes, formats, translations; server sign-in
+npm run test:unit      # Vitest: domain rules, stores, sync, routes, formats, translations; server sign-in and sync
 npm run test:e2e       # builds, starts the servers, runs Playwright on an emulated Pixel 7
 npm run test:mutation  # Stryker mutation tests on the client domain modules
 npm run typecheck
@@ -76,19 +76,22 @@ What is tested where:
 | --- | --- | --- |
 | Bucket rules (`client/src/home/buckets.ts`, `days.ts`) | Vitest | which Bucket a Task or Event goes in, midnight, Late, Progress, Overdue emphasis, a Task row's second line |
 | Event rules (`client/src/events/event.ts`) | Vitest | time zones incl. clock changes, days an Event covers, validation, Linked task dates from Offsets, Event Progress |
-| Stores (`client/src/tasks/taskStore.ts`, `client/src/events/eventStore.ts`) | Vitest + fake-indexeddb | add, Complete, link and unlink, persistence across reopen (reload), upgrade from older data |
+| Stores (`client/src/tasks/taskStore.ts`, `client/src/events/eventStore.ts`) | Vitest + fake-indexeddb | add, Complete, link and unlink, delete, persistence across reopen (reload), upgrade from older data |
+| Sync on the device (`client/src/sync/`) | Vitest + fake-indexeddb, two or three devices (own database and clock each) syncing through an in-memory server (`sync/testing/memoryServer.ts`) | the clock (order, ties, overflow), the outbox and field clocks, per-field merge, deletion, a clock that runs behind, paging and the saved cursor, data from before sync, unknown record types, a record type registered in a test, offline / signed out / failed, coalescing runs, the status line, the auto-sync triggers |
+| Server sync (`server/src/sync.ts`) | Vitest over HTTP | 401 without a session, push then pull, older and equal clocks ignored, a later clock moves the field to the end of the feed, paging, malformed or oversized batches refused whole |
 | Routes and formats (`client/src/app/routes.ts`, `*/format*.ts`) | Vitest | screen addresses, dates, times and Offsets in English and German |
 | Translations (`client/src/i18n/i18n.ts`) | Vitest | English and German have the same texts, English default, choice remembered |
 | Start screen (`client/src/auth/session.ts`) | Vitest | setup, sign-in or the app, from the server's answer or, offline, from what the device remembers |
 | Server sign-in (`server/src/auth.ts`) | Vitest + a software passkey (`server/src/testing/`) over HTTP | registration, the owner rule (also two first launches at once), user verification, sign-in, replayed and foreign-site answers, capped waiting sign-ins, recovery and new codes, sign-out, data routes rejecting requests that aren't signed in |
 | The whole app | Playwright | Tasks survive reload and work offline, Buckets, Events with Linked tasks (Offsets, moving, unlinking), tabs, language switch, installable manifest |
 | Sign-in in the browser (`e2e/sign-in.spec.ts`) | Playwright + Chrome's virtual authenticator | first launch with a recovery code, the owner rule, passkey sign-in on Android and (synced) on desktop, recovery on a new phone, data routes |
+| Sync in the browser (`e2e/sync.spec.ts`) | Playwright, two browser contexts as two devices | a Task added offline reaches the other device, Completing syncs back, the status line and its time after a reload, the sync routes refuse strangers |
 
-The end-to-end tests run two servers, each with an in-memory database: the sign-in tests start from a first launch on their own server; on the other, `e2e/owner.setup.ts` registers the owner once and the app's tests start signed in.
+The end-to-end tests run three servers, each with an in-memory database: the sign-in tests start from a first launch on their own server; on the second, `e2e/owner.setup.ts` registers the owner once and the app's tests start signed in; the third, with an owner of its own (`e2e/sync-owner.setup.ts`), is for the sync tests, whose two devices share that owner. The app's tests import `test` from `e2e/fixtures.ts`, which blocks `/api/sync/`, so they don't pass Tasks to each other through their shared owner (the app then shows its offline sync status).
 
 Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `client/vitest.config.ts`), so day and time-zone tests mean the same on every machine, including daylight-saving changes.
 
-**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage keys' names (language, signed in), the default database name (only used by the running app), `close()`, and a few equivalent mutants (a change no input can tell apart); none of them change behaviour.
+**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. The build fails below a score of 80; the HTML report is written to `client/reports/mutation/index.html`. Known survivors: the localStorage keys' names (language, signed in), the default database name (only used by the running app), `close()`, and a few equivalent mutants (a change no input can tell apart); none of them change behaviour. The sync modules (`hlc.ts`, `replica.ts`, `engine.ts`, `syncDb.ts`, `autoSync.ts`, `formatSync.ts`) are mutation-tested too; their known survivors are the engine's default clock (only used by the running app), the device id being made up again when the clock isn't saved yet, and a few equivalent mutants in the engine (a queued edit is always older than the change that beats it, and the server's time is also fed to the clock when pulling).
 
 **Regression testing:** CI (`.github/workflows/ci.yml`) runs typecheck, unit, end-to-end and mutation tests and a Docker smoke test on every pull request and every push to `main`.
 
@@ -96,6 +99,34 @@ Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `clien
 
 - **Events** are stored in the shape of Outlook/iCalendar events (ADR-0002): start and end, an all-day flag, the time zone of timed Events (IANA name; all-day Events are floating), and `externalSource` / `externalId`, which are null for Events created in the app and will hold e.g. `"outlook"` and the Outlook id once Outlook sync arrives after v1. See `client/src/events/event.ts`.
 - **Linked tasks** store their Event and an Offset in days, not a date (ADR-0003). Their date is always the Event's start date plus the Offset, so they follow when the Event moves.
+
+## Sync
+
+Tasks and Events live in IndexedDB on each device and sync through the server (ADR-0004), so a Task added on the phone shows on the desktop. It only works signed in; the server refuses sync requests without a session.
+
+**When it runs:** when the app starts signed in, when the connection comes back, when the app returns to the foreground, about 2 seconds after each local change, and once a minute while the app is visible. The home screen footer shows the outcome (*Synced 14:32*, *Syncing…*, *Offline · last synced 14:32*, *Sync failed*, *Signed out – sign in to sync*) and has a *Sync now* button.
+
+**The protocol:** the unit is a **Change**: one field of one record (`type`, `id`, `field`, `value`, `hlc`). Every field except `id` syncs on its own, so a title edited on one device and a date edited on another both survive; when the same field was edited on both, the later change wins on every device. All fields changed by one store operation (e.g. linking a Task: `eventId`, `offsetDays`, `date`) share one clock, so they win or lose together. Each device keeps an *outbox* of changes the server hasn't confirmed (a newer edit of a field replaces the older queued one) and, per record, the clock of every field (`fieldClocks` store). A sync pushes the outbox to `POST /api/sync/push`, then pulls `GET /api/sync/pull?after=<cursor>` page by page and applies each Change whose clock is later than the local one. The server keeps only the winning value per field (table `sync_fields`, per owner) and knows no record types.
+
+**Deleting** is a field too: `deletedAt` (the time, or `null`) is an ordinary last-write-wins field, and the record stays stored as a tombstone. Edits to other fields of a deleted record merge but never un-delete it. The stores' `list…` functions leave deleted records out; the 30-day Trash will build on the tombstones.
+
+**The clock** is a hybrid logical clock ([ADR-0010](docs/adr/0010-hybrid-logical-clock-orders-sync-changes.md), `client/src/sync/hlc.ts`): wall time, a counter and the device id as fixed-width text, so string order is time order. A device moves its clock past everything it sees, including the server's time in each answer, so an edit made after seeing another device's change wins even on a slow clock. A device whose clock runs far ahead wins concurrent edits until real time catches up.
+
+**Data from before sync:** Tasks and Events saved by earlier versions get clocks and outbox entries (and `deletedAt: null`) the first time their store is opened, so they reach the server too.
+
+**Known limitations:** a Change of a record type this version doesn't know (from a newer app on another device) is skipped, and the cursor moves on, so an older app never receives it later. A record whose Changes are split across two pull pages shows with placeholder values until the second page arrives (only visible if the sync is interrupted between the pages). Tombstones are never compacted. Another tab upgrading the database makes this tab's connection close; reload it.
+
+### Adding a record type
+
+Lists, Tags, Subtasks, Reminders and the like need no change in the sync engine or the server:
+
+1. Give the record `id` and `deletedAt: string | null` (the tombstone) next to its other fields; the other fields are JSON values.
+2. Add its object store in `openAppDb` (`client/src/data/database.ts`) in a **new** database version (`if (oldVersion < 4) …`), and add it to `AppDb`.
+3. Define its `RecordType` next to its store: `type` (the wire name), `storeName`, and `withDefaults`, which fills fields missing from records saved by older versions or built from partly arrived Changes (see `taskRecordType`).
+4. Register it in the list in `client/src/sync/recordTypes.ts`.
+5. In its store, open the table with `openTable(db, recordType, now)` and write only through it (`get`, `list`, `put`, `delete`), never with `db.put`: the table stamps the clock and fills the outbox.
+
+Never rename a `type` or a field once shipped; the server and other devices know them by name. To rename, add a new field and stop using the old one. A type and its fields must also match the server's checks: `type` is letters starting lowercase (up to 40), a field is letters and digits starting with a letter (up to 64), and `id` is never a field.
 
 ## Translations
 
