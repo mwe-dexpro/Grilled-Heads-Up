@@ -1107,6 +1107,20 @@ describe("Sync between two devices", () => {
         expect((await b.events.listEvents())[0].notes).toHaveLength(99_000);
       });
 
+      it("does so also when the first of several changes is over 100 KB: only a lone value is judged by its size", async () => {
+        const { server, a, b, event } = await withSyncedEvent(50_000);
+        // "allDay" sorts before "title" in the outbox, so the big value leads a request of two changes.
+        await (await openTable(a.db, eventRecordType, a.now)).update(event.id, { allDay: note(150_000) as unknown as boolean, title: "New title" });
+
+        await a.sync();
+
+        expect(server.refusedPushes).toBe(1);
+        expect(a.engine.state().status).toBe("failed");
+        expect(((await a.db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined)).toBe(false);
+        await b.sync();
+        expect((await b.events.listEvents())[0].title).toBe("Party");
+      });
+
       it("takes a refusal of a request with several changes as the server's trouble, however big, and sets nothing aside", async () => {
         const world = new World();
         const server = new MemoryServer({ time: () => world.ms, maxPushBytes: 200_000 });
