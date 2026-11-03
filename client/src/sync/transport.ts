@@ -24,8 +24,11 @@ export interface Transport {
   pull(after: number, limit: number): Promise<PullPage>;
 }
 
-/** Why a request failed: no connection, no valid session, or anything else. */
-export type FailureKind = "offline" | "signedOut" | "failed";
+/**
+ * Why a request failed: no connection, no valid session, the server refusing what was sent (400, 413), or
+ * anything else. As the status of a sync, "rejected" means some changes were refused and stay only on this device.
+ */
+export type FailureKind = "offline" | "signedOut" | "rejected" | "failed";
 
 export class TransportError extends Error {
   constructor(readonly kind: FailureKind) {
@@ -41,6 +44,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     throw new TransportError("offline");
   }
   if (response.status === 401) throw new TransportError("signedOut");
+  if (response.status === 400 || response.status === 413) throw new TransportError("rejected");
   if (!response.ok) throw new TransportError("failed");
   try {
     return (await response.json()) as T;

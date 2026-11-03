@@ -143,5 +143,6 @@
   "sync.offlineSince": "Offline · zuletzt synchronisiert {time}",
   "sync.failed": "Synchronisierung fehlgeschlagen",
   "sync.signedOut": "Abgemeldet – zum Synchronisieren anmelden",
+  "sync.rejected": "Einige Änderungen konnten nicht synchronisiert werden",
   "sync.now": "Jetzt synchronisieren"
 }

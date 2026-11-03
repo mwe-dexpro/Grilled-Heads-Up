@@ -143,5 +143,6 @@
   "sync.offlineSince": "Offline · last synced {time}",
   "sync.failed": "Sync failed",
   "sync.signedOut": "Signed out – sign in to sync",
+  "sync.rejected": "Some changes could not be synced",
   "sync.now": "Sync now"
 }

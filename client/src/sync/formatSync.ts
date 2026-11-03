@@ -20,6 +20,8 @@ export function formatSyncState({ status, lastSyncedAt }: SyncState, now: Date, 
       return t("sync.signedOut");
     case "failed":
       return t("sync.failed");
+    case "rejected":
+      return t("sync.rejected");
     case "offline":
       return lastSyncedAt === null ? t("sync.offline") : t("sync.offlineSince", { time: formatSyncedAt(lastSyncedAt, now, language) });
     case "idle":

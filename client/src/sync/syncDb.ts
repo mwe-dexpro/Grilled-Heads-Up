@@ -24,6 +24,8 @@ export interface OutboxEntry {
   field: string;
   value: unknown;
   hlc: string;
+  /** The server refused this change (too big, or malformed). It stays here, unsent, until a newer edit replaces it. */
+  rejected?: true;
 }
 
 export const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;

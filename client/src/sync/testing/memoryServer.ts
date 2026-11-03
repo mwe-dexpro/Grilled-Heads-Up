@@ -5,6 +5,8 @@ export interface MemoryServerOptions {
   time?: () => number;
   /** Most changes it returns per pull, below what the client asks for. */
   pageSize?: number;
+  /** The largest push it takes, as the JSON text in bytes; a bigger one is refused like the real server's 413. */
+  maxPushBytes?: number;
 }
 
 /**
@@ -14,6 +16,10 @@ export interface MemoryServerOptions {
 export class MemoryServer {
   online = true;
   signedIn = true;
+  /** Refuses (like a 400) every push that carries a change this says yes to. */
+  rejects: ((change: Change) => boolean) | null = null;
+  /** Fails (like a 500) every push. */
+  failPushes = false;
   /** Awaited after a push is stored and before it is answered; lets a test act while a push is in flight. */
   afterPushStored: (() => Promise<void>) | null = null;
   pushRequests = 0;
@@ -27,10 +33,12 @@ export class MemoryServer {
   private seq = 0;
   private readonly time: () => number;
   private readonly pageSize: number;
+  private readonly maxPushBytes: number;
 
-  constructor({ time = Date.now, pageSize = 500 }: MemoryServerOptions = {}) {
+  constructor({ time = Date.now, pageSize = 500, maxPushBytes = 1024 * 1024 }: MemoryServerOptions = {}) {
     this.time = time;
     this.pageSize = pageSize;
+    this.maxPushBytes = maxPushBytes;
   }
 
   /** What the server holds for a field: its winning change. */
@@ -54,8 +62,12 @@ export class MemoryServer {
     return {
       push: async (changes) => {
         this.check();
-        if (changes.length > 500) throw new TransportError("failed");
         this.pushRequests++;
+        if (this.failPushes) throw new TransportError("failed");
+        if (changes.length > 500 || new TextEncoder().encode(JSON.stringify({ changes })).length > this.maxPushBytes) {
+          throw new TransportError("rejected");
+        }
+        if (this.rejects && changes.some(this.rejects)) throw new TransportError("rejected");
         this.pushedChanges += changes.length;
         this.accept(changes);
         const hook = this.afterPushStored;

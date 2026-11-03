@@ -34,6 +34,11 @@ describe("formatSyncState", () => {
     expect(line({ status: "signedOut", lastSyncedAt: today1432 })).toBe("Signed out – sign in to sync");
   });
 
+  it("says when the server refused some changes", () => {
+    expect(line({ status: "rejected", lastSyncedAt: today1432 })).toBe("Some changes could not be synced");
+    expect(line({ status: "rejected", lastSyncedAt: today1432 }, "de")).toBe("Einige Änderungen konnten nicht synchronisiert werden");
+  });
+
   it("speaks German with 24-hour times", () => {
     expect(line({ status: "idle", lastSyncedAt: today1432 }, "de")).toBe("Synchronisiert 14:32");
     expect(line({ status: "idle", lastSyncedAt: earlier }, "de")).toBe("Synchronisiert 3. Okt. · 9:05");

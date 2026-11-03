@@ -701,6 +701,105 @@ describe("Sync between two devices", () => {
     });
   });
 
+  describe("when a push is too big or refused", () => {
+    const note = (length: number) => "x".repeat(length);
+
+    it("sends changes in batches that fit the server's limit, however big the values are", async () => {
+      const { world, server, a, b } = await twoDevices();
+      for (let i = 0; i < 60; i++) {
+        await a.events.addEvent({ ...party, title: `Event ${i}`, notes: note(50_000) });
+        world.advance();
+      }
+
+      await a.sync();
+      await b.sync();
+
+      expect(a.engine.state().status).toBe("idle");
+      expect(server.pushRequests).toBeGreaterThan(1);
+      expect(await b.events.listEvents()).toHaveLength(60);
+    });
+
+    it("sets aside a value the server refuses as too big, reports it, and carries on with everything else", async () => {
+      const { world, a, b } = await twoDevices();
+      const event = await a.events.addEvent({ ...party, notes: note(1_200_000) });
+      await a.tasks.addTask("Fine");
+      world.advance();
+      await b.tasks.addTask("From B");
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(a.engine.state().status).toBe("rejected");
+      expect(await titles(b)).toEqual(["Fine", "From B"]);
+      expect(await titles(a)).toEqual(["Fine", "From B"]);
+      const arrived = (await b.events.listEvents())[0];
+      expect(arrived).toMatchObject({ id: event.id, title: "Party", notes: "" });
+      expect((await a.events.listEvents())[0].notes).toHaveLength(1_200_000);
+    });
+
+    it("sends the value again once the person has made it smaller", async () => {
+      const { world, a, b } = await twoDevices();
+      const event = await a.events.addEvent({ ...party, notes: note(1_200_000) });
+      await a.sync();
+      expect(a.engine.state().status).toBe("rejected");
+      world.advance();
+
+      await a.events.updateEvent(event.id, { ...party, notes: "Short" });
+      await a.sync();
+      await b.sync();
+
+      expect(a.engine.state().status).toBe("idle");
+      expect((await b.events.listEvents())[0].notes).toBe("Short");
+    });
+
+    it("finds the one change the server refuses as malformed and sends the rest", async () => {
+      const { server, a, b } = await twoDevices();
+      server.rejects = (change) => change.field === "title" && change.value === "Poison";
+      await a.tasks.addTask("Fine");
+      await a.tasks.addTask("Poison");
+      await a.tasks.addTask("Also fine");
+
+      await a.sync();
+      await b.sync();
+
+      expect(a.engine.state().status).toBe("rejected");
+      expect((await titles(b)).sort()).toEqual(["", "Also fine", "Fine"]);
+    });
+
+    it("does not send a refused change again on every sync", async () => {
+      const { server, a } = await twoDevices();
+      server.rejects = (change) => change.field === "title" && change.value === "Poison";
+      await a.tasks.addTask("Poison");
+      await a.sync();
+      const requests = server.pushRequests;
+
+      await a.sync();
+
+      expect(server.pushRequests).toBe(requests);
+      expect(a.engine.state().status).toBe("rejected");
+    });
+
+    it("still pulls when the push fails for another reason, and reports the failure", async () => {
+      const { world, server, a, b } = await twoDevices();
+      await a.tasks.addTask("From A");
+      await a.sync();
+      world.advance();
+      await b.tasks.addTask("From B");
+      server.failPushes = true;
+
+      await b.sync();
+
+      expect(b.engine.state().status).toBe("failed");
+      expect(await titles(b)).toEqual(["From A", "From B"]);
+      server.failPushes = false;
+      await b.sync();
+      await a.sync();
+      expect(b.engine.state().status).toBe("idle");
+      expect(await titles(a)).toEqual(["From A", "From B"]);
+    });
+  });
+
   describe("the engine", () => {
     it("turns a request made during a run into exactly one more run", async () => {
       const { server, a } = await twoDevices();
