@@ -43,14 +43,21 @@ test("a Task added offline on one device shows on the other after it is back onl
   await expect(syncStatus(desktop.page)).toContainText(/^Synced/);
 
   await phone.context.setOffline(true);
+  const failedPushes: string[] = [];
+  phone.page.on("requestfailed", (request) => request.url().includes("/api/sync/push") && failedPushes.push(request.url()));
   await addTask(phone.page, title);
   await phone.page.getByRole("button", { name: "Sync now" }).click();
   await expect(syncStatus(phone.page)).toContainText("Offline");
+  // The Task also armed the sync that follows a change by 2 s. Let it run, and fail, while the phone is still
+  // offline (the second failed push): otherwise it would run after the reconnect and do the work the test
+  // wants to see done by the browser's "online" event.
+  await expect.poll(() => failedPushes.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
   await desktop.page.getByRole("button", { name: "Sync now" }).click();
   await expect(syncStatus(desktop.page)).toContainText(/^Synced/);
   await expect(desktop.page.getByText(title)).toBeHidden();
 
-  // Nobody presses Sync now on the phone: coming back online starts the sync by itself.
+  // Nobody presses Sync now on the phone, and no timer is left to run it (the next is a minute away): only coming
+  // back online can start this sync.
   await phone.context.setOffline(false);
   await expect(syncStatus(phone.page)).toHaveText(/^Synced/);
   await syncUntil(desktop.page, (timeout) => expect(desktop.page.getByText(title)).toBeVisible({ timeout }));
