@@ -73,7 +73,7 @@
   "eventForm.location": "Ort",
   "eventForm.notes": "Notizen",
   "eventForm.problem.title": "Gib dem Termin einen Titel.",
-  "eventForm.problem.tooLong": "Das ist zu lang: Titel und Ort dürfen bis zu {title} Zeichen haben, die Notizen bis zu {notes}.",
+  "eventForm.problem.tooLong": "Das ist zu lang: Der Titel darf bis zu {title} Zeichen haben, der Ort bis zu {location}, die Notizen bis zu {notes}.",
   "eventForm.problem.end": "Das Ende darf nicht vor dem Beginn liegen.",
   "eventForm.problem.shape": "Trag Start- und Endzeit ein.",
   "linkedTask.heading": "Aufgabe hinzufügen",

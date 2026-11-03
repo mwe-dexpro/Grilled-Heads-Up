@@ -95,8 +95,10 @@ export function eventDays(event: EventFields): { first: Day; last: Day } {
 }
 
 export function validateEvent(fields: EventFields): EventProblem | null {
-  if (fields.title.trim() === "") return "title";
-  if (fields.title.length > maxTitleLength || fields.location.length > maxLocationLength || fields.notes.length > maxNotesLength) return "tooLong";
+  // The store keeps the trimmed texts, so those are what the limits count.
+  const title = fields.title.trim();
+  if (title === "") return "title";
+  if (title.length > maxTitleLength || fields.location.trim().length > maxLocationLength || fields.notes.trim().length > maxNotesLength) return "tooLong";
   const timesGiven = [fields.startTime, fields.endTime, fields.timeZone].map((value) => value !== null);
   if (fields.allDay ? timesGiven.some(Boolean) : !timesGiven.every(Boolean)) return "shape";
   if (fields.allDay ? fields.endDate < fields.startDate : eventEnd(fields) < eventStart(fields)) return "end";

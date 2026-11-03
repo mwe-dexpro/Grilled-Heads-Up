@@ -126,6 +126,13 @@ describe("validateEvent", () => {
     expect(validateEvent({ ...timed, notes: "x".repeat(maxNotesLength + 1) })).toBe("tooLong");
   });
 
+  it("counts the trimmed texts against the limits, like the store that keeps them", () => {
+    expect(validateEvent({ ...timed, title: `${"x".repeat(maxTitleLength)} ` })).toBeNull();
+    expect(validateEvent({ ...timed, location: ` ${"x".repeat(maxLocationLength)}` })).toBeNull();
+    expect(validateEvent({ ...timed, notes: `${"x".repeat(maxNotesLength)}\n` })).toBeNull();
+    expect(validateEvent({ ...timed, title: `${"x".repeat(maxTitleLength + 1)} ` })).toBe("tooLong");
+  });
+
   it("refuses an end before the start", () => {
     expect(validateEvent({ ...timed, endTime: "12:00" })).toBe("end");
     expect(validateEvent({ ...allDay, endDate: "2026-10-16" })).toBe("end");

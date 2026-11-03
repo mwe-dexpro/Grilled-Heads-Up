@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { goBack } from "../app/navigation";
-import { maxNotesLength, maxTitleLength } from "../data/limits";
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { dayOf } from "../home/days";
 import { useI18n } from "../i18n/I18nProvider";
 import { NavBar } from "../ui/NavBar";
@@ -93,6 +93,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
             value={fields.title}
             onChange={(e) => update({ title: e.target.value })}
             placeholder={t("eventForm.titlePlaceholder")}
+            maxLength={maxTitleLength}
             autoComplete="off"
             autoFocus={!event}
           />
@@ -141,17 +142,28 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
       <div className="card form-card spaced">
         <label className="field">
           <span className="visually-hidden">{t("eventForm.location")}</span>
-          <input value={fields.location} onChange={(e) => update({ location: e.target.value })} placeholder={t("eventForm.location")} />
+          <input
+            value={fields.location}
+            onChange={(e) => update({ location: e.target.value })}
+            placeholder={t("eventForm.location")}
+            maxLength={maxLocationLength}
+          />
         </label>
         <label className="field">
           <span className="visually-hidden">{t("eventForm.notes")}</span>
-          <textarea rows={3} value={fields.notes} onChange={(e) => update({ notes: e.target.value })} placeholder={t("eventForm.notes")} />
+          <textarea
+            rows={3}
+            value={fields.notes}
+            onChange={(e) => update({ notes: e.target.value })}
+            placeholder={t("eventForm.notes")}
+            maxLength={maxNotesLength}
+          />
         </label>
       </div>
 
       {showProblem && problem && (
         <p className="problem" role="alert">
-          {t(`eventForm.problem.${problem}`, { title: String(maxTitleLength), notes: String(maxNotesLength) })}
+          {t(`eventForm.problem.${problem}`, { title: String(maxTitleLength), location: String(maxLocationLength), notes: String(maxNotesLength) })}
         </p>
       )}
     </form>
