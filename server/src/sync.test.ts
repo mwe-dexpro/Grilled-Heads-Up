@@ -160,6 +160,18 @@ describe("sync routes", () => {
     expect((await pull(phone)).changes).toEqual([]);
   });
 
+  test("name the first malformed change in the refusal, and none when the request as a whole is wrong", async () => {
+    const phone = await signedInOwner();
+    const good = change("title", "ok", hlc(1));
+    const bad = { ...good, field: "id" };
+    const indexOf = async (response: Response) => ((await response.json()) as { index?: number }).index;
+
+    expect(await indexOf(await push(phone, [good, good, bad, bad]))).toBe(2);
+    expect(await indexOf(await push(phone, [bad]))).toBe(0);
+    expect(await indexOf(await push(phone, "nope"))).toBeUndefined();
+    expect(await indexOf(await push(phone, Array.from({ length: 501 }, () => good)))).toBeUndefined();
+  });
+
   test("accept a null value and the longest allowed names", async () => {
     const phone = await signedInOwner();
 

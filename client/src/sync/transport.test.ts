@@ -14,6 +14,15 @@ const kindOf = async (call: () => Promise<unknown>) => {
   return "no error";
 };
 
+const refusalOf = async (call: () => Promise<unknown>) => {
+  try {
+    await call();
+  } catch (error) {
+    if (error instanceof TransportError) return { kind: error.kind, refusal: error.refusal };
+  }
+  return "no transport error";
+};
+
 describe("HTTP transport", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -35,14 +44,36 @@ describe("HTTP transport", () => {
 
   it.each([
     [401, "signedOut"],
-    [400, "rejected"],
-    [413, "rejected"],
     [500, "failed"],
     [404, "failed"],
   ])("tells a %i answer as %s", async (status, kind) => {
     answer(status);
 
     expect(await kindOf(() => httpTransport.push([]))).toBe(kind);
+  });
+
+  it("tells a 400 that names a malformed change as a refusal of that change", async () => {
+    answer(400, { error: "Change 3 is malformed.", index: 3 });
+
+    expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { badChange: 3 } });
+  });
+
+  it("tells a 413 as a refusal for being too big", async () => {
+    answer(413);
+
+    expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { tooBig: true } });
+  });
+
+  it.each([
+    ["an empty body, like a proxy's", ""],
+    ["a page", "<html>Bad gateway</html>"],
+    ["JSON that names no change", JSON.stringify({ error: "Send an array of at most 500 changes." })],
+    ["an index that is not a position", JSON.stringify({ index: "3" })],
+    ["a negative index", JSON.stringify({ index: -1 })],
+  ])("tells a 400 with %s as a failure, which says nothing about the changes in the request", async (_name, body) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 400 })));
+
+    expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "failed", refusal: undefined });
   });
 
   it("tells a missing connection as offline, and an answer that isn't JSON as failed", async () => {

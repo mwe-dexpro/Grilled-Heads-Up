@@ -67,8 +67,15 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
 
   routes.post("/push", (req, res) => {
     const changes: unknown = req.body?.changes;
-    if (!Array.isArray(changes) || changes.length > maxChangesPerRequest || !changes.every(isChange)) {
-      res.status(400).json({ error: `Send at most ${maxChangesPerRequest} well-formed changes.` });
+    if (!Array.isArray(changes) || changes.length > maxChangesPerRequest) {
+      res.status(400).json({ error: `Send an array of at most ${maxChangesPerRequest} changes.` });
+      return;
+    }
+    // Names the first malformed change, so a client can tell a change that is certainly bad from a request
+    // refused as a whole for any other reason (a stricter deploy, a proxy), and set aside only that change.
+    const index = changes.findIndex((change) => !isChange(change));
+    if (index !== -1) {
+      res.status(400).json({ error: `Change ${index} is malformed.`, index });
       return;
     }
     const ownerId = res.locals.userId as string;

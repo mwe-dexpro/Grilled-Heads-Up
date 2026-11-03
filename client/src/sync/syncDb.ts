@@ -24,8 +24,12 @@ export interface OutboxEntry {
   field: string;
   value: unknown;
   hlc: string;
-  /** The server refused this change (too big, or malformed). It stays here, unsent, until a newer edit replaces it. */
-  rejected?: true;
+  /**
+   * When (ms since the epoch) the server refused this change as certainly bad (malformed, or too big for any
+   * request). It stays here, unsent, until a newer edit replaces it, the app is started again or an hour has
+   * passed: then it is tried once more, in case the refusal was the server's mistake.
+   */
+  rejectedAt?: number;
 }
 
 export const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;

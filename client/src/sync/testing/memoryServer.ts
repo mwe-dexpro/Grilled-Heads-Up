@@ -16,10 +16,15 @@ export interface MemoryServerOptions {
 export class MemoryServer {
   online = true;
   signedIn = true;
-  /** Refuses (like a 400) every push that carries a change this says yes to. */
+  /** Refuses every push that carries a change this says yes to, naming the first such change (like our server's 400). */
   rejects: ((change: Change) => boolean) | null = null;
   /** Fails (like a 500) every push. */
   failPushes = false;
+  /**
+   * Answers every push with this HTTP status and no reason, like a proxy or a server bug would; only seen
+   * by what goes through `fetch` below.
+   */
+  pushStatus: number | null = null;
   /** Awaited after a push is stored and before it is answered; lets a test act while a push is in flight. */
   afterPushStored: (() => Promise<void>) | null = null;
   pushRequests = 0;
@@ -69,9 +74,10 @@ export class MemoryServer {
         this.pushRequests++;
         if (this.failPushes) throw new TransportError("failed");
         const tooBig = changes.length > 500 || new TextEncoder().encode(JSON.stringify({ changes })).length > this.maxPushBytes;
-        if (tooBig || (this.rejects && changes.some(this.rejects))) {
+        const bad = this.rejects ? changes.findIndex(this.rejects) : -1;
+        if (tooBig || bad !== -1) {
           this.refusedPushes++;
-          throw new TransportError("rejected");
+          throw new TransportError("rejected", tooBig ? { tooBig: true } : { badChange: bad });
         }
         this.pushedChanges += changes.length;
         this.accept(changes);
@@ -96,6 +102,33 @@ export class MemoryServer {
       },
     };
   }
+
+  /**
+   * The same server as HTTP answers, for tests that run the real transport (`createHttpTransport(server.fetch)`):
+   * what the transport does with each status is part of what is tested.
+   */
+  fetch: typeof fetch = async (input, init) => {
+    const url = new URL(String(input), "http://localhost");
+    const transport = this.transport();
+    const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
+    if (url.pathname === "/api/sync/push" && this.pushStatus !== null) {
+      this.refusedPushes++;
+      return new Response("", { status: this.pushStatus });
+    }
+    try {
+      if (url.pathname === "/api/sync/push") {
+        const { changes } = JSON.parse(String(init?.body)) as { changes: Change[] };
+        return json(200, await transport.push(changes));
+      }
+      return json(200, await transport.pull(Number(url.searchParams.get("after")), Number(url.searchParams.get("limit"))));
+    } catch (error) {
+      if (!(error instanceof TransportError)) throw error;
+      if (error.kind === "offline") throw new TypeError("Failed to fetch");
+      if (error.kind === "signedOut") return json(401);
+      if (error.kind === "failed") return json(500);
+      return error.refusal && "badChange" in error.refusal ? json(400, { index: error.refusal.badChange }) : json(413);
+    }
+  };
 
   private check() {
     this.requests++;

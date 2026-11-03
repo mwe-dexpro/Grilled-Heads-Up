@@ -7,10 +7,17 @@ import { TransportError, type Change, type FailureKind, type Transport } from ".
 const batchSize = 500;
 /** The server takes 1 MB of JSON per request; stay well below it, whatever the values weigh. */
 const batchBytes = 400_000;
+/**
+ * No server we know refuses a request below this size as "too big", and the app caps what a person can type
+ * far below it. A refusal of a smaller request says something about the server, not about the changes in it.
+ */
+const tooBigForAnyServer = 100_000;
+/** How long a change the server refused as certainly bad waits before it is tried again (it is also tried at each app start). */
+const retrySetAsideAfterMs = 60 * 60 * 1000;
 
 const byteLength = (text: string) => new TextEncoder().encode(text).length;
 
-/** "rejected": the last sync went through, but the server refused some changes, which stay only on this device. */
+/** "rejected": the last sync went through, but some changes were set aside as certainly bad; they stay on this device for now. */
 export type SyncStatus = "idle" | "syncing" | FailureKind;
 
 export interface SyncState {
@@ -50,6 +57,13 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   const storeNames = types.map((recordType) => recordType.storeName);
 
   let state: SyncState = { status: "idle", lastSyncedAt: ((await db.get("syncInfo", "lastSyncedAt")) as number | undefined) ?? null };
+  // Each start of the app tries again what was set aside as bad, in case the server's refusal was its own mistake.
+  const release = transactionOver(db, []);
+  for (const { rejectedAt, ...entry } of (await release.objectStore("outbox").getAll()) as OutboxEntry[]) {
+    if (rejectedAt !== undefined) await release.objectStore("outbox").put(entry);
+  }
+  await release.done;
+
   const stateListeners = new Set<(state: SyncState) => void>();
   const remoteListeners = new Set<() => void>();
 
@@ -58,12 +72,15 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     for (const listener of stateListeners) listener(state);
   }
 
-  /** The outbox entries as batches that fit one request each, in the order they were made. */
+  /** What an entry adds to a request, in bytes (with its comma). */
+  const sizeOf = (entry: OutboxEntry) => byteLength(JSON.stringify(toChange(entry))) + 1;
+
+  /** The outbox entries as batches that fit one request each, in the order the outbox lists them (by key). */
   function batchesOf(entries: OutboxEntry[]): OutboxEntry[][] {
     const batches: OutboxEntry[][] = [];
     let bytes = 0;
     for (const entry of entries) {
-      const size = byteLength(JSON.stringify(toChange(entry))) + 1;
+      const size = sizeOf(entry);
       const last = batches[batches.length - 1];
       if (last && last.length < batchSize && bytes + size <= batchBytes) {
         last.push(entry);
@@ -88,20 +105,35 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     await tx.done;
   }
 
-  /** Keeps a refused entry in the outbox, marked, so it is not sent again until a newer edit replaces it. */
+  /** Keeps a refused entry in the outbox, marked, so it is not sent again for now (see `OutboxEntry.rejectedAt`). */
   async function setAside(entry: OutboxEntry) {
     const tx = transactionOver(db, []);
     const queued = (await tx.objectStore("outbox").get([entry.type, entry.id, entry.field])) as OutboxEntry | undefined;
-    if (queued?.hlc === entry.hlc) await tx.objectStore("outbox").put({ ...queued, rejected: true });
+    if (queued?.hlc === entry.hlc) await tx.objectStore("outbox").put({ ...queued, rejectedAt: now().getTime() });
     await tx.done;
   }
 
-  /** Sends a batch the server refuses as a whole by halves, until the entry it objects to stands alone. */
+  /**
+   * Sends a batch. Only a change that is certainly bad is set aside: one the server names as malformed (the
+   * rest of the batch is sent again), or one too big to be sent alone. Any other refusal, such as a request
+   * refused as a whole without a reason or a small one refused as too big, says the server is unwell, not the
+   * changes: it ends the push and everything is tried again at the next sync.
+   */
   async function sendOrSplit(batch: OutboxEntry[]) {
     try {
       await send(batch);
     } catch (error) {
-      if (!(error instanceof TransportError && error.kind === "rejected")) throw error;
+      const refusal = error instanceof TransportError ? error.refusal : undefined;
+      if (!refusal) throw error;
+      if ("badChange" in refusal) {
+        const bad = batch[refusal.badChange];
+        if (!bad) throw new TransportError("failed");
+        await setAside(bad);
+        const rest = batch.filter((entry) => entry !== bad);
+        if (rest.length > 0) await sendOrSplit(rest);
+        return;
+      }
+      if (batch.reduce((bytes, entry) => bytes + sizeOf(entry), 0) <= tooBigForAnyServer) throw new TransportError("failed");
       if (batch.length === 1) return setAside(batch[0]);
       const half = batch.length >> 1;
       await sendOrSplit(batch.slice(0, half));
@@ -109,9 +141,11 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     }
   }
 
-  /** Sends the outbox as it is now, except what the server refused before. */
+  /** Sends the outbox as it is now, except what was set aside recently. */
   async function push() {
-    const entries = ((await db.getAll("outbox")) as OutboxEntry[]).filter((entry) => !entry.rejected);
+    const entries = ((await db.getAll("outbox")) as OutboxEntry[]).filter(
+      (entry) => entry.rejectedAt === undefined || now().getTime() - entry.rejectedAt >= retrySetAsideAfterMs,
+    );
     for (const batch of batchesOf(entries)) await sendOrSplit(batch);
   }
 
@@ -188,7 +222,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       if (pushFailure) throw pushFailure;
       const lastSyncedAt = now().getTime();
       await db.put("syncInfo", lastSyncedAt, "lastSyncedAt");
-      const refused = ((await db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejected);
+      const refused = ((await db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined);
       setState({ status: refused ? "rejected" : "idle", lastSyncedAt });
     } catch (error) {
       setState({ status: error instanceof TransportError && error.kind !== "rejected" ? error.kind : "failed" });
