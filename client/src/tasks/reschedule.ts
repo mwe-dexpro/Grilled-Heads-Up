@@ -40,6 +40,32 @@ export function chosenDay(day: Day | undefined | "", today: Day): Day {
 }
 
 /**
+ * A Task's link: its Event and Offset together. One without the other (a sync has brought only one so far) is no
+ * link yet, and the Task is judged as the screens judge it (see `wholeLink`): a Task due on its own date.
+ */
+function linkOf(task: Pick<Task, "eventId" | "offsetDays">): { eventId: string; offsetDays: number } | null {
+  return task.eventId !== null && task.offsetDays !== null ? { eventId: task.eventId, offsetDays: task.offsetDays } : null;
+}
+
+/**
+ * The day a Reschedule to `day` is made for, when `day` was chosen a little while ago: a day that has become too
+ * early since (midnight passed while the sheet was open, so "Tomorrow" is today now) is taken to the earliest day
+ * the Task may have. Anything else is left as it is, and `reschedulePatch` judges it.
+ */
+export function atEarliest(
+  task: Pick<Task, "date" | "completedAt" | "eventId" | "offsetDays">,
+  day: Day,
+  eventStart: (eventId: string) => Day | undefined,
+  today: Day,
+): Day {
+  const link = linkOf(task);
+  const start = link ? eventStart(link.eventId) : undefined;
+  const current = link ? (start === undefined ? null : addDays(start, link.offsetDays)) : task.date;
+  const earliest = earliestRescheduleDay({ date: current, completedAt: task.completedAt }, today);
+  return day < earliest ? earliest : day;
+}
+
+/**
  * The fields a Reschedule of `task` (as stored) to `day` writes, or null when nothing is to be written. Throws
  * for a day before `earliestRescheduleDay` (never a past day; never today for an Overdue Task).
  *
@@ -58,12 +84,13 @@ export function reschedulePatch(
 ): Patch<Task> | null {
   if (day < today) throw new Error(`Cannot reschedule to ${day}: it is in the past`);
 
+  const link = linkOf(task);
   let current: Day | null = task.date;
   let start: Day | undefined;
-  if (task.eventId !== null) {
-    start = eventStart(task.eventId);
+  if (link) {
+    start = eventStart(link.eventId);
     if (start === undefined) return null;
-    current = addDays(start, task.offsetDays ?? 0);
+    current = addDays(start, link.offsetDays);
   }
   if (day < earliestRescheduleDay({ date: current, completedAt: task.completedAt }, today)) {
     throw new Error(`Cannot reschedule an Overdue Task to ${day}: the earliest day is tomorrow`);
@@ -72,5 +99,5 @@ export function reschedulePatch(
 
   const rescheduleCount = current === null ? task.rescheduleCount : task.rescheduleCount + 1;
   if (start === undefined) return { date: day, rescheduleCount };
-  return { eventId: task.eventId!, offsetDays: daysBetween(start, day), date: null, rescheduleCount };
+  return { eventId: link!.eventId, offsetDays: daysBetween(start, day), date: null, rescheduleCount };
 }

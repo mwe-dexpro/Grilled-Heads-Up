@@ -2,7 +2,7 @@ import { defaultDatabaseName, openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
 import { dayOf, type Day, type TimeOfDay } from "../home/days";
 import { openTable, type Patch, type RecordType } from "../sync/replica";
-import { reschedulePatch } from "./reschedule";
+import { atEarliest, reschedulePatch } from "./reschedule";
 import { isExpired } from "./trash";
 
 export interface Task {
@@ -46,6 +46,13 @@ export interface TaskStore {
    * Overdue Task, never a day in the past). A Task that is missing or deleted is ignored, like in `completeTask`.
    */
   rescheduleTask(id: string, day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  /**
+   * Reschedules several Tasks to `day`, one after the other (the Reschedule sheet, and "Reschedule all…"). The day
+   * was chosen on a screen that may be a little behind (midnight passed since): for a Task it is no longer allowed
+   * on, it is taken to the earliest day the Task may have (see `atEarliest`), so no Task stops the others. Tasks
+   * that are missing or deleted are ignored.
+   */
+  rescheduleTasks(ids: string[], day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
   /** Deletes a Task: it moves to the Trash (it leaves every list and syncs as deleted). */
   deleteTask(id: string): Promise<void>;
   /**
@@ -147,6 +154,13 @@ export async function openTaskStore(
       await tasks.update(id, (current) => reschedulePatch(current, day, eventStart, today) ?? {});
     },
 
+    async rescheduleTasks(ids, day, eventStart) {
+      const today = dayOf(now());
+      for (const id of ids) {
+        await tasks.update(id, (current) => reschedulePatch(current, atEarliest(current, day, eventStart, today), eventStart, today) ?? {});
+      }
+    },
+
     async deleteTask(id) {
       if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
       await tasks.delete(id);
@@ -154,7 +168,7 @@ export async function openTaskStore(
 
     async restoreTask(id) {
       const at = now();
-      const deleted = (await tasks.listDeleted()).find((task) => task.id === id);
+      const deleted = await tasks.getDeleted(id);
       if (deleted && !isExpired(deleted.deletedAt!, at)) await tasks.restore(id);
     },
 

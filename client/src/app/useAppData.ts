@@ -93,9 +93,8 @@ export function useAppData() {
   const rescheduleTasks = useCallback(
     (ids: string[], day: Day) => {
       const eventStart = (eventId: string) => events.find((event) => event.id === eventId)?.startDate;
-      return changeTasks(async (s) => {
-        for (const id of ids) await s.rescheduleTask(id, day, eventStart);
-      });
+      // Nobody waits for the result: the lists are reloaded after a failed change too, so they show what was saved.
+      return changeTasks((s) => s.rescheduleTasks(ids, day, eventStart)).catch(() => {});
     },
     [changeTasks, events],
   );

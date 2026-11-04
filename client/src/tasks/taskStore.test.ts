@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { openDB } from "idb";
 import { openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
@@ -327,6 +327,72 @@ describe("Rescheduling a Task", () => {
     expect((await store.listTasks())[0]).toMatchObject({ date: "2026-10-06", rescheduleCount: 1 });
   });
 
+  it("judges a Task whose Event has arrived but not its Offset as the lists show it: a Task due on its date", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName, { now: clock() });
+    const task = await store.addTask("Half", { date: "2026-10-09" });
+    const db = await openAppDb(dbName);
+    await db.put("tasks", { ...(await db.get("tasks", task.id))!, eventId: "e1", offsetDays: null });
+    db.close();
+    // The Event started on 2026-10-01: were the Task taken for a Linked task, it would be Overdue and could not come to today.
+    const eventStart = () => "2026-10-01";
+
+    await store.rescheduleTask(task.id, "2026-10-04", eventStart);
+    await store.rescheduleTask(task.id, "2026-10-10", eventStart);
+
+    expect((await store.listTasks())[0]).toMatchObject({ date: "2026-10-10", eventId: null, offsetDays: null, rescheduleCount: 2 });
+  });
+
+  describe("several at once", () => {
+    // Midnight has passed since the Reschedule sheet was opened: it offered "Tomorrow" for the 4th, and it is the 4th now.
+    const afterMidnight = () => new Date(2026, 9, 4, 0, 0, 5);
+
+    it("takes every Task to the earliest day it may have when the chosen day has become too early, and none stops the others", async () => {
+      const store = await openTaskStore(freshDbName(), { now: afterMidnight });
+      const [a, b, c] = [await store.addTask("A", { date: "2026-10-01" }), await store.addTask("B", { date: "2026-10-02" }), await store.addTask("C", { date: "2026-10-09" })];
+
+      await store.rescheduleTasks([a.id, b.id, c.id], "2026-10-04", noEvents);
+
+      // A and B were Overdue (the 5th is the earliest); C was not, and may come to today.
+      const byTitle = (await store.listTasks()).sort((x, y) => x.title.localeCompare(y.title));
+      expect(byTitle.map((t) => [t.title, t.date, t.rescheduleCount])).toEqual([
+        ["A", "2026-10-05", 1],
+        ["B", "2026-10-05", 1],
+        ["C", "2026-10-04", 1],
+      ]);
+    });
+
+    it("moves a Linked task's Offset to the earliest day, and skips what is missing, deleted or has no Event here", async () => {
+      const store = await openTaskStore(freshDbName(), { now: afterMidnight });
+      const linked = await store.addTask("Linked", { eventId: "e1", offsetDays: -3 });
+      const away = await store.addTask("Away", { eventId: "e2", offsetDays: -3 });
+      const doomed = await store.addTask("Doomed", { date: "2026-10-01" });
+      await store.deleteTask(doomed.id);
+      // e1 starts on the 5th, so Linked is due on the 2nd: Overdue.
+      const eventStart = (id: string) => (id === "e1" ? "2026-10-05" : undefined);
+
+      await store.rescheduleTasks(["missing", doomed.id, away.id, linked.id], "2026-10-04", eventStart);
+
+      const byTitle = (await store.listTasks()).sort((x, y) => x.title.localeCompare(y.title));
+      expect(byTitle.map((t) => [t.title, t.eventId, t.offsetDays, t.date])).toEqual([
+        ["Away", "e2", -3, null],
+        ["Linked", "e1", 0, null],
+      ]);
+    });
+
+    it("still takes a later day as it is, and counts one Reschedule per Task", async () => {
+      const store = await openTaskStore(freshDbName(), { now: afterMidnight });
+      const [a, b] = [await store.addTask("A", { date: "2026-10-01" }), await store.addTask("B", { date: "2026-10-02" })];
+
+      await store.rescheduleTasks([a.id, b.id], "2026-10-12", noEvents);
+
+      expect((await store.listTasks()).map((t) => [t.date, t.rescheduleCount])).toEqual([
+        ["2026-10-12", 1],
+        ["2026-10-12", 1],
+      ]);
+    });
+  });
+
   it("ignores a Task that is missing or deleted, like Complete does", async () => {
     const store = await openTaskStore(freshDbName(), { now: clock() });
     const task = await store.addTask("Doomed", { date: "2026-10-06" });
@@ -360,17 +426,35 @@ describe("The Trash", () => {
     expect(await store.listTrash()).toEqual([expect.objectContaining({ id: doomed.id, title: "Doomed", date: "2026-10-06" })]);
   });
 
-  it("lists the Trash newest deletion first", async () => {
+  /** Adds Tasks under these ids, so a test can choose the order the ids are stored in (the keys of the Tasks). */
+  async function addWithIds<T>(ids: string[], add: () => Promise<T>): Promise<T> {
+    const spy = vi.spyOn(crypto, "randomUUID");
+    for (const id of ids) spy.mockReturnValueOnce(id as ReturnType<typeof crypto.randomUUID>);
+    try {
+      return await add();
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it("lists the Trash newest deletion first, whatever order the ids are stored in", async () => {
     const { state, now } = clock();
     const store = await openTaskStore(freshDbName(), { now });
-    const [a, b, c] = [await store.addTask("A"), await store.addTask("B"), await store.addTask("C")];
+    const added = await addWithIds(["k1", "k2", "k3", "k4"], async () => [
+      await store.addTask("one"),
+      await store.addTask("two"),
+      await store.addTask("three"),
+      await store.addTask("four"),
+    ]);
+    const [one, two, three, four] = added;
 
-    for (const task of [b, c, a]) {
+    // Deleted in the order two, four, one, three: no way the Tasks' keys (k1..k4) list them like that by chance.
+    for (const task of [two, four, one, three]) {
       state.ms += 1000;
       await store.deleteTask(task.id);
     }
 
-    expect((await store.listTrash()).map((t) => t.title)).toEqual(["A", "C", "B"]);
+    expect((await store.listTrash()).map((t) => t.title)).toEqual(["three", "one", "four", "two"]);
   });
 
   it("restores a Task exactly as it was", async () => {
@@ -433,6 +517,31 @@ describe("The Trash", () => {
     expect(await store.listTrash()).toEqual([]);
     await expect(store.restoreTask(task.id)).resolves.toBeUndefined();
     expect(await store.listTasks()).toEqual([]);
+    expect(await store.listTrash()).toEqual([]);
+  });
+
+  it("judges the expiry of the Task it is asked for, not of another one in the Trash", async () => {
+    const { state, now } = clock();
+    const store = await openTaskStore(freshDbName(), { now });
+    // k1 is stored before k2 in both pairs; in the first pair the expired Task is the second one, in the other the first.
+    const [oldLate, freshEarly, oldEarly, freshLate] = await addWithIds(["k2", "k1", "k3", "k4"], async () => [
+      await store.addTask("old, key k2"),
+      await store.addTask("fresh, key k1"),
+      await store.addTask("old, key k3"),
+      await store.addTask("fresh, key k4"),
+    ]);
+    for (const task of [oldLate, oldEarly]) await store.deleteTask(task.id);
+    state.ms += 20 * day;
+    for (const task of [freshEarly, freshLate]) await store.deleteTask(task.id);
+    state.ms += 15 * day;
+
+    await store.restoreTask(oldLate.id);
+    await store.restoreTask(oldEarly.id);
+    expect(await store.listTasks()).toEqual([]);
+
+    await store.restoreTask(freshLate.id);
+    await store.restoreTask(freshEarly.id);
+    expect((await store.listTasks()).map((t) => t.title).sort()).toEqual(["fresh, key k1", "fresh, key k4"]);
     expect(await store.listTrash()).toEqual([]);
   });
 

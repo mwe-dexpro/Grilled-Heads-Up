@@ -165,6 +165,20 @@ describe("Replica table", () => {
     expect(deleted.find((t) => t.id === "t2")).toMatchObject({ title: "Doomed" });
   });
 
+  it("gets a deleted record by id, and none that lives or is missing", async () => {
+    const { tasks } = await open();
+    await tasks.put(task());
+    await tasks.put(task({ id: "t2", title: "Doomed" }));
+    await tasks.put(task({ id: "t3", title: "Also doomed" }));
+    await tasks.delete("t2");
+    await tasks.delete("t3");
+
+    expect(await tasks.getDeleted("t2")).toMatchObject({ id: "t2", title: "Doomed" });
+    expect(await tasks.getDeleted("t3")).toMatchObject({ id: "t3", title: "Also doomed" });
+    expect(await tasks.getDeleted("t1")).toBeUndefined();
+    expect(await tasks.getDeleted("missing")).toBeUndefined();
+  });
+
   describe("restore", () => {
     it("un-deletes a deleted record, sending only deletedAt, under a clock later than the deletion", async () => {
       const { tasks, push } = await open();

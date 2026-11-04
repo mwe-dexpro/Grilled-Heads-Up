@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays, dateAtNoon, type Day } from "../home/days";
-import { chosenDay, earliestRescheduleDay, nextMonday, rescheduleOptions, reschedulePatch } from "./reschedule";
+import { atEarliest, chosenDay, earliestRescheduleDay, nextMonday, rescheduleOptions, reschedulePatch } from "./reschedule";
 import type { Task } from "./taskStore";
 
 let counter = 0;
@@ -198,5 +198,71 @@ describe("reschedulePatch", () => {
 
       expect(patch).toMatchObject({ rescheduleCount: 5 });
     });
+  });
+
+  describe("a Task whose link arrived in part", () => {
+    // A sync brings the fields one by one. The screens show such a Task as a plain Task due on its date; the rule
+    // must judge it the same way, or it can throw for a Task that looks fine, or link a Task the Owner only moved.
+    const eventOnFirst = () => "2026-10-01";
+
+    it("is moved like a plain Task when only its Event has arrived", () => {
+      const half = task({ date: "2026-10-09", eventId: "e1", offsetDays: null });
+
+      expect(reschedulePatch(half, "2026-10-10", eventOnFirst, today)).toEqual({ date: "2026-10-10", rescheduleCount: 1 });
+    });
+
+    it("is not Overdue because of an Event it is not linked to yet", () => {
+      const half = task({ date: "2026-10-09", eventId: "e1", offsetDays: null });
+
+      expect(reschedulePatch(half, today, eventOnFirst, today)).toEqual({ date: today, rescheduleCount: 1 });
+    });
+
+    it("is moved like a plain Task when only its Offset has arrived", () => {
+      const half = task({ date: "2026-10-09", eventId: null, offsetDays: -3 });
+
+      expect(reschedulePatch(half, "2026-10-10", eventOnFirst, today)).toEqual({ date: "2026-10-10", rescheduleCount: 1 });
+    });
+
+    it("does not ask for the Event of a link that is not whole", () => {
+      const asked: string[] = [];
+
+      reschedulePatch(task({ date: "2026-10-09", eventId: "e1", offsetDays: null }), "2026-10-10", (id) => (asked.push(id), undefined), today);
+
+      expect(asked).toEqual([]);
+    });
+  });
+});
+
+describe("atEarliest", () => {
+  it("takes a day that has become too early for an Overdue Task to tomorrow", () => {
+    // The sheet offered "Tomorrow" (the 4th) before midnight; it is the 4th now, and the Task is Overdue.
+    const overdue = task({ date: "2026-10-01" });
+
+    expect(atEarliest(overdue, today, noEvents, today)).toBe("2026-10-05");
+    expect(atEarliest(overdue, "2026-10-03", noEvents, today)).toBe("2026-10-05");
+  });
+
+  it("takes a day in the past to today for a Task that is not Overdue", () => {
+    expect(atEarliest(task({ date: "2026-10-09" }), "2026-10-03", noEvents, today)).toBe(today);
+    expect(atEarliest(task(), "2026-10-03", noEvents, today)).toBe(today);
+  });
+
+  it("leaves a day that is allowed as it is", () => {
+    expect(atEarliest(task({ date: "2026-10-01" }), "2026-10-05", noEvents, today)).toBe("2026-10-05");
+    expect(atEarliest(task({ date: "2026-10-09" }), today, noEvents, today)).toBe(today);
+    expect(atEarliest(task({ date: "2026-10-01" }), "2026-10-20", noEvents, today)).toBe("2026-10-20");
+  });
+
+  it("judges a Linked task by the date its Event gives it", () => {
+    // The Event started on the 3rd; the Task, 1 day before, was due on the 2nd: Overdue.
+    const linked = task({ eventId: "e1", offsetDays: -1 });
+
+    expect(atEarliest(linked, today, eventStartingOn("2026-10-03"), today)).toBe("2026-10-05");
+    expect(atEarliest(linked, today, eventStartingOn("2026-10-12"), today)).toBe(today);
+  });
+
+  it("does not count a Task Completed after it was overdue, nor a link that is not whole", () => {
+    expect(atEarliest(task({ date: "2026-10-01", completedAt: "2026-10-02T09:00:00.000Z" }), today, noEvents, today)).toBe(today);
+    expect(atEarliest(task({ date: "2026-10-09", eventId: "e1", offsetDays: null }), today, eventStartingOn("2026-10-01"), today)).toBe(today);
   });
 });

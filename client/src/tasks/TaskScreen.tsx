@@ -1,5 +1,5 @@
 import { Calendar, Check, ChevronRight, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { hrefOf } from "../app/routes";
 import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
 import { formatEventWhen, formatOffset } from "../events/formatEvent";
@@ -30,6 +30,8 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onRe
   const { language, t } = useI18n();
   const [chosenEventId, setChosenEventId] = useState("");
   const [picking, setPicking] = useState(false);
+  // Delete goes back, and a second tap before the screen has gone would go back once more (and delete again).
+  const leaving = useRef(false);
 
   if (!rawTask) {
     return (
@@ -153,7 +155,15 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onRe
       )}
 
       <div className="actions">
-        <button type="button" className="button-delete" onClick={() => onDelete(rawTask)}>
+        <button
+          type="button"
+          className="button-delete"
+          onClick={() => {
+            if (leaving.current) return;
+            leaving.current = true;
+            onDelete(rawTask);
+          }}
+        >
           <Trash2 size={18} strokeWidth={1.5} aria-hidden="true" />
           {t("task.delete")}
         </button>

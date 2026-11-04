@@ -39,6 +39,8 @@ export interface Table<T extends Synced> {
   update(id: string, change: Patch<T> | ((current: T) => Patch<T>)): Promise<T | undefined>;
   /** Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. */
   delete(id: string): Promise<void>;
+  /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
+  getDeleted(id: string): Promise<T | undefined>;
   /** Deleted records (tombstones), in no particular order. */
   listDeleted(): Promise<T[]>;
   /**
@@ -157,6 +159,11 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const at = now();
       if (prev && prev.deletedAt === null) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
       await tx.done;
+    },
+
+    async getDeleted(id) {
+      const record = await stored(id);
+      return record?.deletedAt === null ? undefined : record;
     },
 
     async listDeleted() {
