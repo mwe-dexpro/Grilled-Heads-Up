@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { openDB } from "idb";
-import { openTaskStore } from "./taskStore";
+import { openAppDb } from "../data/database";
+import { maxTitleLength } from "../data/limits";
+import { openTaskStore, taskRecordType } from "./taskStore";
 
 let dbCounter = 0;
 const freshDbName = () => `tasks-test-${dbCounter++}`;
@@ -72,10 +74,73 @@ describe("Task store", () => {
     expect(await store.listTasks()).toHaveLength(1);
   });
 
-  it("refuses to Complete a Task that does not exist", async () => {
+  it("ignores Complete for a Task that does not exist", async () => {
     const store = await openTaskStore(freshDbName());
 
-    await expect(store.completeTask("missing")).rejects.toThrow("No Task with id missing");
+    await expect(store.completeTask("missing")).resolves.toBeUndefined();
+
+    expect(await store.listTasks()).toEqual([]);
+  });
+
+  it("refuses a title longer than the limit, and takes one of exactly that length", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await expect(store.addTask("x".repeat(maxTitleLength + 1))).rejects.toThrow("up to 200 characters");
+    const task = await store.addTask("x".repeat(maxTitleLength));
+
+    expect(await store.listTasks()).toEqual([task]);
+  });
+});
+
+describe("Tasks that arrive in part", () => {
+  it("get an empty title, no date, no Event, and are not Completed or deleted until the rest arrives", () => {
+    expect(taskRecordType.withDefaults({ id: "t1" })).toEqual({
+      id: "t1",
+      title: "",
+      date: null,
+      time: null,
+      eventId: null,
+      offsetDays: null,
+      createdAt: "",
+      completedAt: null,
+      deletedAt: null,
+    });
+  });
+
+  it("keep the fields they have, also ones this version doesn't know", () => {
+    const partial = { id: "t1", title: "Known", completedAt: "2026-10-01T09:00:00.000Z", fromNewerVersion: 5 };
+
+    expect(taskRecordType.withDefaults(partial)).toMatchObject(partial);
+  });
+});
+
+describe("Deleting a Task", () => {
+  it("takes the Task out of the list, also after a reload", async () => {
+    const dbName = freshDbName();
+    const before = await openTaskStore(dbName, { now: tickingClock() });
+    const doomed = await before.addTask("Doomed");
+    await before.addTask("Kept");
+
+    await before.deleteTask(doomed.id);
+    before.close();
+
+    const after = await openTaskStore(dbName);
+    expect((await after.listTasks()).map((t) => t.title)).toEqual(["Kept"]);
+  });
+
+  it("refuses to delete a Task that is gone, and ignores Complete for it", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName);
+    const task = await store.addTask("Doomed");
+    await store.deleteTask(task.id);
+
+    await expect(store.deleteTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
+    await expect(store.completeTask(task.id)).resolves.toBeUndefined();
+    await expect(store.deleteTask("missing")).rejects.toThrow("No Task with id missing");
+
+    expect(await store.listTasks()).toEqual([]);
+    const raw = await (await openAppDb(dbName)).get("tasks", task.id);
+    expect(raw).toMatchObject({ completedAt: null });
   });
 });
 
@@ -120,6 +185,7 @@ describe("Task dates", () => {
         offsetDays: null,
         createdAt: "2026-09-28T09:00:00.000Z",
         completedAt: null,
+        deletedAt: null,
       },
     ]);
   });

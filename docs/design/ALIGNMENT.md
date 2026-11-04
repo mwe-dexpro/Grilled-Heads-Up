@@ -79,6 +79,6 @@ Events
 
 App
 - Quick add **"+" on every screen** (prototype: home only) → Inbox; Android share-sheet target
-- Passkey sign-in + recovery code (built in #3 without a design, from the detail screens' parts; *Add a passkey*, *New recovery code* and *Sign out* sit in the home footer until Settings exist), push-permission prompt, sync/offline status
+- Passkey sign-in + recovery code (built in #3 without a design, from the detail screens' parts; *Add a passkey*, *New recovery code* and *Sign out* sit in the home footer until Settings exist), push-permission prompt, sync/offline status (the sync line and *Sync now* sit in the home footer since #4, built without a design: a small calm line, "Synced 14:32" / "Offline · last synced 14:32" / "Sync failed" / "Some changes could not be synced"; a tab whose database another tab upgraded shows a plain full-screen "Reload to continue", also without a design; the sync line needs a designed home, e.g. in Settings or a banner when changes are only local)
 - Settings: language EN/DE, default reminder time, JSON export, Trash
 - Empty states (empty Overdue = a calm "nothing overdue" line, empty day, empty Project)

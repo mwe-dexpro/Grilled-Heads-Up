@@ -77,6 +77,7 @@ describe("formatEventTime", () => {
     createdAt: "",
     externalSource: null,
     externalId: null,
+    deletedAt: null,
   });
 
   it("shows the start time on this device, or All day", () => {

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { goBack } from "../app/navigation";
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { dayOf } from "../home/days";
 import { useI18n } from "../i18n/I18nProvider";
 import { NavBar } from "../ui/NavBar";
@@ -10,7 +11,8 @@ interface EventFormProps {
   /** The Event to edit; a new Event when missing. */
   event?: Event;
   now: Date;
-  onSave(fields: EventFields): Promise<void>;
+  /** `base` is what the form was opened with (editing only); the fields that differ from it are what the person changed. */
+  onSave(fields: EventFields, base?: EventFields): Promise<void>;
 }
 
 function newEventFields(now: Date): EventFields {
@@ -36,7 +38,9 @@ function fieldsOf(event: Event): EventFields {
 /** Creates or edits an Event. Changing its dates moves its Linked tasks with it (they keep their Offsets). */
 export function EventForm({ event, now, onSave }: EventFormProps) {
   const { t } = useI18n();
-  const [fields, setFields] = useState<EventFields>(() => (event ? fieldsOf(event) : newEventFields(now)));
+  // Kept as they were when the form opened: an Event changed by a sync meanwhile doesn't reset the form (nor this).
+  const [base] = useState<EventFields | undefined>(() => (event ? fieldsOf(event) : undefined));
+  const [fields, setFields] = useState<EventFields>(() => base ?? newEventFields(now));
   const [showProblem, setShowProblem] = useState(false);
   const problem = validateEvent(fields);
 
@@ -62,7 +66,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
       setShowProblem(true);
       return;
     }
-    await onSave(fields);
+    await onSave(fields, base);
   }
 
   return (
@@ -89,6 +93,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
             value={fields.title}
             onChange={(e) => update({ title: e.target.value })}
             placeholder={t("eventForm.titlePlaceholder")}
+            maxLength={maxTitleLength}
             autoComplete="off"
             autoFocus={!event}
           />
@@ -137,17 +142,28 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
       <div className="card form-card spaced">
         <label className="field">
           <span className="visually-hidden">{t("eventForm.location")}</span>
-          <input value={fields.location} onChange={(e) => update({ location: e.target.value })} placeholder={t("eventForm.location")} />
+          <input
+            value={fields.location}
+            onChange={(e) => update({ location: e.target.value })}
+            placeholder={t("eventForm.location")}
+            maxLength={maxLocationLength}
+          />
         </label>
         <label className="field">
           <span className="visually-hidden">{t("eventForm.notes")}</span>
-          <textarea rows={3} value={fields.notes} onChange={(e) => update({ notes: e.target.value })} placeholder={t("eventForm.notes")} />
+          <textarea
+            rows={3}
+            value={fields.notes}
+            onChange={(e) => update({ notes: e.target.value })}
+            placeholder={t("eventForm.notes")}
+            maxLength={maxNotesLength}
+          />
         </label>
       </div>
 
       {showProblem && problem && (
         <p className="problem" role="alert">
-          {t(`eventForm.problem.${problem}`)}
+          {t(`eventForm.problem.${problem}`, { title: String(maxTitleLength), location: String(maxLocationLength), notes: String(maxNotesLength) })}
         </p>
       )}
     </form>

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 
 /** Adds a Task through the "+" button; without a date it goes to the Inbox. */
 async function addTask(page: Page, title: string, { date = "", time = "" } = {}) {

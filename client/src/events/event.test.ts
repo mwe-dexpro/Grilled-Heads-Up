@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import type { Task } from "../tasks/taskStore";
 import {
   eventDays,
@@ -37,7 +38,7 @@ const allDay: EventFields = {
 };
 
 function event(fields: Partial<EventFields> = {}, id = "e1"): Event {
-  return { ...timed, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null };
+  return { ...timed, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null, deletedAt: null };
 }
 
 let counter = 0;
@@ -52,6 +53,7 @@ function task(fields: Partial<Task> = {}): Task {
     offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    deletedAt: null,
     ...fields,
   };
 }
@@ -113,6 +115,22 @@ describe("validateEvent", () => {
 
   it("needs a title", () => {
     expect(validateEvent({ ...timed, title: "  " })).toBe("title");
+  });
+
+  it("refuses a title, location or notes over the limit, and accepts ones of exactly the limit", () => {
+    expect(validateEvent({ ...timed, title: "x".repeat(maxTitleLength) })).toBeNull();
+    expect(validateEvent({ ...timed, location: "x".repeat(maxLocationLength) })).toBeNull();
+    expect(validateEvent({ ...timed, notes: "x".repeat(maxNotesLength) })).toBeNull();
+    expect(validateEvent({ ...timed, title: "x".repeat(maxTitleLength + 1) })).toBe("tooLong");
+    expect(validateEvent({ ...timed, location: "x".repeat(maxLocationLength + 1) })).toBe("tooLong");
+    expect(validateEvent({ ...timed, notes: "x".repeat(maxNotesLength + 1) })).toBe("tooLong");
+  });
+
+  it("counts the trimmed texts against the limits, like the store that keeps them", () => {
+    expect(validateEvent({ ...timed, title: `${"x".repeat(maxTitleLength)} ` })).toBeNull();
+    expect(validateEvent({ ...timed, location: ` ${"x".repeat(maxLocationLength)}` })).toBeNull();
+    expect(validateEvent({ ...timed, notes: `${"x".repeat(maxNotesLength)}\n` })).toBeNull();
+    expect(validateEvent({ ...timed, title: `${"x".repeat(maxTitleLength + 1)} ` })).toBe("tooLong");
   });
 
   it("refuses an end before the start", () => {

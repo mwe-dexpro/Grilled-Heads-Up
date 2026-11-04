@@ -73,6 +73,7 @@
   "eventForm.location": "Location",
   "eventForm.notes": "Notes",
   "eventForm.problem.title": "Give the event a title.",
+  "eventForm.problem.tooLong": "That is too long: the title can have up to {title} characters, the location up to {location}, the notes up to {notes}.",
   "eventForm.problem.end": "The end can't be before the start.",
   "eventForm.problem.shape": "Fill in the start and end times.",
   "linkedTask.heading": "Add task",
@@ -135,5 +136,17 @@
   "settings.signOut": "Sign out",
   "settings.problem.signOut": "Couldn't sign out. Try again.",
   "settings.newRecoveryCode": "New recovery code",
-  "settings.problem.recoveryCode": "Couldn't make a new recovery code. Try again."
+  "settings.problem.recoveryCode": "Couldn't make a new recovery code. Try again.",
+  "sync.synced": "Synced {time}",
+  "sync.never": "Not synced yet",
+  "sync.syncing": "Syncing…",
+  "sync.offline": "Offline",
+  "sync.offlineSince": "Offline · last synced {time}",
+  "sync.failed": "Sync failed",
+  "sync.signedOut": "Signed out – sign in to sync",
+  "sync.rejected": "Some changes could not be synced",
+  "sync.now": "Sync now",
+  "outdated.title": "Reload to continue",
+  "outdated.text": "Another tab has updated Grilled Heads-Up. Reload this page so that your changes are saved again.",
+  "outdated.reload": "Reload"
 }

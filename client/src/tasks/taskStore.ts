@@ -1,5 +1,7 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
+import { maxTitleLength } from "../data/limits";
 import type { Day, TimeOfDay } from "../home/days";
+import { openTable, type Patch, type RecordType } from "../sync/replica";
 
 export interface Task {
   id: string;
@@ -14,6 +16,8 @@ export interface Task {
   offsetDays: number | null;
   createdAt: string;
   completedAt: string | null;
+  /** When the Task was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  deletedAt: string | null;
 }
 
 export interface TaskWhen {
@@ -26,12 +30,15 @@ export interface TaskWhen {
 
 export interface TaskStore {
   addTask(title: string, when?: TaskWhen): Promise<Task>;
+  /** Completes a Task; one that is missing or deleted (say, by a sync a moment ago) is ignored. */
   completeTask(id: string): Promise<void>;
   /** Attaches a Task to an Event at an Offset; from then on its date comes from the Event. */
   linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
   unlinkTask(id: string, date: Day | null): Promise<void>;
-  /** Tasks in the order they were added. */
+  /** Deletes a Task (it leaves every list and syncs as deleted); the swipe, undo and Trash come later. */
+  deleteTask(id: string): Promise<void>;
+  /** Tasks in the order they were added; deleted ones are left out. */
   listTasks(): Promise<Task[]>;
   close(): void;
 }
@@ -40,15 +47,31 @@ export interface TaskStoreOptions {
   now?: () => Date;
 }
 
-/** Tasks saved by earlier versions lack the fields added since. */
-function withDefaults(task: Task): Task {
-  return {
+/** How Tasks sync. Tasks saved by earlier versions, or arriving in part, lack some fields. */
+export const taskRecordType: RecordType<Task> = {
+  type: "task",
+  storeName: "tasks",
+  withDefaults: (task) => ({
     ...task,
+    title: task.title ?? "",
     date: task.date ?? null,
     time: task.time ?? null,
     eventId: task.eventId ?? null,
     offsetDays: task.offsetDays ?? null,
-  };
+    createdAt: task.createdAt ?? "",
+    completedAt: task.completedAt ?? null,
+    deletedAt: task.deletedAt ?? null,
+  }),
+};
+
+/**
+ * A Linked task has both its Event and its Offset. One of them can be missing for a while after a sync (the
+ * fields arrive one by one); the Task then shows as a Task without an Event. Only the reading is changed.
+ */
+function wholeLink(task: Task): Task {
+  if (task.eventId !== null && task.offsetDays === null) return { ...task, eventId: null };
+  if (task.eventId === null && task.offsetDays !== null) return { ...task, offsetDays: null };
+  return task;
 }
 
 export async function openTaskStore(
@@ -56,17 +79,18 @@ export async function openTaskStore(
   { now = () => new Date() }: TaskStoreOptions = {},
 ): Promise<TaskStore> {
   const db = await openAppDb(dbName);
+  const tasks = await openTable(db, taskRecordType, now);
 
-  async function existing(id: string): Promise<Task> {
-    const task = await db.get("tasks", id);
-    if (!task) throw new Error(`No Task with id ${id}`);
-    return withDefaults(task);
+  /** Changes a live Task in one transaction (see `Table.update`), so a sync landing meanwhile is not overwritten. */
+  async function change(id: string, patch: Patch<Task>): Promise<void> {
+    if (!(await tasks.update(id, patch))) throw new Error(`No Task with id ${id}`);
   }
 
   return {
     async addTask(rawTitle, { date = null, time = null, eventId = null, offsetDays = null } = {}) {
       const title = rawTitle.trim();
       if (title === "") throw new Error("A Task needs a title");
+      if (title.length > maxTitleLength) throw new Error(`A Task's title can have up to ${maxTitleLength} characters`);
       if ((eventId === null) !== (offsetDays === null)) throw new Error("A Linked task needs both an Event and an Offset");
       if (eventId !== null && date !== null) throw new Error("A Linked task gets its date from its Event");
       if (time !== null && date === null && eventId === null) throw new Error("Only a dated Task can have a time");
@@ -79,26 +103,32 @@ export async function openTaskStore(
         offsetDays,
         createdAt: now().toISOString(),
         completedAt: null,
+        deletedAt: null,
       };
-      await db.put("tasks", task);
+      await tasks.put(task);
       return task;
     },
 
     async completeTask(id) {
-      await db.put("tasks", { ...(await existing(id)), completedAt: now().toISOString() });
+      // A Task that a sync has just deleted is gone anyway; completing it is a tap on a stale row, not an error.
+      await tasks.update(id, { completedAt: now().toISOString() });
     },
 
     async linkTask(id, eventId, offsetDays) {
-      await db.put("tasks", { ...(await existing(id)), eventId, offsetDays, date: null });
+      await change(id, { eventId, offsetDays, date: null });
     },
 
     async unlinkTask(id, date) {
-      await db.put("tasks", { ...(await existing(id)), eventId: null, offsetDays: null, date });
+      await change(id, { eventId: null, offsetDays: null, date });
+    },
+
+    async deleteTask(id) {
+      if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
+      await tasks.delete(id);
     },
 
     async listTasks() {
-      const tasks = (await db.getAll("tasks")).map(withDefaults);
-      return tasks.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await tasks.list()).map(wholeLink).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {

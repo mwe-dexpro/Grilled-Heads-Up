@@ -1,3 +1,4 @@
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import type { Progress } from "../home/buckets";
 import { addDays, dayOf, type Day, type TimeOfDay } from "../home/days";
 import type { Task } from "../tasks/taskStore";
@@ -29,12 +30,14 @@ export interface Event {
   externalSource: string | null;
   externalId: string | null;
   createdAt: string;
+  /** When the Event was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  deletedAt: string | null;
 }
 
 /** What a person enters for an Event. */
-export type EventFields = Omit<Event, "id" | "createdAt" | "externalSource" | "externalId">;
+export type EventFields = Omit<Event, "id" | "createdAt" | "externalSource" | "externalId" | "deletedAt">;
 
-export type EventProblem = "title" | "end" | "shape";
+export type EventProblem = "title" | "tooLong" | "end" | "shape";
 
 export function deviceTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -92,7 +95,10 @@ export function eventDays(event: EventFields): { first: Day; last: Day } {
 }
 
 export function validateEvent(fields: EventFields): EventProblem | null {
-  if (fields.title.trim() === "") return "title";
+  // The store keeps the trimmed texts, so those are what the limits count.
+  const title = fields.title.trim();
+  if (title === "") return "title";
+  if (title.length > maxTitleLength || fields.location.trim().length > maxLocationLength || fields.notes.trim().length > maxNotesLength) return "tooLong";
   const timesGiven = [fields.startTime, fields.endTime, fields.timeZone].map((value) => value !== null);
   if (fields.allDay ? timesGiven.some(Boolean) : !timesGiven.every(Boolean)) return "shape";
   if (fields.allDay ? fields.endDate < fields.startDate : eventEnd(fields) < eventStart(fields)) return "end";

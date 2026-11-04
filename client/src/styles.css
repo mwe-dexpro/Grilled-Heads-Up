@@ -303,6 +303,28 @@ a.task-title {
   margin-top: 32px;
 }
 
+/* Sync status (no design yet: calm, small, in the footer's style) */
+
+.sync-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+  margin-bottom: 12px;
+}
+
+.sync-status {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-meta);
+}
+
+.sync-line .button-text {
+  margin-right: 0;
+  padding: 6px 0;
+  font-size: 15px;
+}
+
 .language {
   display: flex;
   align-items: center;

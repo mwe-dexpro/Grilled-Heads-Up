@@ -40,7 +40,7 @@ describe("formatRiskStatus", () => {
 describe("formatRiskExplanation", () => {
   /** Sunday 4 October 2026. */
   const now = new Date(2026, 9, 4, 13, 5);
-  const birthday: Event = { ...timed, id: "e", createdAt: "", externalSource: null, externalId: null };
+  const birthday: Event = { ...timed, id: "e", createdAt: "", externalSource: null, externalId: null, deletedAt: null };
   const overdueTask = (title: string, date: string): Task => ({
     id: title,
     title,
@@ -50,6 +50,7 @@ describe("formatRiskExplanation", () => {
     offsetDays: -1,
     createdAt: "",
     completedAt: null,
+    deletedAt: null,
   });
   const risk = (fields: Partial<EventRisk>): EventRisk => ({ status: "atRisk", openPreparation: 1, overdue: [], daysUntil: 8, ...fields });
 

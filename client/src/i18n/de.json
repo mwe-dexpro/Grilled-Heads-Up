@@ -73,6 +73,7 @@
   "eventForm.location": "Ort",
   "eventForm.notes": "Notizen",
   "eventForm.problem.title": "Gib dem Termin einen Titel.",
+  "eventForm.problem.tooLong": "Das ist zu lang: Der Titel darf bis zu {title} Zeichen haben, der Ort bis zu {location}, die Notizen bis zu {notes}.",
   "eventForm.problem.end": "Das Ende darf nicht vor dem Beginn liegen.",
   "eventForm.problem.shape": "Trag Start- und Endzeit ein.",
   "linkedTask.heading": "Aufgabe hinzufügen",
@@ -135,5 +136,17 @@
   "settings.signOut": "Abmelden",
   "settings.problem.signOut": "Abmelden hat nicht geklappt. Versuch es noch einmal.",
   "settings.newRecoveryCode": "Neuer Wiederherstellungscode",
-  "settings.problem.recoveryCode": "Ein neuer Wiederherstellungscode hat nicht geklappt. Versuch es noch einmal."
+  "settings.problem.recoveryCode": "Ein neuer Wiederherstellungscode hat nicht geklappt. Versuch es noch einmal.",
+  "sync.synced": "Synchronisiert {time}",
+  "sync.never": "Noch nicht synchronisiert",
+  "sync.syncing": "Synchronisiere …",
+  "sync.offline": "Offline",
+  "sync.offlineSince": "Offline · zuletzt synchronisiert {time}",
+  "sync.failed": "Synchronisierung fehlgeschlagen",
+  "sync.signedOut": "Abgemeldet – zum Synchronisieren anmelden",
+  "sync.rejected": "Einige Änderungen konnten nicht synchronisiert werden",
+  "sync.now": "Jetzt synchronisieren",
+  "outdated.title": "Zum Weitermachen neu laden",
+  "outdated.text": "Ein anderer Tab hat Grilled Heads-Up aktualisiert. Lade diese Seite neu, damit deine Änderungen wieder gespeichert werden.",
+  "outdated.reload": "Neu laden"
 }

@@ -1,8 +1,10 @@
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { goBack, navigate, useRoute } from "./app/navigation";
 import type { Route } from "./app/routes";
 import { useAppData } from "./app/useAppData";
+import { useSignedIn } from "./auth/AuthGate";
+import { useDatabaseOutdated } from "./data/useDatabaseOutdated";
 import { EventForm } from "./events/EventForm";
 import { EventScreen } from "./events/EventScreen";
 import { HomeScreen } from "./home/HomeScreen";
@@ -21,6 +23,16 @@ export function App() {
   const route = useRoute();
   const [adding, setAdding] = useState(false);
   const currentTab = tabs.find((tab) => tab === route.name);
+
+  // The server no longer knows this session (it expired): go and sign in again. Local data stays; sync resumes after.
+  const { recheck } = useSignedIn();
+  const signedOut = data.sync.status === "signedOut";
+  useEffect(() => {
+    if (signedOut) void recheck();
+  }, [signedOut, recheck]);
+
+  const outdated = useDatabaseOutdated();
+  if (outdated) return <ReloadScreen />;
 
   return (
     <div className="app">
@@ -41,11 +53,42 @@ export function App() {
   );
 }
 
+/** Another tab upgraded the database and this tab let go of it; nothing could be saved here any more. */
+function ReloadScreen() {
+  const { t } = useI18n();
+  return (
+    <div className="screen auth-screen">
+      <header className="detail-header">
+        <p className="eyebrow">{t("app.title")}</p>
+        <h1 className="large-title">{t("outdated.title")}</h1>
+      </header>
+      <p className="auth-text" role="alert">
+        {t("outdated.text")}
+      </p>
+      <div className="actions">
+        <button type="button" className="button-primary" onClick={() => window.location.reload()}>
+          {t("outdated.reload")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Screen({ route, data, now }: { route: Route; data: ReturnType<typeof useAppData>; now: Date }) {
   const { t } = useI18n();
   switch (route.name) {
     case "today":
-      return <HomeScreen ready={data.ready} tasks={data.tasks} events={data.events} now={now} onComplete={data.completeTask} />;
+      return (
+        <HomeScreen
+          ready={data.ready}
+          tasks={data.tasks}
+          events={data.events}
+          now={now}
+          sync={data.sync}
+          onSyncNow={data.syncNow}
+          onComplete={data.completeTask}
+        />
+      );
     case "calendar":
     case "projects":
       return (
@@ -75,8 +118,8 @@ function Screen({ route, data, now }: { route: Route; data: ReturnType<typeof us
           key={event.id}
           event={event}
           now={now}
-          onSave={async (fields) => {
-            await data.updateEvent(event.id, fields);
+          onSave={async (fields, base) => {
+            await data.updateEvent(event.id, fields, base);
             goBack();
           }}
         />

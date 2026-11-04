@@ -17,7 +17,7 @@ const birthdayFields: EventFields = {
 };
 
 function event(fields: Partial<EventFields> = {}, id = "e1"): Event {
-  return { ...birthdayFields, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null };
+  return { ...birthdayFields, ...fields, id, createdAt: "2026-10-01T09:00:00.000Z", externalSource: null, externalId: null, deletedAt: null };
 }
 
 /** Friday 16 – Sunday 18 October 2026, all day. */
@@ -35,6 +35,7 @@ function linked(offsetDays: number, fields: Partial<Task> = {}): Task {
     offsetDays,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    deletedAt: null,
     ...fields,
   };
 }

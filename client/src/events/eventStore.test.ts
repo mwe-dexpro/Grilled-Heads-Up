@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { openTaskStore } from "../tasks/taskStore";
 import type { EventFields } from "./event";
-import { openEventStore } from "./eventStore";
+import { eventRecordType, openEventStore } from "./eventStore";
 
 let dbCounter = 0;
 const freshDbName = () => `events-test-${dbCounter++}`;
@@ -17,6 +18,33 @@ const birthday: EventFields = {
   location: " Café Luise, Berlin ",
   notes: " Table for 8 ",
 };
+
+describe("Events that arrive in part", () => {
+  it("show as an empty all-day placeholder, with no date made up, until the rest arrives", () => {
+    expect(eventRecordType.withDefaults({ id: "e1" })).toEqual({
+      id: "e1",
+      title: "",
+      allDay: true,
+      startDate: "",
+      startTime: null,
+      endDate: "",
+      endTime: null,
+      timeZone: null,
+      location: "",
+      notes: "",
+      externalSource: null,
+      externalId: null,
+      createdAt: "",
+      deletedAt: null,
+    });
+  });
+
+  it("keep the fields they have, including false and null ones", () => {
+    const partial = { id: "e1", title: "Party", allDay: false, timeZone: "Europe/Berlin", externalSource: "outlook", externalId: "AAMk", fromNewerVersion: 5 };
+
+    expect(eventRecordType.withDefaults(partial)).toMatchObject(partial);
+  });
+});
 
 describe("Event store", () => {
   it("saves an Event created in the app, with no external source, and reads it back after a reopen", async () => {
@@ -37,6 +65,7 @@ describe("Event store", () => {
         createdAt: "2026-10-04T11:05:00.000Z",
         externalSource: null,
         externalId: null,
+        deletedAt: null,
       },
     ]);
   });
@@ -56,6 +85,18 @@ describe("Event store", () => {
     await expect(store.addEvent({ ...birthday, title: "" })).rejects.toThrow("Invalid Event: title");
     await expect(store.addEvent({ ...birthday, endTime: "11:00" })).rejects.toThrow("Invalid Event: end");
     expect(await store.listEvents()).toEqual([]);
+  });
+
+  it("refuses a title, location or notes over the limit, and takes ones of exactly the limit", async () => {
+    const store = await openEventStore(freshDbName());
+
+    await expect(store.addEvent({ ...birthday, title: "x".repeat(maxTitleLength + 1) })).rejects.toThrow("Invalid Event: tooLong");
+    await expect(store.addEvent({ ...birthday, location: "x".repeat(maxLocationLength + 1) })).rejects.toThrow("Invalid Event: tooLong");
+    await expect(store.addEvent({ ...birthday, notes: "x".repeat(maxNotesLength + 1) })).rejects.toThrow("Invalid Event: tooLong");
+    expect(await store.listEvents()).toEqual([]);
+
+    await store.addEvent({ ...birthday, title: "x".repeat(maxTitleLength), location: "x".repeat(maxLocationLength), notes: "x".repeat(maxNotesLength) });
+    expect(await store.listEvents()).toHaveLength(1);
   });
 
   it("updates an Event's fields and keeps its identity", async () => {

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 
 const bucket = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
 

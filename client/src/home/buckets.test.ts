@@ -20,6 +20,7 @@ function task(fields: Partial<Task> = {}): Task {
     offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    deletedAt: null,
     ...fields,
   };
 }
@@ -238,6 +239,7 @@ function event(fields: Partial<Event> = {}): Event {
     externalSource: null,
     externalId: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
+    deletedAt: null,
     ...fields,
   };
 }
@@ -290,6 +292,16 @@ describe("Events on the home screen", () => {
 
     expect(home.find((b) => b.kind === "today")!.tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
     expect(home.find((b) => b.kind === "tomorrow")!.tasks.map((t) => t.id)).toEqual([gift.id]);
+  });
+
+  it("treats a Linked task whose Event hasn't arrived on this device (yet) as undated", () => {
+    const orphan = task({ eventId: "not-synced-yet", offsetDays: -7 });
+    const other = event({ startDate: "2026-10-12", endDate: "2026-10-12" });
+
+    const home = arrangeHome([orphan], now, [other]);
+
+    expect(home.find((b) => b.kind === "inbox")!.tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
+    expect(taskMeta(home.find((b) => b.kind === "inbox")!.tasks[0], "inbox", now)).toBeNull();
   });
 });
 
