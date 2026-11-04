@@ -681,11 +681,20 @@ a.task-title {
 }
 
 .pick-date input {
+  flex: 1;
   min-width: 0;
   padding: 6px 10px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   background: var(--white);
+}
+
+.pick-date .button-primary {
+  flex: none;
+  padding: 8px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+  hyphens: none;
 }
 
 .bucket > .pick-date {
@@ -1238,16 +1247,4 @@ a.task-title {
   background: none;
   font-size: 17px;
   color: var(--blue-action);
-}
-
-.pick-date input {
-  flex: 1;
-}
-
-.pick-date .button-primary {
-  flex: none;
-  padding: 8px 16px;
-  font-size: 15px;
-  white-space: nowrap;
-  hyphens: none;
 }

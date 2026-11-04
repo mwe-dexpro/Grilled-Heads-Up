@@ -27,6 +27,23 @@ async function drag(page: Page, title: string, fromX: number, byX: number) {
   await page.mouse.up();
 }
 
+/**
+ * Swipes a row with a finger: real touch events (through the DevTools protocol), which differ from the mouse in
+ * the browser's own handling (the touch is captured by the row it started on, `touch-action`, `pointercancel`).
+ */
+async function touchSwipe(page: Page, title: string, fromX: number, byX: number) {
+  const box = (await row(page, title).boundingBox())!;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, x: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  await send("touchStart", fromX);
+  const steps = 8;
+  for (let step = 1; step <= steps; step++) await send("touchMove", fromX + (byX * step) / steps);
+  await send("touchEnd", fromX + byX);
+  await cdp.detach();
+}
+
 /** Swipes a row left from its right side, away from the edge zones. */
 async function swipeLeft(page: Page, title: string) {
   await drag(page, title, 330, -230);
@@ -60,19 +77,74 @@ test("swiping a row left reveals Reschedule, Complete and Delete; Complete works
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
 });
 
-test("a swipe that starts at either screen edge opens nothing", async ({ page }) => {
+test("a swipe that starts at either screen edge opens nothing, and changes nothing on an open row", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
   const width = page.viewportSize()!.width;
   const content = row(page, "Pay dentist invoice").locator(".swipe-content");
 
+  // Right edge: a leftward swipe would open the row.
   await drag(page, "Pay dentist invoice", width - 6, -230);
+  await expect(content).toHaveCSS("transform", "none");
+  await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+
+  // Left edge: a rightward swipe would close an open row, and it stays open.
+  await swipeLeft(page, "Pay dentist invoice");
+  await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+  // Three actions of 78 px each.
+  const open = "matrix(1, 0, 0, 1, -234, 0)";
+  await expect(content).toHaveCSS("transform", open);
   await drag(page, "Pay dentist invoice", 20, 230);
-  await drag(page, "Pay dentist invoice", 20, -100);
+  await expect(content).toHaveCSS("transform", open);
+  await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+
+  // The same swipe from the middle does close it.
+  await drag(page, "Pay dentist invoice", 100, 230);
+  await expect(content).toHaveCSS("transform", "none");
+  await expect(page).toHaveURL(/#\/$|^[^#]*$/);
+});
+
+test("a finger swipe opens the row, and a short one that snaps back doesn't swallow the next keyboard activation", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
+  const content = row(page, "Pay dentist invoice").locator(".swipe-content");
+
+  await touchSwipe(page, "Pay dentist invoice", 330, -230);
+  await expect(row(page, "Pay dentist invoice").getByRole("button", { name: "Delete", exact: true })).toBeVisible();
+  await page.getByRole("heading", { name: "Today", level: 1 }).click();
+  await expect(content).toHaveCSS("transform", "none");
+
+  // A short swipe: the row snaps back. A finger ends in no click, so nothing may wait for one: the Space the Owner
+  // presses on the focused check circle a moment later is a click of its own, and Completes the Task.
+  await touchSwipe(page, "Pay dentist invoice", 330, -40);
+  await expect(content).toHaveCSS("transform", "none");
+  await page.waitForTimeout(300);
+  const check = page.getByRole("checkbox", { name: "Complete Pay dentist invoice" });
+  await check.focus();
+  await page.keyboard.press("Space");
+  await expect(check).toBeChecked();
+});
+
+test("a press that goes down and is let go outside the row leaves nothing armed: the mouse moving over it later moves nothing", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  const content = row(page, "Pay dentist invoice").locator(".swipe-content");
+  const box = (await row(page, "Pay dentist invoice").boundingBox())!;
+  const other = (await row(page, "Order cake").boundingBox())!;
+
+  await page.mouse.move(330, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(325, box.y + 40, { steps: 4 });
+  // Let go over the other row: the first row never hears of it.
+  await page.mouse.move(325, other.y + other.height / 2, { steps: 4 });
+  await page.mouse.up();
+  // With no button pressed, move sideways over the first row.
+  await page.mouse.move(330, box.y + 10);
+  await page.mouse.move(150, box.y + 10, { steps: 8 });
 
   await expect(content).toHaveCSS("transform", "none");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
-  await expect(page).toHaveURL(/#\/$|^[^#]*$/);
 });
 
 test("a short swipe snaps back, and a vertical drag moves nothing", async ({ page }) => {
@@ -153,6 +225,27 @@ test("Reschedule all… empties the Overdue bucket in two taps", async ({ page }
   await expect(bucket(page, "Today")).toContainText("Order cake");
 });
 
+test("Reschedule all… after midnight, with the sheet's day gone stale, still moves every Task to the earliest day it may have", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.clock.setSystemTime(new Date(2026, 9, 7, 23, 59, 40));
+  await page.goto("/");
+  await addTask(page, "Pay dentist invoice", { date: "2026-10-01" });
+  await addTask(page, "Buy gift for Mom", { date: "2026-10-05" });
+  await expect(bucket(page, "Overdue").getByRole("listitem")).toHaveCount(2);
+  await page.getByRole("button", { name: "Reschedule all…" }).click();
+  await expect(page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ })).toContainText("Thu, Oct 8");
+
+  // Midnight passes while the sheet is open; the screen does not know yet (it looks at the clock every 30 seconds).
+  await page.clock.setSystemTime(new Date(2026, 9, 8, 0, 0, 5));
+  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+
+  // The Tasks went to the real tomorrow, the 9th, which the stale screen shows as the day after tomorrow.
+  await expect(page.getByText("Nothing overdue.")).toBeVisible();
+  await expect(page.getByRole("listitem")).toHaveText([/Pay dentist invoice.*Fri, Oct 9/, /Buy gift for Mom.*Fri, Oct 9/]);
+  expect(errors).toEqual([]);
+});
+
 test("Next week is the next Monday", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
@@ -207,6 +300,32 @@ test("a deleted Task is in the Trash, newest first, and Restore puts it back", a
   await expect(bucket(page, "Today")).toContainText("Order cake");
   await expect(bucket(page, "Today")).not.toContainText("Call the plumber");
   await expect(bucket(page, "Inbox")).toContainText("Birthday card");
+});
+
+test("the undo toast is announced: its live region is in the page before it, and a second delete is announced again", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  await addTask(page, "Call the plumber", { date: "2026-10-07" });
+  // A live region that comes with its text is often not read out; one that was already there and gets text is.
+  const region = page.locator("[aria-live='polite']");
+  await expect(region).toHaveCount(1);
+  await expect(region).toBeEmpty();
+  const regionHandle = await region.elementHandle();
+
+  await row(page, "Order cake").dispatchEvent("contextmenu");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+
+  await expect(region).toContainText("Task deleted");
+  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  const firstToast = await region.locator(".undo-toast").elementHandle();
+  await row(page, "Call the plumber").dispatchEvent("contextmenu");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  // The second toast is a new element in the same region, which is what a screen reader reads out.
+  await expect.poll(() => firstToast!.evaluate((element) => element.isConnected)).toBe(false);
+  await expect(region.locator(".undo-toast")).toHaveCount(1);
+  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  // It is not a second status line: the page's one `status` is the sync line, which the sync tests listen to.
+  await expect(page.getByRole("status")).toHaveCount(1);
 });
 
 test("the undo toast goes after 5 seconds, and the Task is then restored from the Trash", async ({ page }) => {
@@ -294,6 +413,22 @@ test("Task detail has the same actions: Reschedule chips, Delete and a Complete 
   await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
   await expect(page.getByText("Task deleted")).toBeVisible();
   await expect(bucket(page, "Today")).not.toContainText("Call the plumber");
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(bucket(page, "Today")).toContainText("Call the plumber");
+});
+
+test("a double tap on Delete in Task detail goes back once, to where the Task was opened from", async ({ page }) => {
+  await page.goto("/#/calendar");
+  await page.goto("/");
+  await addTask(page, "Call the plumber", { date: "2026-10-07" });
+  await page.getByRole("link", { name: "Call the plumber" }).click();
+  await expect(page.getByRole("heading", { name: "Call the plumber", level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete" }).dblclick();
+
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/#\/$|^[^#]*$/);
+  await expect(page.getByText("Task deleted")).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(bucket(page, "Today")).toContainText("Call the plumber");
 });

@@ -121,7 +121,7 @@ export function App() {
         onClose={() => setRescheduleIds([])}
       />
       <UndoToast
-        visible={deleted !== null}
+        deletedTaskId={deleted?.taskId ?? null}
         onUndo={() => {
           if (!deleted) return;
           setDeleted(null);
@@ -218,6 +218,7 @@ function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<
     case "task":
       return (
         <TaskScreen
+          key={route.id}
           task={data.tasks.find((task) => task.id === route.id)}
           tasks={data.tasks}
           events={data.events}
