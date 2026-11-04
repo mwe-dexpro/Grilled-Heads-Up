@@ -50,6 +50,7 @@ describe("formatRiskExplanation", () => {
     offsetDays: -1,
     createdAt: "",
     completedAt: null,
+    rescheduleCount: 0,
     deletedAt: null,
   });
   const risk = (fields: Partial<EventRisk>): EventRisk => ({ status: "atRisk", openPreparation: 1, overdue: [], daysUntil: 8, ...fields });

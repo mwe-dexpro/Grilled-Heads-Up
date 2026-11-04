@@ -1,7 +1,9 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
-import type { Day, TimeOfDay } from "../home/days";
+import { dayOf, type Day, type TimeOfDay } from "../home/days";
 import { openTable, type Patch, type RecordType } from "../sync/replica";
+import { reschedulePatch } from "./reschedule";
+import { isExpired } from "./trash";
 
 export interface Task {
   id: string;
@@ -16,7 +18,9 @@ export interface Task {
   offsetDays: number | null;
   createdAt: string;
   completedAt: string | null;
-  /** When the Task was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  /** How often the Task was rescheduled; synced, but not shown in v1. Last write wins, so it is a hint, not an audit. */
+  rescheduleCount: number;
+  /** When the Task was deleted; it then stays stored so the deletion syncs, and the Trash lists it for 30 days. */
   deletedAt: string | null;
 }
 
@@ -36,10 +40,23 @@ export interface TaskStore {
   linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
   unlinkTask(id: string, date: Day | null): Promise<void>;
-  /** Deletes a Task (it leaves every list and syncs as deleted); the swipe, undo and Trash come later. */
+  /**
+   * Gives a Task a new date (a Linked task a new Offset, from `eventStart`, the start day of the Event it belongs to)
+   * and counts the Reschedule; see `reschedulePatch`. Throws for a day that is not allowed (never today for an
+   * Overdue Task, never a day in the past). A Task that is missing or deleted is ignored, like in `completeTask`.
+   */
+  rescheduleTask(id: string, day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  /** Deletes a Task: it moves to the Trash (it leaves every list and syncs as deleted). */
   deleteTask(id: string): Promise<void>;
+  /**
+   * Takes a Task out of the Trash, exactly as it was. Only a Task that is in the Trash (deleted, and not for 30
+   * days yet) is restored; one that is live, missing or expired is left alone, without an error.
+   */
+  restoreTask(id: string): Promise<void>;
   /** Tasks in the order they were added; deleted ones are left out. */
   listTasks(): Promise<Task[]>;
+  /** The Trash: Tasks deleted less than 30 days ago, the latest deletion first. */
+  listTrash(): Promise<Task[]>;
   close(): void;
 }
 
@@ -60,6 +77,7 @@ export const taskRecordType: RecordType<Task> = {
     offsetDays: task.offsetDays ?? null,
     createdAt: task.createdAt ?? "",
     completedAt: task.completedAt ?? null,
+    rescheduleCount: task.rescheduleCount ?? 0,
     deletedAt: task.deletedAt ?? null,
   }),
 };
@@ -103,6 +121,7 @@ export async function openTaskStore(
         offsetDays,
         createdAt: now().toISOString(),
         completedAt: null,
+        rescheduleCount: 0,
         deletedAt: null,
       };
       await tasks.put(task);
@@ -122,13 +141,33 @@ export async function openTaskStore(
       await change(id, { eventId: null, offsetDays: null, date });
     },
 
+    async rescheduleTask(id, day, eventStart) {
+      // The rule runs on the stored Task inside the transaction, so a sync that landed meanwhile is respected.
+      const today = dayOf(now());
+      await tasks.update(id, (current) => reschedulePatch(current, day, eventStart, today) ?? {});
+    },
+
     async deleteTask(id) {
       if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
       await tasks.delete(id);
     },
 
+    async restoreTask(id) {
+      const at = now();
+      const deleted = (await tasks.listDeleted()).find((task) => task.id === id);
+      if (deleted && !isExpired(deleted.deletedAt!, at)) await tasks.restore(id);
+    },
+
     async listTasks() {
       return (await tasks.list()).map(wholeLink).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+
+    async listTrash() {
+      const at = now();
+      return (await tasks.listDeleted())
+        .filter((task) => !isExpired(task.deletedAt!, at))
+        .map(wholeLink)
+        .sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!));
     },
 
     close() {

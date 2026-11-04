@@ -36,11 +36,12 @@ const task = (fields: Partial<Task> = {}): Task => ({
   offsetDays: null,
   createdAt: "2026-10-01T09:00:00.000Z",
   completedAt: null,
+  rescheduleCount: 0,
   deletedAt: null,
   ...fields,
 });
 
-const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "time", "title"];
+const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "rescheduleCount", "time", "title"];
 
 describe("Replica table", () => {
   it("sends every field of a new record, all under one clock, and none for the id", async () => {
@@ -147,6 +148,65 @@ describe("Replica table", () => {
 
     expect(await tasks.get("t1")).toEqual(task());
     expect((await tasks.list()).map((t) => t.id)).toEqual(["t1"]);
+  });
+
+  it("lists deleted records, and none that live", async () => {
+    const { tasks } = await open();
+    await tasks.put(task());
+    await tasks.put(task({ id: "t2", title: "Doomed" }));
+    await tasks.put(task({ id: "t3", title: "Also doomed" }));
+    await tasks.delete("t2");
+    await tasks.delete("t3");
+
+    const deleted = await tasks.listDeleted();
+
+    expect(deleted.map((t) => t.id).sort()).toEqual(["t2", "t3"]);
+    expect(deleted.every((t) => t.deletedAt !== null)).toBe(true);
+    expect(deleted.find((t) => t.id === "t2")).toMatchObject({ title: "Doomed" });
+  });
+
+  describe("restore", () => {
+    it("un-deletes a deleted record, sending only deletedAt, under a clock later than the deletion", async () => {
+      const { tasks, push } = await open();
+      await tasks.put(task({ date: "2026-10-04" }));
+      await tasks.delete("t1");
+      const deleted = await push();
+
+      const restored = await tasks.restore("t1");
+      const sent = await push();
+
+      expect(restored).toEqual(task({ date: "2026-10-04" }));
+      expect(await tasks.get("t1")).toEqual(restored);
+      expect(await tasks.listDeleted()).toEqual([]);
+      expect(sent.deletedAt.value).toBeNull();
+      expect(sent.deletedAt.hlc > deleted.deletedAt.hlc).toBe(true);
+      expect(sent.title.hlc).toBe(deleted.title.hlc);
+    });
+
+    it("writes a single outbox entry", async () => {
+      const { tasks, db, push } = await open();
+      await tasks.put(task());
+      await tasks.delete("t1");
+      await push();
+
+      await tasks.restore("t1");
+
+      expect(await db.getAll("outbox")).toEqual([expect.objectContaining({ type: "task", id: "t1", field: "deletedAt", value: null })]);
+    });
+
+    it("returns undefined, and sends nothing, for a record that is live or missing", async () => {
+      const { tasks, server, push } = await open();
+      await tasks.put(task());
+      await push();
+      const pushed = server.pushedChanges;
+
+      expect(await tasks.restore("t1")).toBeUndefined();
+      expect(await tasks.restore("missing")).toBeUndefined();
+
+      await push();
+      expect(server.pushedChanges).toBe(pushed);
+      expect(await tasks.get("t1")).toEqual(task());
+    });
   });
 
   describe("update", () => {

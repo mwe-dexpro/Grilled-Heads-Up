@@ -53,6 +53,7 @@ function task(fields: Partial<Task> = {}): Task {
     offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    rescheduleCount: 0,
     deletedAt: null,
     ...fields,
   };

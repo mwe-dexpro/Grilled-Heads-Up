@@ -326,6 +326,179 @@ describe("Sync between two devices", () => {
     expect(await titles(b)).toEqual([]);
   });
 
+  describe("the Trash", () => {
+    it("brings a Task back on B that was deleted and then restored on A, exactly as it was", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Buy gift", { date: "2026-10-04", time: "13:00" });
+      await a.sync();
+      await b.sync();
+      const before = await b.tasks.listTasks();
+      world.advance();
+      await a.tasks.deleteTask(task.id);
+      await a.sync();
+      await b.sync();
+      expect(await titles(b)).toEqual([]);
+      expect((await b.tasks.listTrash()).map((t) => t.title)).toEqual(["Buy gift"]);
+      world.advance();
+
+      await a.tasks.restoreTask(task.id);
+      await a.sync();
+      await b.sync();
+
+      expect(await b.tasks.listTasks()).toEqual(before);
+      expect(await a.tasks.listTasks()).toEqual(before);
+      expect(await b.tasks.listTrash()).toEqual([]);
+    });
+
+    it("brings the Trash to the other device too, so a Task deleted on the phone can be restored on the desktop", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Doomed");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.tasks.deleteTask(task.id);
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await b.tasks.restoreTask(task.id);
+      await b.sync();
+      await a.sync();
+
+      expect(await titles(a)).toEqual(["Doomed"]);
+      expect(await a.tasks.listTrash()).toEqual([]);
+    });
+
+    it("lets a restore beat an older delete that reaches the server later from the other device", async () => {
+      const { world, server, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Disputed");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.tasks.deleteTask(task.id);
+      world.advance();
+      await b.tasks.deleteTask(task.id);
+      world.advance();
+      await b.tasks.restoreTask(task.id);
+      await b.sync();
+
+      // A's older deletion, made while apart from B, arrives after B's restore.
+      await a.sync();
+      await b.sync();
+
+      expect(await titles(a)).toEqual(["Disputed"]);
+      expect(await titles(b)).toEqual(["Disputed"]);
+      expect(server.stored("task", task.id, "deletedAt")?.value).toBeNull();
+    });
+
+    it("lets a later delete beat an earlier restore", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Again");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.tasks.deleteTask(task.id);
+      world.advance();
+      await a.tasks.restoreTask(task.id);
+      world.advance();
+      await b.tasks.deleteTask(task.id);
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(await titles(a)).toEqual([]);
+      expect(await titles(b)).toEqual([]);
+      expect((await a.tasks.listTrash()).map((t) => t.title)).toEqual(["Again"]);
+    });
+
+    it("sends a restore as the one field deletedAt", async () => {
+      const { world, server, a } = await twoDevices();
+      const task = await a.tasks.addTask("Doomed");
+      await a.tasks.deleteTask(task.id);
+      await a.sync();
+      const pushed = server.pushedChanges;
+      world.advance();
+
+      await a.tasks.restoreTask(task.id);
+      await a.sync();
+
+      expect(server.pushedChanges - pushed).toBe(1);
+      expect(server.stored("task", task.id, "deletedAt")?.value).toBeNull();
+    });
+  });
+
+  describe("Rescheduling", () => {
+    it("shows the new date and the count on the other device", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pay invoice", { date: "2026-10-01", time: "09:00" });
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.tasks.rescheduleTask(task.id, "2026-10-09", () => undefined);
+      await a.sync();
+      await b.sync();
+
+      expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
+      expect((await b.tasks.listTasks())[0]).toMatchObject({ date: "2026-10-09", time: "09:00", rescheduleCount: 1 });
+    });
+
+    it("changes a Linked task's Offset on the other device too, its own date still empty, so it keeps following its Event", async () => {
+      const { world, a, b } = await twoDevices();
+      const event = await a.events.addEvent(party);
+      const task = await a.tasks.addTask("Buy gift", { eventId: event.id, offsetDays: -7 });
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.tasks.rescheduleTask(task.id, "2026-10-08", (id) => (id === event.id ? event.startDate : undefined));
+      await a.sync();
+      await b.sync();
+
+      expect((await b.tasks.listTasks())[0]).toMatchObject({ eventId: event.id, offsetDays: -4, date: null, rescheduleCount: 1 });
+      const [onB] = withEventDates(await b.tasks.listTasks(), await b.events.listEvents());
+      expect(onB.date).toBe("2026-10-08");
+    });
+
+    it("keeps the Reschedule of one device and the Completion of the other", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Both", { date: "2026-10-06" });
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.tasks.rescheduleTask(task.id, "2026-10-09", () => undefined);
+      await b.tasks.completeTask(task.id);
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
+      const [both] = await a.tasks.listTasks();
+      expect(both).toMatchObject({ date: "2026-10-09", rescheduleCount: 1 });
+      expect(both.completedAt).not.toBeNull();
+    });
+
+    it("lets the later Reschedule win for the date and the count together, so one increment can be lost (known trade-off)", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pushed twice", { date: "2026-10-06" });
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.tasks.rescheduleTask(task.id, "2026-10-07", () => undefined);
+      world.advance();
+      await b.tasks.rescheduleTask(task.id, "2026-10-08", () => undefined);
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(await a.tasks.listTasks()).toEqual(await b.tasks.listTasks());
+      expect((await a.tasks.listTasks())[0]).toMatchObject({ date: "2026-10-08", rescheduleCount: 1 });
+    });
+  });
+
   it("learns of a Task that arrives already deleted without ever showing it", async () => {
     const { world, a, b } = await twoDevices();
     const task = await a.tasks.addTask("Short-lived");
@@ -829,8 +1002,8 @@ describe("Sync between two devices", () => {
       await reopened.sync();
 
       expect(await titles(reopened)).toEqual(["Old", "New"]);
-      // Only the new Task's eight fields; the old Task is not downloaded again.
-      expect(server.pulledChanges - beforeReopenedSync).toBe(8);
+      // Only the new Task's nine fields; the old Task is not downloaded again.
+      expect(server.pulledChanges - beforeReopenedSync).toBe(9);
     });
   });
 
@@ -900,6 +1073,7 @@ describe("Sync between two devices", () => {
         offsetDays: null,
         createdAt: "2026-09-28T09:00:00.000Z",
         completedAt: null,
+        rescheduleCount: 0,
         deletedAt: null,
       },
     ]);
