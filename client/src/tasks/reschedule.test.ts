@@ -116,12 +116,13 @@ describe("reschedulePatch", () => {
     });
 
     it("never takes an Overdue Task to today", () => {
-      expect(() => reschedulePatch(task({ date: "2026-10-03" }), today, noEvents, today)).toThrow();
+      expect(() => reschedulePatch(task({ date: "2026-10-03" }), today, noEvents, today)).toThrow("earliest day is tomorrow");
     });
 
-    it("never takes a Task to a day in the past", () => {
-      expect(() => reschedulePatch(task({ date: "2026-10-06" }), "2026-10-03", noEvents, today)).toThrow();
-      expect(() => reschedulePatch(task(), "2026-10-03", noEvents, today)).toThrow();
+    it("never takes a Task to a day in the past, not even a Linked task whose Event is not on this device", () => {
+      expect(() => reschedulePatch(task({ date: "2026-10-06" }), "2026-10-03", noEvents, today)).toThrow("in the past");
+      expect(() => reschedulePatch(task(), "2026-10-03", noEvents, today)).toThrow("in the past");
+      expect(() => reschedulePatch(task({ eventId: "e1", offsetDays: -7 }), "2026-10-03", noEvents, today)).toThrow("in the past");
     });
 
     it("lets a Task due later come back to today", () => {
