@@ -1,12 +1,15 @@
-import { Calendar, ChevronRight } from "lucide-react";
+import { Calendar, Check, ChevronRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { hrefOf } from "../app/routes";
 import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
 import { formatEventWhen, formatOffset } from "../events/formatEvent";
-import { dayOf, daysBetween } from "../home/days";
+import { dayOf, daysBetween, type Day } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
 import { NavBar } from "../ui/NavBar";
+import { availableActions } from "./availableActions";
+import { PickDate } from "./PickDate";
+import { earliestRescheduleDay, rescheduleOptions } from "./reschedule";
 import type { Task } from "./taskStore";
 
 interface TaskScreenProps {
@@ -15,14 +18,18 @@ interface TaskScreenProps {
   events: Event[];
   now: Date;
   onComplete(id: string): void;
+  onReschedule(id: string, day: Day): void;
+  /** Deletes the Task (to the Trash), offers to undo it and goes back. */
+  onDelete(task: Task): void;
   onLink(id: string, eventId: string, offsetDays: number): void;
   onUnlink(id: string, date: string | null): void;
 }
 
-/** Task detail: when it's due and, for a Linked task, the Event it is part of. */
-export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onLink, onUnlink }: TaskScreenProps) {
+/** Task detail: when it's due, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
+export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onReschedule, onDelete, onLink, onUnlink }: TaskScreenProps) {
   const { language, t } = useI18n();
   const [chosenEventId, setChosenEventId] = useState("");
+  const [picking, setPicking] = useState(false);
 
   if (!rawTask) {
     return (
@@ -42,6 +49,7 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onLi
       ? t("task.noDate")
       : t("task.due", { date: [formatShortDay(task.date, language), task.time && formatTime(task.time, language)].filter(Boolean).join(" · ") });
   const upcoming = events.filter((e) => eventDays(e).last >= today);
+  const actions = availableActions(task, new Set(events.map((e) => e.id)));
 
   function link() {
     const chosen = events.find((e) => e.id === chosenEventId);
@@ -120,6 +128,44 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onLi
             </div>
           )}
         </section>
+      )}
+
+      {actions.includes("reschedule") && (
+        <section className="bucket" aria-labelledby="task-reschedule-heading">
+          <div className="section-header">
+            <h2 id="task-reschedule-heading" className="section-title">
+              {t("reschedule.heading")}
+            </h2>
+          </div>
+          <div className="chips">
+            {rescheduleOptions(today).map(({ choice, day }) => (
+              <button key={choice} type="button" className="chip" onClick={() => onReschedule(task.id, day)}>
+                {t(`reschedule.${choice}`)}
+              </button>
+            ))}
+            <button type="button" className="chip" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+              <Calendar size={16} strokeWidth={1.5} aria-hidden="true" />
+              {t("reschedule.pick")}
+            </button>
+          </div>
+          {picking && <PickDate today={today} earliest={earliestRescheduleDay(task, today)} onPick={(day) => onReschedule(task.id, day)} />}
+        </section>
+      )}
+
+      <div className="actions">
+        <button type="button" className="button-delete" onClick={() => onDelete(rawTask)}>
+          <Trash2 size={18} strokeWidth={1.5} aria-hidden="true" />
+          {t("task.delete")}
+        </button>
+      </div>
+
+      {!completed && (
+        <div className="sticky-action">
+          <button type="button" className="button-primary wide" onClick={() => onComplete(task.id)}>
+            <Check size={18} strokeWidth={1.5} aria-hidden="true" />
+            {t("task.complete")}
+          </button>
+        </div>
       )}
     </div>
   );

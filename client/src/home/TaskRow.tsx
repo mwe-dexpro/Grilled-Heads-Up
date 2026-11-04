@@ -4,6 +4,7 @@ import { formatOffset } from "../events/formatEvent";
 import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
+import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { taskMeta, type BucketKind } from "./buckets";
 import { formatShortDay, formatTime } from "./format";
 
@@ -13,10 +14,12 @@ interface TaskRowProps {
   now: Date;
   /** The Event of a Linked task; its name opens the Event view. */
   event?: Event;
-  onComplete(id: string): void;
+  /** Ids of the Events on this device. */
+  eventIds: { has(id: string): boolean };
+  actions: TaskActions;
 }
 
-export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) {
+export function TaskRow({ task, bucket, now, event, eventIds, actions }: TaskRowProps) {
   const { language, t } = useI18n();
   const completed = task.completedAt !== null;
   const meta = taskMeta(task, bucket, now);
@@ -46,13 +49,13 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
 
   const classes = ["task", completed && "completed", meta?.kind === "overdue" && "overdue"].filter(Boolean).join(" ");
   return (
-    <li className={classes}>
+    <TaskSwipeRow task={task} eventIds={eventIds} actions={actions} className={classes}>
       <input
         type="checkbox"
         className="check"
         checked={completed}
         disabled={completed}
-        onChange={() => onComplete(task.id)}
+        onChange={() => actions.complete(task.id)}
         aria-label={t("task.completeNamed", { title: task.title })}
       />
       <div className="task-text">
@@ -76,6 +79,6 @@ export function TaskRow({ task, bucket, now, event, onComplete }: TaskRowProps) 
         )}
         {completed && <span className="visually-hidden">{t("task.completed")}</span>}
       </div>
-    </li>
+    </TaskSwipeRow>
   );
 }

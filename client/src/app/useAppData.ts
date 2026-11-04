@@ -19,6 +19,7 @@ export function useAppData() {
   const stores = useRef<Stores | null>(null);
   const [ready, setReady] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [trash, setTrash] = useState<Task[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
 
   // Reads from the stores as they are when it runs, so a sync that reports changes while the stores are still
@@ -27,9 +28,17 @@ export function useAppData() {
   const reload = useMemo(
     () =>
       createListReader(
-        async () => (stores.current ? { tasks: await stores.current.tasks.listTasks(), events: await stores.current.events.listEvents() } : null),
+        async () =>
+          stores.current
+            ? {
+                tasks: await stores.current.tasks.listTasks(),
+                trash: await stores.current.tasks.listTrash(),
+                events: await stores.current.events.listEvents(),
+              }
+            : null,
         (lists) => {
           setTasks(lists.tasks);
+          setTrash(lists.trash);
           setEvents(lists.events);
         },
       ),
@@ -77,6 +86,20 @@ export function useAppData() {
     [changeTasks],
   );
   const unlinkTask = useCallback((id: string, date: Day | null) => changeTasks((s) => s.unlinkTask(id, date)), [changeTasks]);
+  const deleteTask = useCallback((id: string) => changeTasks((s) => s.deleteTask(id)), [changeTasks]);
+  const restoreTask = useCallback((id: string) => changeTasks((s) => s.restoreTask(id)), [changeTasks]);
+
+  // A Linked task is rescheduled by changing its Offset from its Event's start day, so the Events are needed.
+  const rescheduleTasks = useCallback(
+    (ids: string[], day: Day) => {
+      const eventStart = (eventId: string) => events.find((event) => event.id === eventId)?.startDate;
+      return changeTasks(async (s) => {
+        for (const id of ids) await s.rescheduleTask(id, day, eventStart);
+      });
+    },
+    [changeTasks, events],
+  );
+  const rescheduleTask = useCallback((id: string, day: Day) => rescheduleTasks([id], day), [rescheduleTasks]);
 
   const addEvent = useCallback(
     async (fields: EventFields): Promise<Event | null> => {
@@ -98,7 +121,24 @@ export function useAppData() {
     [reload, syncSoon],
   );
 
-  return { ready, tasks, events, sync: sync.state, syncNow: sync.syncNow, addTask, completeTask, linkTask, unlinkTask, addEvent, updateEvent };
+  return {
+    ready,
+    tasks,
+    trash,
+    events,
+    sync: sync.state,
+    syncNow: sync.syncNow,
+    addTask,
+    completeTask,
+    linkTask,
+    unlinkTask,
+    rescheduleTask,
+    rescheduleTasks,
+    deleteTask,
+    restoreTask,
+    addEvent,
+    updateEvent,
+  };
 }
 
 export type AppData = ReturnType<typeof useAppData>;

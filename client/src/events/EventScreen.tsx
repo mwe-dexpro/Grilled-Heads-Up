@@ -5,6 +5,7 @@ import { dayOf } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
+import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { NavBar } from "../ui/NavBar";
 import { SegmentedProgress } from "../ui/SegmentedProgress";
 import { AddLinkedTaskSheet } from "./AddLinkedTaskSheet";
@@ -19,12 +20,12 @@ interface EventScreenProps {
   event: Event | undefined;
   tasks: Task[];
   now: Date;
-  onComplete(id: string): void;
+  actions: TaskActions;
   onAddTask(title: string, offsetDays: number): void;
 }
 
 /** The Event view: when and where, its Progress and risk, and its Preparation and Follow-up tasks with their Offsets. */
-export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventScreenProps) {
+export function EventScreen({ event, tasks, now, actions, onAddTask }: EventScreenProps) {
   const { language, t } = useI18n();
   const [adding, setAdding] = useState(false);
 
@@ -50,6 +51,8 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
   const followUp = linked.filter((task) => linkedRole(task, event) === "followUp");
   const when = `${formatEventWhen(event, language)} · ${formatRelativeDay(eventDays(event).first, today, t)}`;
 
+  // Only this Event is known here, and the Tasks listed belong to it.
+  const eventIds = new Set([event.id]);
   const taskList = (list: Task[]) => (
     <ul className="card task-list">
       {list.map((task) => {
@@ -59,13 +62,19 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
           .filter(Boolean)
           .join(" · ");
         return (
-          <li key={task.id} className={["task", completed && "completed", overdue && "overdue"].filter(Boolean).join(" ")}>
+          <TaskSwipeRow
+            key={task.id}
+            task={task}
+            eventIds={eventIds}
+            actions={actions}
+            className={["task", completed && "completed", overdue && "overdue"].filter(Boolean).join(" ")}
+          >
             <input
               type="checkbox"
               className="check"
               checked={completed}
               disabled={completed}
-              onChange={() => onComplete(task.id)}
+              onChange={() => actions.complete(task.id)}
               aria-label={t("task.completeNamed", { title: task.title })}
             />
             <div className="task-text">
@@ -74,7 +83,7 @@ export function EventScreen({ event, tasks, now, onComplete, onAddTask }: EventS
               </a>
               <span className={overdue ? "task-meta warning" : "task-meta"}>{meta}</span>
             </div>
-          </li>
+          </TaskSwipeRow>
         );
       })}
     </ul>

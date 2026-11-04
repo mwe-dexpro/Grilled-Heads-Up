@@ -184,6 +184,13 @@ button,
   border-bottom: 1px solid var(--divider);
 }
 
+.overdue-header .overdue-action {
+  margin: 0 0 0 auto;
+  padding: 0;
+  font-size: 15px;
+  text-align: right;
+}
+
 .dot {
   width: 10px;
   height: 10px;
@@ -229,7 +236,7 @@ button,
   padding: 12px 16px;
 }
 
-.task + .task {
+.task-list > li + li {
   border-top: 1px solid var(--divider);
 }
 
@@ -297,10 +304,79 @@ a.task-title {
   color: var(--ink-meta);
 }
 
-/* Footer (temporary home of the language switch until Settings exist) */
+/* Swipe row: the content slides left over the actions; vertical moves are left to the page's scrolling */
+
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.swipe-actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+}
+
+.swipe-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 78px;
+  padding: 0;
+  border: none;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.swipe-action.neutral {
+  background: var(--disabled);
+  color: var(--ink);
+}
+
+.swipe-action.primary {
+  background: var(--blue-action);
+  color: var(--white);
+}
+
+.swipe-action.strong {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.swipe-content {
+  position: relative;
+  background: var(--white);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 120ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.swipe-content.dragging {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-content {
+    transition: none;
+  }
+}
+
+/* Footer (temporary home of the language switch, Trash and sign-in until Settings exist) */
 
 .screen-footer {
   margin-top: 32px;
+}
+
+.footer-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 6px 0;
+  font-size: 15px;
+  color: var(--blue-action);
+  text-decoration: none;
 }
 
 /* Sync status (no design yet: calm, small, in the footer's style) */
@@ -527,6 +603,157 @@ a.task-title {
   border: 1px solid var(--blue-action);
   background: none;
   color: var(--blue-action);
+}
+
+.button-ghost.small {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 15px;
+}
+
+.button-primary.wide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Delete: ink background, white text (ALIGNMENT §1) */
+.button-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 22px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--white);
+  font-size: 17px;
+}
+
+/* Sheets of options: Task actions and Reschedule */
+
+.option-card {
+  margin-bottom: 8px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: none;
+  font-size: 17px;
+  text-align: left;
+}
+
+.option + .option,
+.option-card > .pick-date {
+  border-top: 1px solid var(--divider);
+}
+
+.option > span:first-of-type {
+  flex: 1;
+}
+
+.option-date {
+  font-size: 14px;
+  color: var(--ink-meta);
+}
+
+.option.pick {
+  color: var(--blue-action);
+}
+
+.option.danger {
+  font-weight: 600;
+}
+
+.pick-date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.pick-date input {
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+}
+
+.bucket > .pick-date {
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: flex-start;
+}
+
+/* Chips: Reschedule in Task detail */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  font-size: 14px;
+  line-height: 1.29;
+}
+
+/* Complete in Task detail: full width, stays in view above the "+" button row */
+.sticky-action {
+  position: sticky;
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 84px);
+  margin-top: 24px;
+}
+
+/* Undo toast: in the row of the "+" button, to its left, above the tab bar (never under the button) */
+.undo-toast {
+  position: fixed;
+  left: max(16px, calc((100vw - 40rem) / 2 + 16px));
+  right: max(92px, calc((100vw - 40rem) / 2 + 92px));
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + 16px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--radius-card);
+  background: var(--ink);
+  color: var(--white);
+  font-size: 15px;
+}
+
+.undo-button {
+  flex: none;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+  text-decoration: underline;
+}
+
+/* Trash */
+
+.trash-row {
+  justify-content: space-between;
 }
 
 /* Tab bar */
@@ -1011,4 +1238,16 @@ a.task-title {
   background: none;
   font-size: 17px;
   color: var(--blue-action);
+}
+
+.pick-date input {
+  flex: 1;
+}
+
+.pick-date .button-primary {
+  flex: none;
+  padding: 8px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+  hyphens: none;
 }
