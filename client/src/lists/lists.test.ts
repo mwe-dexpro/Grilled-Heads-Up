@@ -8,6 +8,7 @@ import {
   arrangeProjects,
   liveList,
   liveTags,
+  listChanges,
   listProgress,
   listSummary,
   listTasks,
@@ -361,5 +362,27 @@ describe("liveList and liveTags", () => {
   it("finds the Tags of a Task in the order they were added, leaving out unknown ones", () => {
     expect(liveTags(task({ tagIds: ["c", "gone", "a"] }), tags)).toEqual([tags[2], tags[0]]);
     expect(liveTags(task(), tags)).toEqual([]);
+  });
+});
+
+describe("listChanges", () => {
+  const initial = { name: "Basement", isProject: false };
+
+  it("names nothing when nothing was changed, also when only spaces were added around the name", () => {
+    expect(listChanges(initial, { name: "Basement", isProject: false })).toEqual({});
+    expect(listChanges(initial, { name: "  Basement ", isProject: false })).toEqual({});
+  });
+
+  it("names only the name when only the name was changed", () => {
+    expect(listChanges(initial, { name: "Cellar", isProject: false })).toEqual({ name: "Cellar" });
+  });
+
+  it("names only the Project flag when only the flag was changed, and the other way round", () => {
+    expect(listChanges(initial, { name: "Basement", isProject: true })).toEqual({ isProject: true });
+    expect(listChanges({ name: "Basement", isProject: true }, { name: "Basement", isProject: false })).toEqual({ isProject: false });
+  });
+
+  it("names both when both were changed", () => {
+    expect(listChanges(initial, { name: "Cellar", isProject: true })).toEqual({ name: "Cellar", isProject: true });
   });
 });

@@ -1,6 +1,7 @@
 import { ChevronRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { hrefOf } from "../app/routes";
+import type { Progress } from "../home/buckets";
 import { dayOf } from "../home/days";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
@@ -24,10 +25,8 @@ export function ProjectsScreen({ lists, tasks, now, onAddList }: ProjectsScreenP
   const today = dayOf(now);
   const { projects, lists: plain } = arrangeProjects(lists);
 
-  const progressText = (list: List) => {
-    const { done, total } = listProgress(tasks, list.id);
-    return total === 0 ? t("project.noTasks") : t("project.progress", { done: String(done), total: String(total) });
-  };
+  const progressText = ({ done, total }: Progress) =>
+    total === 0 ? t("project.noTasks") : t("project.progress", { done: String(done), total: String(total) });
 
   return (
     <div className="screen">
@@ -54,7 +53,7 @@ export function ProjectsScreen({ lists, tasks, now, onAddList }: ProjectsScreenP
                   <SegmentedProgress progress={progress} segments={segments} />
                   <span className="project-card-foot">
                     <span className="task-meta">
-                      {progressText(list)}
+                      {progressText(progress)}
                       {next && " · "}
                       {next && (nextOverdue ? <span className="warning">{t("project.nextOverdue", { title: next.title })}</span> : next.title)}
                     </span>
@@ -85,7 +84,7 @@ export function ProjectsScreen({ lists, tasks, now, onAddList }: ProjectsScreenP
                   <span className="task-text">
                     <span className="task-title">{list.name}</span>
                   </span>
-                  <span className="task-meta">{progressText(list)}</span>
+                  <span className="task-meta">{progressText(listProgress(tasks, list.id))}</span>
                   <ChevronRight className="chevron" size={16} strokeWidth={1.5} aria-hidden="true" />
                 </a>
               </li>

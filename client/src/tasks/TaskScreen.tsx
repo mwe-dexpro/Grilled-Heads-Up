@@ -72,6 +72,7 @@ export function TaskScreen({
 
   const [task] = withEventDates([rawTask], events);
   const event = task.eventId === null ? undefined : events.find((e) => e.id === task.eventId);
+  const taskTags = liveTags(task, tags);
   const completed = task.completedAt !== null;
   const today = dayOf(now);
   const due =
@@ -192,9 +193,9 @@ export function TaskScreen({
             {t("task.tagsHeading")}
           </h2>
         </div>
-        {liveTags(task, tags).length > 0 && (
+        {taskTags.length > 0 && (
           <ul className="chips tag-chips">
-            {liveTags(task, tags).map((tag) => (
+            {taskTags.map((tag) => (
               <li key={tag.id} className="chip">
                 {tag.name}
                 <button type="button" className="chip-remove" aria-label={t("task.removeTag", { name: tag.name })} onClick={() => onRemoveTag(task.id, tag.id)}>

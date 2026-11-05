@@ -3,12 +3,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "./listStore";
+import { listChanges } from "./lists";
 
 interface EditListSheetProps {
   list: List;
   /** How many Tasks are in the List: the delete question says they stay. */
   taskCount: number;
-  onSave(name: string, isProject: boolean): void;
+  /** Only what the person changed in the sheet, so what a sync brought meanwhile is not written over. */
+  onSave(changes: { name?: string; isProject?: boolean }): void;
   onDelete(): void;
   onClose(): void;
 }
@@ -20,8 +22,10 @@ interface EditListSheetProps {
 export function EditListSheet({ list, taskCount, onSave, onDelete, onClose }: EditListSheetProps) {
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
-  const [name, setName] = useState(list.name);
-  const [isProject, setIsProject] = useState(list.isProject);
+  // The List as the sheet showed it when it opened: `list` itself may change under the sheet (a sync).
+  const [initial] = useState({ name: list.name, isProject: list.isProject });
+  const [name, setName] = useState(initial.name);
+  const [isProject, setIsProject] = useState(initial.isProject);
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -32,7 +36,7 @@ export function EditListSheet({ list, taskCount, onSave, onDelete, onClose }: Ed
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (name.trim() === "") return;
-    onSave(name, isProject);
+    onSave(listChanges(initial, { name, isProject }));
     onClose();
   }
 

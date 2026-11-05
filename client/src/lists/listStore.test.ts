@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
-import { listRecordType, openListStore } from "./listStore";
+import { NoListError, listRecordType, openListStore } from "./listStore";
 
 let dbCounter = 0;
 const freshDbName = () => `lists-test-${dbCounter++}`;
@@ -104,6 +104,18 @@ describe("List store", () => {
 
     await expect(store.renameList(list.id, "Back")).rejects.toThrow("No List with id");
     await expect(store.setProject(list.id, true)).rejects.toThrow("No List with id");
+  });
+
+  it("tells a List that is gone from a real failure: renaming or marking it throws a NoListError, a bad name does not", async () => {
+    const store = await openListStore(freshDbName());
+    const list = await store.addList("Gone");
+    await store.deleteList(list.id);
+
+    await expect(store.renameList("missing", "Nope")).rejects.toBeInstanceOf(NoListError);
+    await expect(store.renameList(list.id, "Back")).rejects.toBeInstanceOf(NoListError);
+    await expect(store.setProject(list.id, true)).rejects.toBeInstanceOf(NoListError);
+    const live = await store.addList("Live");
+    await expect(store.renameList(live.id, " ")).rejects.not.toBeInstanceOf(NoListError);
   });
 
   it("leaves out a List whose name has not arrived yet", async () => {

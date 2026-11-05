@@ -43,7 +43,8 @@ export function progressSegments(tasks: Task[], listId: string, today: Day): Seg
   const own = listTasks(tasks, listId);
   const overdue = own.filter((task) => isOverdue(task, today)).length;
   const done = own.filter((task) => !isOpen(task)).length;
-  return [...Array<Segment>(done).fill("done"), ...Array<Segment>(overdue).fill("overdue"), ...Array<Segment>(own.length - done - overdue).fill("open")];
+  const open = own.length - done - overdue;
+  return [...Array<Segment>(done).fill("done"), ...Array<Segment>(overdue).fill("overdue"), ...Array<Segment>(open).fill("open")];
 }
 
 /**
@@ -60,6 +61,20 @@ export function projectStatus(tasks: Task[], listId: string, today: Day): Projec
 /** The open Task to do next: the earliest date (an Overdue one first), then untimed before timed, time, creation; undated last. */
 export function nextTask(tasks: Task[], listId: string): Task | undefined {
   return listTasks(tasks, listId).filter(isOpen).sort(compareTasks)[0];
+}
+
+/**
+ * What the person changed in the Edit sheet, compared with the List as the sheet showed it when it opened: only these
+ * are saved, so a rename or Project flag that a sync brought meanwhile is not written over with the sheet's old copy.
+ */
+export function listChanges(
+  initial: { name: string; isProject: boolean },
+  edited: { name: string; isProject: boolean },
+): { name?: string; isProject?: boolean } {
+  return {
+    ...(edited.name.trim() !== initial.name && { name: edited.name }),
+    ...(edited.isProject !== initial.isProject && { isProject: edited.isProject }),
+  };
 }
 
 /** What a card on the Projects tab shows. */
@@ -87,7 +102,12 @@ export function listSummary(tasks: Task[], listId: string, today: Day): ListSumm
  * The Tasks the Project view lists: open ones, those Completed today (they stay crossed out in place until the end of
  * the day), and all Completed ones when `showCompleted`; only those with the Tag when one is chosen.
  */
-export function projectViewTasks(tasks: Task[], listId: string, { showCompleted, tagId = null }: { showCompleted: boolean; tagId?: string | null }, today: Day): Task[] {
+export function projectViewTasks(
+  tasks: Task[],
+  listId: string,
+  { showCompleted, tagId = null }: { showCompleted: boolean; tagId?: string | null },
+  today: Day,
+): Task[] {
   return listTasks(tasks, listId)
     .filter((task) => isOpen(task) || showCompleted || dayOf(new Date(task.completedAt!)) === today)
     .filter((task) => tagId === null || task.tagIds.includes(tagId))

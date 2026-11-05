@@ -34,6 +34,33 @@ async function addList(page: Page, name: string, { project = false } = {}) {
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 }
 
+/**
+ * Makes the app's syncs answer from the test: a push is accepted, a pull brings what `bring` was given (once), as
+ * if from another device whose clock is later than anything here. The test then runs the page clock to the next sync.
+ */
+async function otherDevice(page: Page) {
+  let pending: unknown[] = [];
+  // The server's time is the page's: a device moves its clock past it, and the other device's changes must be later.
+  const serverTime = wednesday.getTime();
+  const later = new Date(2026, 9, 7, 14, 0).getTime();
+  await page.route(/\/api\/sync\/push/, (route) => route.fulfill({ json: { serverTime } }));
+  await page.route(/\/api\/sync\/pull/, (route) => {
+    const changes = pending;
+    pending = [];
+    return route.fulfill({ json: { changes, cursor: 1, more: false, serverTime } });
+  });
+  const hlc = `${String(later).padStart(15, "0")}-00000-other-device`;
+  return {
+    /** The List `id` has `field` set to `value` on the other device. */
+    bring(id: string, field: string, value: unknown) {
+      pending = [{ type: "list", id, field, value, hlc }];
+    },
+  };
+}
+
+/** The id of the List the Project view is showing. */
+const listIdOf = (page: Page) => decodeURIComponent(new URL(page.url()).hash.replace("#/list/", ""));
+
 /** Opens a List or Project from the Projects tab. */
 async function openList(page: Page, name: string) {
   await tab(page, "Projects").click();
@@ -360,4 +387,125 @@ test("the Projects tab and the Project view speak German", async ({ page }) => {
   await page.getByRole("button", { name: "Bearbeiten" }).click();
   await page.getByRole("button", { name: "Liste löschen" }).click();
   await expect(page.getByRole("dialog")).toContainText("„Keller“ löschen? Die Aufgabe bleibt erhalten, ohne Liste.");
+});
+
+test("a List that does not exist says so", async ({ page }) => {
+  await page.goto("/#/list/nope");
+
+  await expect(page.getByText("This list doesn't exist (any more).")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0);
+});
+
+test("the row of a plain List shows how many of its Tasks are done", async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Shopping");
+  await openList(page, "Shopping");
+  await addTask(page, "Milk");
+  await addTask(page, "Bread");
+  await tab(page, "Projects").click();
+  const shopping = page.getByRole("region", { name: "Lists" }).getByRole("listitem").filter({ hasText: "Shopping" });
+  await expect(shopping).toContainText("0 of 2");
+
+  await openList(page, "Shopping");
+  await page.getByRole("checkbox", { name: "Complete Milk" }).click();
+  await expect(page.getByRole("heading", { name: "Progress: 1 of 2 done" })).toBeVisible();
+  await tab(page, "Projects").click();
+
+  await expect(shopping).toContainText("1 of 2");
+});
+
+test("the Tag input stops at the length a Tag's name can have", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Post parcel");
+  await page.getByRole("link", { name: "Post parcel", exact: true }).click();
+
+  await expect(page.getByRole("combobox", { name: "Add tag" })).toHaveAttribute("maxlength", "50");
+});
+
+test("saving the Edit sheet writes only what was changed: a rename that arrived by sync meanwhile is kept", async ({ page }) => {
+  const other = await otherDevice(page);
+  await page.goto("/");
+  await addList(page, "Basement");
+  await openList(page, "Basement");
+  const id = listIdOf(page);
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.getByLabel("Name")).toHaveValue("Basement");
+
+  // The sync that runs every minute brings "Cellar" while the sheet is open on "Basement".
+  other.bring(id, "name", "Cellar");
+  await page.clock.runFor(65_000);
+  await expect(page.locator("h1")).toHaveText("Cellar");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // A later change goes through the same stores, so by the time it is shown, a write the Save made has been made.
+  await addTask(page, "Marker");
+  await expect(page.locator("h1")).toHaveText("Cellar");
+});
+
+test("saving the Edit sheet keeps a Project mark that arrived by sync meanwhile, and still saves the rename", async ({ page }) => {
+  const other = await otherDevice(page);
+  await page.goto("/");
+  await addList(page, "Basment");
+  await openList(page, "Basment");
+  const id = listIdOf(page);
+  await page.getByRole("button", { name: "Edit" }).click();
+
+  other.bring(id, "isProject", true);
+  await page.clock.runFor(65_000);
+  await expect(page.locator(".detail-header .eyebrow")).toHaveText("Project");
+  await page.getByLabel("Name").fill("Basement");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.locator("h1")).toHaveText("Basement");
+  await addTask(page, "Marker");
+  await expect(page.locator(".detail-header .eyebrow")).toHaveText("Project");
+});
+
+test("saving the Edit sheet of a List that another tab deleted meanwhile ends calmly, not in an error", async ({ page, context }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await addList(page, "Basement");
+  await openList(page, "Basement");
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel("Name").fill("Cellar");
+
+  // Another tab of the app (the same database) deletes the List; this tab does not know yet.
+  const other = await context.newPage();
+  await other.goto("/#/projects");
+  await other.getByRole("link").filter({ hasText: "Basement" }).first().click();
+  await other.getByRole("button", { name: "Edit" }).click();
+  await other.getByRole("button", { name: "Delete list" }).click();
+  await other.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(other.getByText("No lists yet.", { exact: false })).toBeVisible();
+  await other.close();
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("This list doesn't exist (any more).")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("deleting a List from its Project view goes to the Projects tab at once, and Back does not return to the deleted List", async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Basement");
+  await openList(page, "Basement");
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("button", { name: "Delete list" }).click();
+  // Records whether the "not found" line is ever on screen: it would flash while the deleted List is still the route.
+  await page.evaluate(() => {
+    const seen = { notFound: false };
+    (window as unknown as { seen: typeof seen }).seen = seen;
+    new MutationObserver(() => {
+      if (document.body.innerText.includes("doesn't exist")) seen.notFound = true;
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
+
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+
+  await expect(page.getByText("No lists yet.", { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { seen: { notFound: boolean } }).seen.notFound)).toBe(false);
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/projects$/);
+  await expect(page.getByRole("heading", { name: "Projects", level: 1 })).toBeVisible();
 });

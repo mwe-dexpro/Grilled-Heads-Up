@@ -11,7 +11,7 @@ import type { TaskActions } from "../tasks/TaskSwipeRow";
 import { NavBar } from "../ui/NavBar";
 import { SegmentedProgress } from "../ui/SegmentedProgress";
 import { EditListSheet } from "./EditListSheet";
-import type { List } from "./listStore";
+import { NoListError, type List } from "./listStore";
 import { listProgress, listTasks, progressSegments, projectViewTasks, tagsInList } from "./lists";
 
 interface ProjectScreenProps {
@@ -120,15 +120,21 @@ export function ProjectScreen({ list, tasks, events, tags, now, actions, onRenam
         <EditListSheet
           list={list}
           taskCount={listTasks(tasks, list.id).length}
-          onSave={async (name, isProject) => {
-            if (name.trim() !== list.name) await onRename(list.id, name);
-            if (isProject !== list.isProject) await onSetProject(list.id, isProject);
+          onSave={async ({ name, isProject }) => {
+            try {
+              if (name !== undefined) await onRename(list.id, name);
+              if (isProject !== undefined) await onSetProject(list.id, isProject);
+            } catch (error) {
+              // Deleted meanwhile (in another tab): the screen reloads and says so. Any other failure is not hidden.
+              if (!(error instanceof NoListError)) throw error;
+            }
           }}
           onDelete={async () => {
             setEditing(false);
-            await onDelete(list.id);
-            // Replace the entry, so that Back does not return to a List that is gone.
+            // Leave first, replacing the entry (so that Back does not return to a List that is gone): once the List is
+            // deleted, this route would show "not found" until the move.
             navigate({ name: "projects" }, { replace: true });
+            await onDelete(list.id);
           }}
           onClose={() => setEditing(false)}
         />

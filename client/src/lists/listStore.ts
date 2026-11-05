@@ -14,12 +14,20 @@ export interface List {
   deletedAt: string | null;
 }
 
+/** A change was asked for a List that is not there (never was, or a sync has deleted it). Other failures are not this. */
+export class NoListError extends Error {
+  constructor(id: string) {
+    super(`No List with id ${id}`);
+    this.name = "NoListError";
+  }
+}
+
 export interface ListStore {
   /** Throws for an empty or too long name. */
   addList(name: string, options?: { isProject?: boolean }): Promise<List>;
-  /** Same checks as `addList`; a List that is missing or deleted throws. */
+  /** Same checks as `addList`; a List that is missing or deleted throws `NoListError`. */
   renameList(id: string, name: string): Promise<void>;
-  /** Marks a List as a Project, or unmarks it; a List that is missing or deleted throws. */
+  /** Marks a List as a Project, or unmarks it; a List that is missing or deleted throws `NoListError`. */
   setProject(id: string, isProject: boolean): Promise<void>;
   /** Deletes a List (its Tasks are the caller's business, see `TaskStore.clearList`); one that is missing is ignored. */
   deleteList(id: string): Promise<void>;
@@ -61,17 +69,18 @@ export async function openListStore(
 
   return {
     async addList(rawName, { isProject = false } = {}) {
-      const list: List = { id: crypto.randomUUID(), name: checkedName(rawName), isProject, createdAt: now().toISOString(), deletedAt: null };
+      const name = checkedName(rawName);
+      const list: List = { id: crypto.randomUUID(), name, isProject, createdAt: now().toISOString(), deletedAt: null };
       await lists.put(list);
       return list;
     },
 
     async renameList(id, name) {
-      if (!(await lists.update(id, { name: checkedName(name) }))) throw new Error(`No List with id ${id}`);
+      if (!(await lists.update(id, { name: checkedName(name) }))) throw new NoListError(id);
     },
 
     async setProject(id, isProject) {
-      if (!(await lists.update(id, { isProject }))) throw new Error(`No List with id ${id}`);
+      if (!(await lists.update(id, { isProject }))) throw new NoListError(id);
     },
 
     async deleteList(id) {
