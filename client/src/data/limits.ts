@@ -5,3 +5,5 @@
 export const maxTitleLength = 200;
 export const maxLocationLength = 200;
 export const maxNotesLength = 10_000;
+/** A Tag's name: short, since it is a label and shows as a chip. */
+export const maxTagLength = 50;

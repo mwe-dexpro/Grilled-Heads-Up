@@ -18,6 +18,8 @@ function task(fields: Partial<Task> = {}): Task {
     time: null,
     eventId: null,
     offsetDays: null,
+    listId: null,
+    tagIds: [],
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
     rescheduleCount: 0,

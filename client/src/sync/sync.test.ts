@@ -11,6 +11,8 @@ import { arrangeHome } from "../home/buckets";
 import { dayOf } from "../home/days";
 import { translate } from "../i18n/i18n";
 import { maxNotesLength } from "../data/limits";
+import { openListStore, type ListStore } from "../lists/listStore";
+import { openTagStore, type TagStore } from "../tags/tagStore";
 import { openTaskStore, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
@@ -40,6 +42,8 @@ interface Device {
   now: () => Date;
   tasks: TaskStore;
   events: EventStore;
+  lists: ListStore;
+  tags: TagStore;
   engine: SyncEngine;
   sync(): Promise<void>;
   /** Closes everything, like closing the app; the data stays. */
@@ -57,6 +61,8 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
   const now = world.clock(clockOffsetMs);
   const tasks = await openTaskStore(name, { now });
   const events = await openEventStore(name, { now });
+  const lists = await openListStore(name, { now });
+  const tags = await openTagStore(name, { now });
   const db = await openAppDb(name);
   const engine = await createSyncEngine({ db, types: recordTypes, transport, now });
   return {
@@ -65,11 +71,15 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
     now,
     tasks,
     events,
+    lists,
+    tags,
     engine,
     sync: () => engine.syncNow(),
     close() {
       tasks.close();
       events.close();
+      lists.close();
+      tags.close();
       db.close();
     },
   };
@@ -324,6 +334,133 @@ describe("Sync between two devices", () => {
 
     expect(await titles(a)).toEqual([]);
     expect(await titles(b)).toEqual([]);
+  });
+
+  describe("Lists and Tags", () => {
+    it("shows a List created on A on B, with its name and Project flag, and a rename and unmarking after it", async () => {
+      const { world, a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement", { isProject: true });
+      await a.sync();
+      await b.sync();
+      expect(await b.lists.listLists()).toEqual(await a.lists.listLists());
+      world.advance();
+
+      await a.lists.renameList(basement.id, "Cellar");
+      await a.lists.setProject(basement.id, false);
+      await a.sync();
+      await b.sync();
+
+      expect(await b.lists.listLists()).toMatchObject([{ id: basement.id, name: "Cellar", isProject: false }]);
+    });
+
+    it("shows a Tag created on A on B, and the Tag a Task got there", async () => {
+      const { a, b } = await twoDevices();
+      const errand = await a.tags.findOrAddTag("Errand");
+      const task = await a.tasks.addTask("Post parcel");
+      await a.tasks.addTaskTag(task.id, errand.id);
+
+      await a.sync();
+      await b.sync();
+
+      expect(await b.tags.listTags()).toEqual([errand]);
+      expect((await b.tasks.listTasks())[0].tagIds).toEqual([errand.id]);
+    });
+
+    it("brings a Task's List to B, and takes it out again there", async () => {
+      const { world, a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement");
+      const task = await a.tasks.addTask("Sort boxes");
+      await a.tasks.setTaskList(task.id, basement.id);
+      await a.sync();
+      await b.sync();
+      expect((await b.tasks.listTasks())[0].listId).toBe(basement.id);
+      world.advance();
+
+      await a.tasks.setTaskList(task.id, null);
+      await a.sync();
+      await b.sync();
+
+      expect((await b.tasks.listTasks())[0].listId).toBeNull();
+    });
+
+    it("lets a Task added into a List on A arrive on B in that List", async () => {
+      const { a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement");
+      await a.tasks.addTask("Sort boxes", undefined, basement.id);
+
+      await a.sync();
+      await b.sync();
+
+      expect((await b.tasks.listTasks()).map((t) => [t.title, t.listId])).toEqual([["Sort boxes", basement.id]]);
+    });
+
+    it("leaves B's Tasks without a List when A deletes the List and clears its Tasks", async () => {
+      const { world, a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement");
+      const task = await a.tasks.addTask("Sort boxes", undefined, basement.id);
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.lists.deleteList(basement.id);
+      await a.tasks.clearList(basement.id);
+      await a.sync();
+      await b.sync();
+
+      expect(await b.lists.listLists()).toEqual([]);
+      expect(await b.tasks.listTasks()).toMatchObject([{ id: task.id, listId: null }]);
+    });
+
+    it("keeps only the later device's Tags when two devices changed a Task's Tags apart (one field, last write wins)", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Call");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.tasks.addTaskTag(task.id, "from-a");
+      world.advance();
+      await b.tasks.addTaskTag(task.id, "from-b");
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      // `tagIds` is one last-write-wins field: the earlier device's Tag is lost, on both devices alike.
+      expect((await a.tasks.listTasks())[0].tagIds).toEqual(["from-b"]);
+      expect((await b.tasks.listTasks())[0].tagIds).toEqual(["from-b"]);
+    });
+
+    it("shows two Tags of the same name made on two devices while apart, both (a known limitation)", async () => {
+      const { world, a, b } = await twoDevices();
+      const fromA = await a.tags.findOrAddTag("Errand");
+      world.advance();
+      const fromB = await b.tags.findOrAddTag("errand");
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(fromA.id).not.toBe(fromB.id);
+      expect((await a.tags.listTags()).map((tag) => tag.id).sort()).toEqual([fromA.id, fromB.id].sort());
+      expect((await b.tags.listTags()).map((tag) => tag.id).sort()).toEqual([fromA.id, fromB.id].sort());
+    });
+
+    it("keeps a List's name and Project flag apart: a rename on A and a mark on B both survive", async () => {
+      const { world, a, b } = await twoDevices();
+      const list = await a.lists.addList("Basement");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.lists.renameList(list.id, "Cellar");
+      await b.lists.setProject(list.id, true);
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(await a.lists.listLists()).toMatchObject([{ name: "Cellar", isProject: true }]);
+      expect(await b.lists.listLists()).toMatchObject([{ name: "Cellar", isProject: true }]);
+    });
   });
 
   describe("the Trash", () => {
@@ -1002,8 +1139,8 @@ describe("Sync between two devices", () => {
       await reopened.sync();
 
       expect(await titles(reopened)).toEqual(["Old", "New"]);
-      // Only the new Task's nine fields; the old Task is not downloaded again.
-      expect(server.pulledChanges - beforeReopenedSync).toBe(9);
+      // Only the new Task's eleven fields; the old Task is not downloaded again.
+      expect(server.pulledChanges - beforeReopenedSync).toBe(11);
     });
   });
 
@@ -1071,6 +1208,8 @@ describe("Sync between two devices", () => {
         time: null,
         eventId: null,
         offsetDays: null,
+        listId: null,
+        tagIds: [],
         createdAt: "2026-09-28T09:00:00.000Z",
         completedAt: null,
         rescheduleCount: 0,

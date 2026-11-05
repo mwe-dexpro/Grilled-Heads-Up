@@ -34,6 +34,8 @@ const task = (fields: Partial<Task> = {}): Task => ({
   time: null,
   eventId: null,
   offsetDays: null,
+  listId: null,
+  tagIds: [],
   createdAt: "2026-10-01T09:00:00.000Z",
   completedAt: null,
   rescheduleCount: 0,
@@ -41,7 +43,7 @@ const task = (fields: Partial<Task> = {}): Task => ({
   ...fields,
 });
 
-const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "rescheduleCount", "time", "title"];
+const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "listId", "offsetDays", "rescheduleCount", "tagIds", "time", "title"];
 
 describe("Replica table", () => {
   it("sends every field of a new record, all under one clock, and none for the id", async () => {

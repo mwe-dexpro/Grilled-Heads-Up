@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { openDB } from "idb";
 import { openAppDb } from "../data/database";
+import { createSyncStores } from "../sync/syncDb";
 import { maxTitleLength } from "../data/limits";
 import { NoTaskError, openTaskStore, taskRecordType } from "./taskStore";
 
@@ -93,7 +94,7 @@ describe("Task store", () => {
 });
 
 describe("Tasks that arrive in part", () => {
-  it("get an empty title, no date, no Event, and are not Completed or deleted until the rest arrives", () => {
+  it("get an empty title, no date, no Event, no List, no Tags, and are not Completed or deleted until the rest arrives", () => {
     expect(taskRecordType.withDefaults({ id: "t1" })).toEqual({
       id: "t1",
       title: "",
@@ -101,11 +102,19 @@ describe("Tasks that arrive in part", () => {
       time: null,
       eventId: null,
       offsetDays: null,
+      listId: null,
+      tagIds: [],
       createdAt: "",
       completedAt: null,
       deletedAt: null,
       rescheduleCount: 0,
     });
+  });
+
+  it("read a Tags field that is not a list of Tags as no Tags", () => {
+    expect(taskRecordType.withDefaults({ id: "t1", tagIds: "g1" as never }).tagIds).toEqual([]);
+    expect(taskRecordType.withDefaults({ id: "t1", tagIds: null as never }).tagIds).toEqual([]);
+    expect(taskRecordType.withDefaults({ id: "t1", tagIds: ["g1", "g2"], listId: "l1" })).toMatchObject({ tagIds: ["g1", "g2"], listId: "l1" });
   });
 
   it("keep the fields they have, also ones this version doesn't know", () => {
@@ -187,6 +196,8 @@ describe("Task dates", () => {
         time: null,
         eventId: null,
         offsetDays: null,
+        listId: null,
+        tagIds: [],
         createdAt: "2026-09-28T09:00:00.000Z",
         completedAt: null,
         deletedAt: null,
@@ -593,5 +604,195 @@ describe("The Trash", () => {
     db.close();
 
     expect((await store.listTrash())[0]).toMatchObject({ eventId: null, offsetDays: null });
+  });
+});
+
+describe("Lists and Tags of a Task", () => {
+  /** The outbox entries of one Task's field: what a change would send to the server. */
+  async function queued(dbName: string, id: string, field: string) {
+    const db = await openAppDb(dbName);
+    const entries = (await db.getAll("outbox")).filter((entry) => entry.id === id && entry.field === field);
+    db.close();
+    return entries;
+  }
+
+  it("adds a Task without a List and without Tags by default, or into a List", async () => {
+    const store = await openTaskStore(freshDbName(), { now: tickingClock() });
+
+    await store.addTask("Loose");
+    await store.addTask("Sorted", { date: "2026-10-04" }, "l1");
+    await store.addTask("In the Inbox of a List", undefined, "l1");
+    await store.addTask("Explicitly none", undefined, null);
+
+    expect((await store.listTasks()).map((t) => [t.title, t.listId, t.tagIds])).toEqual([
+      ["Loose", null, []],
+      ["Sorted", "l1", []],
+      ["In the Inbox of a List", "l1", []],
+      ["Explicitly none", null, []],
+    ]);
+  });
+
+  it("puts a Task in a List and takes it out again, also after a reload", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName);
+    const task = await store.addTask("Sort boxes");
+
+    await store.setTaskList(task.id, "l1");
+    store.close();
+    const reopened = await openTaskStore(dbName);
+    expect((await reopened.listTasks())[0].listId).toBe("l1");
+    await reopened.setTaskList(task.id, null);
+
+    expect((await reopened.listTasks())[0].listId).toBeNull();
+  });
+
+  it("refuses to put a Task that is missing or deleted in a List", async () => {
+    const store = await openTaskStore(freshDbName());
+    const task = await store.addTask("Gone");
+    await store.deleteTask(task.id);
+
+    await expect(store.setTaskList("missing", "l1")).rejects.toBeInstanceOf(NoTaskError);
+    await expect(store.setTaskList(task.id, "l1")).rejects.toBeInstanceOf(NoTaskError);
+  });
+
+  it("adds Tags in the order they were added, each once", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName);
+    const task = await store.addTask("Call");
+
+    await store.addTaskTag(task.id, "g2");
+    await store.addTaskTag(task.id, "g1");
+    await store.addTaskTag(task.id, "g2");
+
+    expect((await store.listTasks())[0].tagIds).toEqual(["g2", "g1"]);
+  });
+
+  it("removes a Tag and leaves the others; one that is not there changes nothing", async () => {
+    const store = await openTaskStore(freshDbName());
+    const task = await store.addTask("Call");
+    for (const tagId of ["g1", "g2", "g3"]) await store.addTaskTag(task.id, tagId);
+
+    await store.removeTaskTag(task.id, "g2");
+    await store.removeTaskTag(task.id, "g9");
+
+    expect((await store.listTasks())[0].tagIds).toEqual(["g1", "g3"]);
+  });
+
+  it("writes nothing for a Tag that is there already or one that is not there to remove", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName, { now: tickingClock() });
+    const task = await store.addTask("Call");
+    await store.addTaskTag(task.id, "g1");
+    const before = await queued(dbName, task.id, "tagIds");
+
+    await store.addTaskTag(task.id, "g1");
+    await store.removeTaskTag(task.id, "g9");
+
+    expect(await queued(dbName, task.id, "tagIds")).toEqual(before);
+  });
+
+  it("writes the Tags as one field, so a change is one outbox entry that replaces the last", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName, { now: tickingClock() });
+    const task = await store.addTask("Call");
+
+    await store.addTaskTag(task.id, "g1");
+    await store.addTaskTag(task.id, "g2");
+
+    const entries = await queued(dbName, task.id, "tagIds");
+    expect(entries).toHaveLength(1);
+    expect(entries[0].value).toEqual(["g1", "g2"]);
+  });
+
+  it("refuses Tag changes on a Task that is missing or deleted", async () => {
+    const store = await openTaskStore(freshDbName());
+    const task = await store.addTask("Gone");
+    await store.deleteTask(task.id);
+
+    await expect(store.addTaskTag("missing", "g1")).rejects.toBeInstanceOf(NoTaskError);
+    await expect(store.addTaskTag(task.id, "g1")).rejects.toBeInstanceOf(NoTaskError);
+    await expect(store.removeTaskTag("missing", "g1")).rejects.toBeInstanceOf(NoTaskError);
+    await expect(store.removeTaskTag(task.id, "g1")).rejects.toBeInstanceOf(NoTaskError);
+  });
+
+  it("takes a Tag change from what is stored when it runs, not from a copy read earlier", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName);
+    const task = await store.addTask("Call");
+    // Another change lands (a sync, say) between the screen's read and this change.
+    const db = await openAppDb(dbName);
+    await db.put("tasks", { ...(await db.get("tasks", task.id))!, tagIds: ["g-from-sync"] });
+    db.close();
+
+    await store.addTaskTag(task.id, "g1");
+
+    expect((await store.listTasks())[0].tagIds).toEqual(["g-from-sync", "g1"]);
+  });
+
+  it("clears the List of every live Task in it, and of no other", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName, { now: tickingClock() });
+    const inList = await store.addTask("In", undefined, "l1");
+    const done = await store.addTask("Done", undefined, "l1");
+    await store.completeTask(done.id);
+    await store.addTask("Elsewhere", undefined, "l2");
+    await store.addTask("Nowhere");
+    const deleted = await store.addTask("Deleted", undefined, "l1");
+    await store.deleteTask(deleted.id);
+
+    await store.clearList("l1");
+
+    expect((await store.listTasks()).map((t) => [t.title, t.listId])).toEqual([
+      ["In", null],
+      ["Done", null],
+      ["Elsewhere", "l2"],
+      ["Nowhere", null],
+    ]);
+    // A Task in the Trash keeps its List: restoring it puts it back where it was (the List may be gone by then).
+    expect((await store.listTrash())[0].listId).toBe("l1");
+    expect(await queued(dbName, inList.id, "listId")).toHaveLength(1);
+  });
+
+  it("writes nothing for Tasks that are not in the List it clears", async () => {
+    const dbName = freshDbName();
+    const store = await openTaskStore(dbName, { now: tickingClock() });
+    const other = await store.addTask("Elsewhere", undefined, "l2");
+    const before = await queued(dbName, other.id, "listId");
+
+    await store.clearList("l1");
+
+    expect(await queued(dbName, other.id, "listId")).toEqual(before);
+  });
+
+  it("reads a Task saved by version 3, before Lists and Tags, as in no List and without Tags, and writes nothing for that", async () => {
+    const dbName = freshDbName();
+    const old = await openDB(dbName, 3, {
+      upgrade(db) {
+        db.createObjectStore("tasks", { keyPath: "id" });
+        db.createObjectStore("events", { keyPath: "id" });
+        createSyncStores(db);
+      },
+    });
+    await old.put("tasks", {
+      id: "old",
+      title: "From version 3",
+      date: null,
+      time: null,
+      eventId: null,
+      offsetDays: null,
+      createdAt: "2026-09-28T09:00:00.000Z",
+      completedAt: null,
+      rescheduleCount: 0,
+      deletedAt: null,
+    });
+    await old.put("syncInfo", true, "queued:task");
+    old.close();
+
+    const store = await openTaskStore(dbName);
+
+    expect(await store.listTasks()).toMatchObject([{ id: "old", listId: null, tagIds: [] }]);
+    const db = await openAppDb(dbName);
+    expect(await db.getAll("outbox")).toEqual([]);
+    db.close();
   });
 });
