@@ -150,7 +150,7 @@ test("a tab that another tab's database upgrade waits for lets go and asks to be
   await other.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open("grilled-heads-up", 4);
+        const request = indexedDB.open("grilled-heads-up", 5);
         request.onsuccess = () => {
           request.result.close();
           resolve();

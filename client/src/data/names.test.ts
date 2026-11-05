@@ -20,6 +20,7 @@ describe("Sorting by name", () => {
 describe("The same name", () => {
   it("ignores case and the spaces around it, also for umlauts", () => {
     expect(sameName("Errand", " errand ")).toBe(true);
+    expect(sameName("  errand", "Errand")).toBe(true);
     expect(sameName("ÄRGER", "ärger")).toBe(true);
   });
 
