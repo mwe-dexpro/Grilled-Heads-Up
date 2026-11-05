@@ -1074,6 +1074,10 @@ a.task-title {
   background: var(--blue-action);
 }
 
+.progress-segments span.overdue {
+  background: var(--amber);
+}
+
 .progress-bar span {
   display: block;
   height: 100%;
@@ -1233,11 +1237,18 @@ a.task-title {
   align-items: center;
 }
 
-.link-event select {
+.link-event select,
+.link-event .tag-input {
   flex: 1;
   min-width: 0;
   padding: 10px 14px;
   font-size: 15px;
+}
+
+.tag-input {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--white);
 }
 
 .button-text {
@@ -1247,4 +1258,100 @@ a.task-title {
   background: none;
   font-size: 17px;
   color: var(--blue-action);
+}
+
+/* Lists, Projects and Tags */
+
+.screen-header .button-ghost.small {
+  margin-bottom: 4px;
+}
+
+.project-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-card-head,
+.project-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-name {
+  min-width: 0;
+  font-size: 21px;
+  line-height: 1.19;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.project-open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  font-size: 17px;
+  color: var(--blue-action);
+}
+
+.project-card-foot .task-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.band + .chips,
+.chips.tag-filter {
+  margin-top: 16px;
+}
+
+.band + .bucket,
+.chips + .bucket {
+  margin-top: 16px;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--blue-action);
+  background: var(--blue-action);
+  color: var(--white);
+}
+
+ul.chips {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.chip-remove {
+  display: inline-grid;
+  place-items: center;
+  margin: 0 -6px 0 0;
+  padding: 3px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-meta);
+}
+
+.sheet-text {
+  margin: 0 0 16px;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.sheet-actions .delete-start {
+  margin-right: auto;
 }

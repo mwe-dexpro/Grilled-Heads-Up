@@ -1,11 +1,15 @@
-import { Calendar, Check, ChevronRight, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { Calendar, Check, ChevronRight, Trash2, X } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 import { hrefOf } from "../app/routes";
+import { maxTagLength } from "../data/limits";
 import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
 import { formatEventWhen, formatOffset } from "../events/formatEvent";
 import { dayOf, daysBetween, type Day } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
+import type { List } from "../lists/listStore";
+import { liveList, liveTags } from "../lists/lists";
+import type { Tag } from "../tags/tagStore";
 import { NavBar } from "../ui/NavBar";
 import { availableActions } from "./availableActions";
 import { PickDate } from "./PickDate";
@@ -16,6 +20,9 @@ interface TaskScreenProps {
   task: Task | undefined;
   tasks: Task[];
   events: Event[];
+  /** The live Lists and Tags on this device. */
+  lists: List[];
+  tags: Tag[];
   now: Date;
   onComplete(id: string): void;
   onReschedule(id: string, day: Day): void;
@@ -23,13 +30,34 @@ interface TaskScreenProps {
   onDelete(task: Task): void;
   onLink(id: string, eventId: string, offsetDays: number): void;
   onUnlink(id: string, date: string | null): void;
+  /** Puts the Task in a List, or in none (null). */
+  onSetList(id: string, listId: string | null): void;
+  /** Adds the Tag of that name, making it if there is none. */
+  onAddTag(id: string, name: string): void;
+  onRemoveTag(id: string, tagId: string): void;
 }
 
-/** Task detail: when it's due, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
-export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onReschedule, onDelete, onLink, onUnlink }: TaskScreenProps) {
+/** Task detail: when it's due, its List and Tags, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
+export function TaskScreen({
+  task: rawTask,
+  tasks,
+  events,
+  lists,
+  tags,
+  now,
+  onComplete,
+  onReschedule,
+  onDelete,
+  onLink,
+  onUnlink,
+  onSetList,
+  onAddTag,
+  onRemoveTag,
+}: TaskScreenProps) {
   const { language, t } = useI18n();
   const [chosenEventId, setChosenEventId] = useState("");
   const [picking, setPicking] = useState(false);
+  const [newTag, setNewTag] = useState("");
   // Delete goes back, and a second tap before the screen has gone would go back once more (and delete again).
   const leaving = useRef(false);
 
@@ -52,6 +80,13 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onRe
       : t("task.due", { date: [formatShortDay(task.date, language), task.time && formatTime(task.time, language)].filter(Boolean).join(" · ") });
   const upcoming = events.filter((e) => eventDays(e).last >= today);
   const actions = availableActions(task, new Set(events.map((e) => e.id)));
+
+  function addTag(e: FormEvent) {
+    e.preventDefault();
+    if (newTag.trim() === "") return;
+    onAddTag(task.id, newTag);
+    setNewTag("");
+  }
 
   function link() {
     const chosen = events.find((e) => e.id === chosenEventId);
@@ -131,6 +166,66 @@ export function TaskScreen({ task: rawTask, tasks, events, now, onComplete, onRe
           )}
         </section>
       )}
+
+      <section className="bucket" aria-labelledby="task-list-heading">
+        <div className="section-header">
+          <h2 id="task-list-heading" className="section-title">
+            {t("task.listHeading")}
+          </h2>
+        </div>
+        <div className="link-event">
+          {/* A List that is not live on this device (deleted elsewhere, not arrived yet) counts as none. */}
+          <select aria-label={t("task.listHeading")} value={liveList(task, lists)?.id ?? ""} onChange={(e) => onSetList(task.id, e.target.value || null)}>
+            <option value="">{t("task.noList")}</option>
+            {lists.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      <section className="bucket" aria-labelledby="task-tags-heading">
+        <div className="section-header">
+          <h2 id="task-tags-heading" className="section-title">
+            {t("task.tagsHeading")}
+          </h2>
+        </div>
+        {liveTags(task, tags).length > 0 && (
+          <ul className="chips tag-chips">
+            {liveTags(task, tags).map((tag) => (
+              <li key={tag.id} className="chip">
+                {tag.name}
+                <button type="button" className="chip-remove" aria-label={t("task.removeTag", { name: tag.name })} onClick={() => onRemoveTag(task.id, tag.id)}>
+                  <X size={14} strokeWidth={1.5} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form className="link-event" onSubmit={addTag}>
+          <input
+            className="tag-input"
+            list="tag-names"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            placeholder={t("task.addTag")}
+            aria-label={t("task.addTag")}
+            maxLength={maxTagLength}
+            autoComplete="off"
+            enterKeyHint="done"
+          />
+          <datalist id="tag-names">
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.name} />
+            ))}
+          </datalist>
+          <button type="submit" className="button-primary" disabled={newTag.trim() === ""}>
+            {t("task.addTagButton")}
+          </button>
+        </form>
+      </section>
 
       {actions.includes("reschedule") && (
         <section className="bucket" aria-labelledby="task-reschedule-heading">

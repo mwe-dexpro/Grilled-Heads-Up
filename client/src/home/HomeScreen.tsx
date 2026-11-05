@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Event } from "../events/event";
 import { EventRow } from "../events/EventRow";
 import { useI18n } from "../i18n/I18nProvider";
+import type { List } from "../lists/listStore";
+import { liveList } from "../lists/lists";
 import { languages, type Language } from "../i18n/i18n";
 import { formatSyncState } from "../sync/formatSync";
 import type { SyncState } from "../sync/engine";
@@ -19,13 +21,14 @@ interface HomeScreenProps {
   ready: boolean;
   tasks: Task[];
   events: Event[];
+  lists: List[];
   now: Date;
   sync: SyncState;
   onSyncNow(): void;
   actions: TaskActions;
 }
 
-export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, actions }: HomeScreenProps) {
+export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, actions }: HomeScreenProps) {
   const { language, setLanguage, t } = useI18n();
   const buckets = arrangeHome(tasks, now, events);
   const [overdue, today, ...rest] = buckets;
@@ -40,6 +43,7 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, actions
         bucket={bucket.kind}
         now={now}
         event={task.eventId === null ? undefined : eventsById.get(task.eventId)}
+        list={liveList(task, lists)}
         eventIds={eventsById}
         actions={actions}
       />

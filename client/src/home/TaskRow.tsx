@@ -3,6 +3,7 @@ import type { Event } from "../events/event";
 import { formatOffset } from "../events/formatEvent";
 import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
+import type { List } from "../lists/listStore";
 import type { Task } from "../tasks/taskStore";
 import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { taskMeta, type BucketKind } from "./buckets";
@@ -14,12 +15,14 @@ interface TaskRowProps {
   now: Date;
   /** The Event of a Linked task; its name opens the Event view. */
   event?: Event;
+  /** The Task's List; its name opens the Project view, in place of an Event name. Left out where the List is the screen. */
+  list?: List;
   /** Ids of the Events on this device. */
   eventIds: { has(id: string): boolean };
   actions: TaskActions;
 }
 
-export function TaskRow({ task, bucket, now, event, eventIds, actions }: TaskRowProps) {
+export function TaskRow({ task, bucket, now, event, list, eventIds, actions }: TaskRowProps) {
   const { language, t } = useI18n();
   const completed = task.completedAt !== null;
   const meta = taskMeta(task, bucket, now);
@@ -45,6 +48,13 @@ export function TaskRow({ task, bucket, now, event, eventIds, actions }: TaskRow
       {event.title}
     </a>
   );
+  // The second line names the Event of a Linked task, else the List, else nothing (ALIGNMENT §1).
+  const listLink = task.eventId === null && list && (
+    <a className="event-link" href={hrefOf({ name: "list", id: list.id })}>
+      {list.name}
+    </a>
+  );
+  const place = eventLink || listLink;
   const [beforeEvent, afterEvent] = t("risk.putsAtRisk").split("{event}");
 
   const classes = ["task", completed && "completed", meta?.kind === "overdue" && "overdue"].filter(Boolean).join(" ");
@@ -69,10 +79,10 @@ export function TaskRow({ task, bucket, now, event, eventIds, actions }: TaskRow
             {afterEvent}
           </span>
         ) : (
-          (event || metaText) && (
+          (place || metaText) && (
             <span className="task-meta">
-              {eventLink}
-              {event && metaText && " · "}
+              {place}
+              {place && metaText && " · "}
               {metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>}
             </span>
           )
