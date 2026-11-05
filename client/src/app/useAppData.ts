@@ -93,8 +93,10 @@ export function useAppData() {
   const rescheduleTasks = useCallback(
     (ids: string[], day: Day) => {
       const eventStart = (eventId: string) => events.find((event) => event.id === eventId)?.startDate;
-      // Nobody waits for the result: the lists are reloaded after a failed change too, so they show what was saved.
-      return changeTasks((s) => s.rescheduleTasks(ids, day, eventStart)).catch(() => {});
+      // No catch: a stale day is taken to the earliest allowed one, so what can still fail is the store itself, and
+      // that is not hidden: like every other change, the failure reaches the caller (and the console). The lists are
+      // reloaded after it anyway.
+      return changeTasks((s) => s.rescheduleTasks(ids, day, eventStart));
     },
     [changeTasks, events],
   );

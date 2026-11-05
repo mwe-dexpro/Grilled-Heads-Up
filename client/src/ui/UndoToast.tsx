@@ -1,30 +1,51 @@
+import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 
 /** How long the toast offers the undo. */
-export const undoToastMs = 5000;
+const undoToastMs = 5000;
 
 /**
  * "Task deleted · Undo". It sits in the row of the "+" button, to its left, above the tab bar, so it never covers
- * the button or the tabs.
+ * the button or the tabs. It goes after `undoToastMs`, except while the Undo button has the keyboard focus or a mouse
+ * is over it: someone who is reaching for it must not have it taken away. The five seconds then start anew. (A
+ * finger over it does not hold it: a touch ends with the finger, and a toast that stays would never go.)
  *
  * Screen readers announce what is added to a live region that is already in the page; one that arrives together
  * with its text is often not read. So the region is always there (empty while no toast is shown) and the toast is
  * put into it. It is a live region (`aria-live`), not `role="status"`, so the page still has one status line only:
  * the sync line. The toast is keyed by the deleted Task, so a second delete while the first toast is up is a new
- * toast, and is announced again.
+ * toast, is announced again and has its own five seconds.
  */
-export function UndoToast({ deletedTaskId, onUndo }: { deletedTaskId: string | null; onUndo(): void }) {
-  const { t } = useI18n();
+export function UndoToast({ deletedTaskId, onUndo, onExpire }: { deletedTaskId: string | null; onUndo(): void; onExpire(): void }) {
   return (
     <div className="undo-region" aria-live="polite" aria-atomic="true">
-      {deletedTaskId !== null && (
-        <div key={deletedTaskId} className="undo-toast">
-          <span>{t("toast.taskDeleted")}</span>
-          <button type="button" className="undo-button" onClick={onUndo}>
-            {t("toast.undo")}
-          </button>
-        </div>
-      )}
+      {deletedTaskId !== null && <Toast key={deletedTaskId} onUndo={onUndo} onExpire={onExpire} />}
+    </div>
+  );
+}
+
+function Toast({ onUndo, onExpire }: { onUndo(): void; onExpire(): void }) {
+  const { t } = useI18n();
+  const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const held = focused || hovered;
+
+  useEffect(() => {
+    if (held) return;
+    const timer = setTimeout(onExpire, undoToastMs);
+    return () => clearTimeout(timer);
+  }, [held, onExpire]);
+
+  return (
+    <div
+      className="undo-toast"
+      onPointerEnter={(event) => setHovered(event.pointerType !== "touch")}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <span>{t("toast.taskDeleted")}</span>
+      <button type="button" className="undo-button" onClick={onUndo} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+        {t("toast.undo")}
+      </button>
     </div>
   );
 }

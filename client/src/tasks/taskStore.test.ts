@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { openDB } from "idb";
 import { openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
-import { openTaskStore, taskRecordType } from "./taskStore";
+import { NoTaskError, openTaskStore, taskRecordType } from "./taskStore";
 
 let dbCounter = 0;
 const freshDbName = () => `tasks-test-${dbCounter++}`;
@@ -138,6 +138,9 @@ describe("Deleting a Task", () => {
     await expect(store.deleteTask(task.id)).rejects.toThrow(`No Task with id ${task.id}`);
     await expect(store.completeTask(task.id)).resolves.toBeUndefined();
     await expect(store.deleteTask("missing")).rejects.toThrow("No Task with id missing");
+    // The app tells "the Task is gone already" from a real failure by this class.
+    await expect(store.deleteTask("missing")).rejects.toBeInstanceOf(NoTaskError);
+    await expect(store.linkTask("missing", "e1", 0)).rejects.toBeInstanceOf(NoTaskError);
 
     expect(await store.listTasks()).toEqual([]);
     const raw = await (await openAppDb(dbName)).get("tasks", task.id);

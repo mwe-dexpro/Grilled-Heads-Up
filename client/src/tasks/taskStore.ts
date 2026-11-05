@@ -24,6 +24,14 @@ export interface Task {
   deletedAt: string | null;
 }
 
+/** A change was asked for a Task that is not there (never was, or a sync has deleted it). Other failures are not this. */
+export class NoTaskError extends Error {
+  constructor(id: string) {
+    super(`No Task with id ${id}`);
+    this.name = "NoTaskError";
+  }
+}
+
 export interface TaskWhen {
   date?: Day | null;
   time?: TimeOfDay | null;
@@ -41,6 +49,11 @@ export interface TaskStore {
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
   unlinkTask(id: string, date: Day | null): Promise<void>;
   /**
+   * The strict single-Task Reschedule: the day is taken as given, so one that is no longer allowed is refused. The
+   * app does not use it (its screens go through `rescheduleTasks`, which takes a stale day to the earliest allowed
+   * one); it is the plain rule on the store, for callers that want the refusal, and what the store and sync tests
+   * use to change one Task.
+   *
    * Gives a Task a new date (a Linked task a new Offset, from `eventStart`, the start day of the Event it belongs to)
    * and counts the Reschedule; see `reschedulePatch`. Throws for a day that is not allowed (never today for an
    * Overdue Task, never a day in the past). A Task that is missing or deleted is ignored, like in `completeTask`.
@@ -108,7 +121,7 @@ export async function openTaskStore(
 
   /** Changes a live Task in one transaction (see `Table.update`), so a sync landing meanwhile is not overwritten. */
   async function change(id: string, patch: Patch<Task>): Promise<void> {
-    if (!(await tasks.update(id, patch))) throw new Error(`No Task with id ${id}`);
+    if (!(await tasks.update(id, patch))) throw new NoTaskError(id);
   }
 
   return {
@@ -162,7 +175,7 @@ export async function openTaskStore(
     },
 
     async deleteTask(id) {
-      if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
+      if (!(await tasks.get(id))) throw new NoTaskError(id);
       await tasks.delete(id);
     },
 

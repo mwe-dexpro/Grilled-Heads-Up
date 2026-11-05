@@ -44,6 +44,15 @@ async function touchSwipe(page: Page, title: string, fromX: number, byX: number)
   await cdp.detach();
 }
 
+/** From now on every write to IndexedDB fails, as it does when the disk is full or the database was taken away. */
+async function failWrites(page: Page) {
+  await page.evaluate(() => {
+    IDBObjectStore.prototype.put = () => {
+      throw new Error("disk full");
+    };
+  });
+}
+
 /** Swipes a row left from its right side, away from the edge zones. */
 async function swipeLeft(page: Page, title: string) {
   await drag(page, title, 330, -230);
@@ -74,6 +83,29 @@ test("swiping a row left reveals Reschedule, Complete and Delete; Complete works
   await swipeLeft(page, "Order cake");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(1);
   await page.getByRole("heading", { name: "Today", level: 1 }).click();
+  await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+});
+
+test("opening a row closes the one that was open, and scrolling the page closes an open row", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  const first = row(page, "Pay dentist invoice").locator(".swipe-content");
+  const second = row(page, "Order cake").locator(".swipe-content");
+  const open = "matrix(1, 0, 0, 1, -234, 0)";
+
+  await swipeLeft(page, "Pay dentist invoice");
+  await expect(first).toHaveCSS("transform", open);
+  await swipeLeft(page, "Order cake");
+  await expect(second).toHaveCSS("transform", open);
+  await expect(first).toHaveCSS("transform", "none");
+
+  // The page is made long enough to scroll, and scrolls.
+  await page.evaluate(() => {
+    document.body.style.minHeight = "4000px";
+  });
+  await page.evaluate(() => window.scrollTo(0, 120));
+  await expect(second).toHaveCSS("transform", "none");
   await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
 });
 
@@ -246,6 +278,37 @@ test("Reschedule all… after midnight, with the sheet's day gone stale, still m
   expect(errors).toEqual([]);
 });
 
+test("a Reschedule that fails in the store is not hidden: the page reports it and the Task stays Overdue", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
+  await failWrites(page);
+
+  await swipeLeft(page, "Pay dentist invoice");
+  await row(page, "Pay dentist invoice").getByRole("button", { name: "Reschedule", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+
+  // Like a failed Complete or a failed add, the failure is not swallowed.
+  await expect.poll(() => errors).toEqual([expect.stringContaining("disk full")]);
+  await expect(bucket(page, "Overdue")).toContainText("Pay dentist invoice");
+});
+
+test("a Delete that fails in the store is not hidden: the page reports it, and there is nothing to undo", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/");
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  await failWrites(page);
+
+  await swipeLeft(page, "Order cake");
+  await row(page, "Order cake").getByRole("button", { name: "Delete", exact: true }).click();
+
+  await expect.poll(() => errors).toEqual([expect.stringContaining("disk full")]);
+  await expect(page.getByText("Task deleted")).toBeHidden();
+  await expect(bucket(page, "Today")).toContainText("Order cake");
+});
+
 test("Next week is the next Monday", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
@@ -336,6 +399,8 @@ test("the undo toast goes after 5 seconds, and the Task is then restored from th
   await row(page, "Order cake").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("Task deleted")).toBeVisible();
+  // The mouse is where the sheet's Delete button was, which is over the toast, and a toast the mouse is over stays.
+  await page.mouse.move(5, 5);
   await page.clock.fastForward(4_000);
   await expect(page.getByText("Task deleted")).toBeVisible();
   await page.clock.fastForward(1_500);
@@ -346,6 +411,63 @@ test("the undo toast goes after 5 seconds, and the Task is then restored from th
   await expect(page.getByText("The Trash is empty.")).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
   await expect(bucket(page, "Today")).toContainText("Order cake");
+});
+
+test("the undo toast waits while Undo has the keyboard focus, and goes 5 seconds after the focus leaves", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  await row(page, "Order cake").dispatchEvent("contextmenu");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Task deleted")).toBeVisible();
+  await page.mouse.move(5, 5);
+
+  // The Owner tabs to Undo; the five seconds pass and the toast is still there to be pressed.
+  await page.getByRole("button", { name: "Undo" }).focus();
+  await page.clock.fastForward(8_000);
+  await expect(page.getByText("Task deleted")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Undo" }).blur();
+  await page.clock.fastForward(4_000);
+  await expect(page.getByText("Task deleted")).toBeVisible();
+  await page.clock.fastForward(1_500);
+  await expect(page.getByText("Task deleted")).toBeHidden();
+});
+
+test("the undo toast waits while the mouse is over it, and goes 5 seconds after it leaves; a finger does not hold it", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Order cake", { date: "2026-10-07" });
+  await addTask(page, "Call the plumber", { date: "2026-10-07" });
+  await row(page, "Order cake").dispatchEvent("contextmenu");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  const toast = page.locator(".undo-toast");
+  await expect(toast).toBeVisible();
+
+  const box = await rectOf(toast);
+  await page.mouse.move(5, 5);
+  await page.mouse.move(box.x + 8, box.y + box.height / 2);
+  await page.clock.fastForward(8_000);
+  await expect(toast).toBeVisible();
+
+  await page.mouse.move(5, 300);
+  await page.clock.fastForward(4_000);
+  await expect(toast).toBeVisible();
+  await page.clock.fastForward(1_500);
+  await expect(toast).toBeHidden();
+
+  // A touch on the toast (not on Undo) ends with the finger: it does not make the toast stay.
+  await row(page, "Call the plumber").dispatchEvent("contextmenu");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(toast).toBeVisible();
+  await page.mouse.move(5, 5);
+  const again = await rectOf(toast);
+  const cdp = await page.context().newCDPSession(page);
+  const point = { x: again.x + 8, y: again.y + again.height / 2, id: 1 };
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+  await page.clock.fastForward(5_500);
+  await expect(toast).toBeHidden();
 });
 
 test("a Task deleted 30 days ago is gone from the Trash", async ({ page }) => {
@@ -431,6 +553,38 @@ test("a double tap on Delete in Task detail goes back once, to where the Task wa
   await expect(page.getByText("Task deleted")).toBeVisible();
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(bucket(page, "Today")).toContainText("Call the plumber");
+});
+
+test("Delete in a Task detail that was opened straight from a link stays in the app, on Today, with the undo toast", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Call the plumber", { date: "2026-10-07" });
+  const href = await page.getByRole("link", { name: "Call the plumber" }).getAttribute("href");
+  // The tab had another page before the link was followed: Back would leave the app.
+  await page.goto("about:blank");
+  await page.goto(`/${href}`);
+  await expect(page.getByRole("heading", { name: "Call the plumber", level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete" }).click();
+
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page.getByText("Task deleted")).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(bucket(page, "Today")).toContainText("Call the plumber");
+});
+
+test("Back in an app screen goes back a step of the app, and after a reload of the screen opened on still does", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Call the plumber", { date: "2026-10-07" });
+  await page.getByRole("link", { name: "Trash" }).click();
+  await expect(page.getByRole("heading", { name: "Trash", level: 1 })).toBeVisible();
+  await page.reload();
+
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/#\/$|^[^#]*$/);
+  // It went back in the history, not forward to a new Today: Forward is Trash again.
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: "Trash", level: 1 })).toBeVisible();
 });
 
 test("Rescheduling a Linked task in the Event view changes its Offset, so it keeps following the Event", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { goBack, navigate, useRoute } from "./app/navigation";
 import type { Route } from "./app/routes";
 import { useAppData } from "./app/useAppData";
@@ -17,11 +17,12 @@ import { earliestRescheduleDay } from "./tasks/reschedule";
 import { RescheduleSheet } from "./tasks/RescheduleSheet";
 import { TaskActionsSheet } from "./tasks/TaskActionsSheet";
 import { TaskScreen } from "./tasks/TaskScreen";
+import { NoTaskError } from "./tasks/taskStore";
 import type { TaskActions } from "./tasks/TaskSwipeRow";
 import { TrashScreen } from "./tasks/TrashScreen";
 import { NewTaskSheet } from "./ui/NewTaskSheet";
 import { TabBar, type Tab } from "./ui/TabBar";
-import { UndoToast, undoToastMs } from "./ui/UndoToast";
+import { UndoToast } from "./ui/UndoToast";
 
 const tabs: Tab[] = ["today", "calendar", "projects"];
 
@@ -45,12 +46,7 @@ export function App() {
     if (signedOut) void recheck();
   }, [signedOut, recheck]);
 
-  // Each delete starts the five seconds anew, and replaces the toast of an earlier one.
-  useEffect(() => {
-    if (!deleted) return;
-    const timer = setTimeout(() => setDeleted(null), undoToastMs);
-    return () => clearTimeout(timer);
-  }, [deleted]);
+  const closeToast = useCallback(() => setDeleted(null), []);
 
   // Linked tasks need their Events' dates to be told when they are due (Overdue, earliest day to Reschedule to).
   const datedTasks = useMemo(() => withEventDates(data.tasks, data.events), [data.tasks, data.events]);
@@ -65,8 +61,10 @@ export function App() {
       try {
         await deleteTask(task.id);
         setDeleted({ taskId: task.id });
-      } catch {
+      } catch (error) {
         // The Task is gone already (a sync deleted it a moment ago): nothing to delete, nothing to undo.
+        // Any other failure is a real one, and is not hidden.
+        if (!(error instanceof NoTaskError)) throw error;
       }
     },
     openMenu: (task) => setMenuId(task.id),
@@ -127,6 +125,7 @@ export function App() {
           setDeleted(null);
           void restoreTask(deleted.taskId);
         }}
+        onExpire={closeToast}
       />
       <TabBar current={currentTab} onSelect={(tab) => navigate({ name: tab })} />
     </div>
