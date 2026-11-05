@@ -12,6 +12,7 @@ import { dayOf } from "../home/days";
 import { translate } from "../i18n/i18n";
 import { maxNotesLength } from "../data/limits";
 import { openListStore, type ListStore } from "../lists/listStore";
+import { liveList } from "../lists/lists";
 import { openTagStore, type TagStore } from "../tags/tagStore";
 import { openTaskStore, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
@@ -409,6 +410,30 @@ describe("Sync between two devices", () => {
 
       expect(await b.lists.listLists()).toEqual([]);
       expect(await b.tasks.listTasks()).toMatchObject([{ id: task.id, listId: null }]);
+    });
+
+    it("shows a Task B put in a List offline without a List when A deleted that List meanwhile", async () => {
+      const { world, a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement");
+      const task = await a.tasks.addTask("Sort boxes");
+      await a.sync();
+      await b.sync();
+      world.advance();
+      await a.lists.deleteList(basement.id);
+      await a.tasks.clearList(basement.id);
+      await a.sync();
+      world.advance();
+      // B has not heard of the deletion: it puts the Task in the List, which is live there.
+      await b.tasks.setTaskList(task.id, basement.id);
+
+      await b.sync();
+      await a.sync();
+
+      for (const device of [a, b]) {
+        const [stored] = await device.tasks.listTasks();
+        expect(stored.listId).toBe(basement.id);
+        expect(liveList(stored, await device.lists.listLists())).toBeUndefined();
+      }
     });
 
     it("keeps only the later device's Tags when two devices changed a Task's Tags apart (one field, last write wins)", async () => {
