@@ -6,7 +6,7 @@ import { openListStore, type List, type ListStore } from "../lists/listStore";
 import { openTagStore, type Tag, type TagStore } from "../tags/tagStore";
 import { useSync } from "../sync/useSync";
 import { createListReader } from "./listReader";
-import { openTaskStore, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
+import { NoTaskError, openTaskStore, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
 
 interface Stores {
   tasks: TaskStore;
@@ -121,6 +121,8 @@ export function useAppData() {
   const addTaskTag = useCallback(
     (id: string, name: string) =>
       changeStores(async (s) => {
+        // A Task that is gone gets no Tag, and no Tag is made for it that nothing would use.
+        if (!(await s.tasks.listTasks()).some((task) => task.id === id)) throw new NoTaskError(id);
         const tag = await s.tags.findOrAddTag(name);
         await s.tasks.addTaskTag(id, tag.id);
       }),

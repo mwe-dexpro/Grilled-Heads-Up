@@ -14,8 +14,18 @@ import { EditListSheet } from "./EditListSheet";
 import { NoListError, type List } from "./listStore";
 import { listProgress, listTasks, progressSegments, projectViewTasks, tagsInList } from "./lists";
 
+/** What the Project view shows of a List besides its Tasks: kept by the app, so that it outlives a visit to Task detail. */
+export interface ProjectView {
+  showCompleted: boolean;
+  tagId: string | null;
+}
+
+export const defaultProjectView: ProjectView = { showCompleted: false, tagId: null };
+
 interface ProjectScreenProps {
   list: List | undefined;
+  view: ProjectView;
+  onView(view: ProjectView): void;
   /** The live Tasks with their Events' dates (`withEventDates`). */
   tasks: Task[];
   events: Event[];
@@ -28,12 +38,14 @@ interface ProjectScreenProps {
 }
 
 /** The Project view: one List or Project with its open Tasks and Progress, "Show completed" and a Tag filter. */
-export function ProjectScreen({ list, tasks, events, tags, now, actions, onRename, onSetProject, onDelete }: ProjectScreenProps) {
+export function ProjectScreen({ list, view, onView, tasks, events, tags, now, actions, onRename, onSetProject, onDelete }: ProjectScreenProps) {
   const { t } = useI18n();
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [tagId, setTagId] = useState<string | null>(null);
+  const { showCompleted, tagId } = view;
   const [editing, setEditing] = useState(false);
+  // The List was deleted from here and the screen is on its way out: nothing to show (and no "not found") meanwhile.
+  const [leaving, setLeaving] = useState(false);
 
+  if (leaving) return null;
   if (!list) {
     return (
       <div className="screen">
@@ -79,11 +91,11 @@ export function ProjectScreen({ list, tasks, events, tags, now, actions, onRenam
 
       {chips.length > 0 && (
         <div className="chips tag-filter" role="group" aria-label={t("list.filterLabel")}>
-          <button type="button" className="chip" aria-pressed={chosen === null} onClick={() => setTagId(null)}>
+          <button type="button" className="chip" aria-pressed={chosen === null} onClick={() => onView({ ...view, tagId: null })}>
             {t("list.filterAll")}
           </button>
           {chips.map((tag) => (
-            <button key={tag.id} type="button" className="chip" aria-pressed={chosen === tag.id} onClick={() => setTagId(tag.id)}>
+            <button key={tag.id} type="button" className="chip" aria-pressed={chosen === tag.id} onClick={() => onView({ ...view, tagId: tag.id })}>
               {tag.name}
             </button>
           ))}
@@ -111,7 +123,7 @@ export function ProjectScreen({ list, tasks, events, tags, now, actions, onRenam
       </section>
 
       <div className="actions">
-        <button type="button" className="chip" aria-pressed={showCompleted} onClick={() => setShowCompleted(!showCompleted)}>
+        <button type="button" className="chip" aria-pressed={showCompleted} onClick={() => onView({ ...view, showCompleted: !showCompleted })}>
           {t("list.showCompleted")}
         </button>
       </div>
@@ -131,10 +143,17 @@ export function ProjectScreen({ list, tasks, events, tags, now, actions, onRenam
           }}
           onDelete={async () => {
             setEditing(false);
-            // Leave first, replacing the entry (so that Back does not return to a List that is gone): once the List is
-            // deleted, this route would show "not found" until the move.
+            // Delete first, then leave, replacing the entry (so that Back does not return to a List that is gone). The
+            // screen shows nothing meanwhile: the route would say "not found", and the Projects tab, not yet shown,
+            // must not list a List that is going.
+            setLeaving(true);
+            try {
+              await onDelete(list.id);
+            } catch (error) {
+              setLeaving(false);
+              throw error;
+            }
             navigate({ name: "projects" }, { replace: true });
-            await onDelete(list.id);
           }}
           onClose={() => setEditing(false)}
         />

@@ -112,6 +112,7 @@ describe("List store", () => {
     await store.deleteList(list.id);
 
     await expect(store.renameList("missing", "Nope")).rejects.toBeInstanceOf(NoListError);
+    await expect(store.renameList("missing", "Nope")).rejects.toMatchObject({ name: "NoListError", message: "No List with id missing" });
     await expect(store.renameList(list.id, "Back")).rejects.toBeInstanceOf(NoListError);
     await expect(store.setProject(list.id, true)).rejects.toBeInstanceOf(NoListError);
     const live = await store.addList("Live");

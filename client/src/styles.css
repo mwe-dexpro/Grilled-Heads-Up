@@ -1339,7 +1339,8 @@ ul.chips {
   display: inline-grid;
   place-items: center;
   margin: 0 -6px 0 0;
-  padding: 3px;
+  /* 24 by 24 pixels at least (WCAG 2.5.8): the 14-pixel icon and 5 pixels around it. */
+  padding: 5px;
   border: none;
   border-radius: 50%;
   background: none;

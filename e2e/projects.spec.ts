@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: today is Oct 7, so Oct 5 is Overdue and Oct 9 is ahead. */
 const wednesday = new Date(2026, 9, 7, 13, 5);
@@ -494,18 +494,133 @@ test("deleting a List from its Project view goes to the Projects tab at once, an
   await page.getByRole("button", { name: "Delete list" }).click();
   // Records whether the "not found" line is ever on screen: it would flash while the deleted List is still the route.
   await page.evaluate(() => {
-    const seen = { notFound: false };
+    const seen = { notFound: false, listed: false };
     (window as unknown as { seen: typeof seen }).seen = seen;
     new MutationObserver(() => {
       if (document.body.innerText.includes("doesn't exist")) seen.notFound = true;
+      // Once on the Projects tab, the deleted List must not be there to open any more.
+      if (window.location.hash === "#/projects" && document.body.innerText.includes("Basement")) seen.listed = true;
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
 
   await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
 
   await expect(page.getByText("No lists yet.", { exact: false })).toBeVisible();
-  expect(await page.evaluate(() => (window as unknown as { seen: { notFound: boolean } }).seen.notFound)).toBe(false);
+  expect(await page.evaluate(() => (window as unknown as { seen: { notFound: boolean; listed: boolean } }).seen)).toEqual({ notFound: false, listed: false });
   await page.goBack();
   await expect(page).toHaveURL(/#\/projects$/);
   await expect(page.getByRole("heading", { name: "Projects", level: 1 })).toBeVisible();
+});
+
+/** Opens the Task detail of a Task from the Project view or the home screen. */
+const openTask = (page: Page, title: string) => page.getByRole("link", { name: title, exact: true }).click();
+
+/** Adds a Tag in Task detail (a typed name). */
+async function addTag(page: Page, name: string) {
+  const input = page.getByRole("combobox", { name: "Add tag" });
+  await input.fill(name);
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+}
+
+test("the Tag filter and Show completed of a Project view are still set after a Task is opened and Back is pressed", async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Basement", { project: true });
+  await openList(page, "Basement");
+  await addTask(page, "Sort boxes");
+  await addTask(page, "Plain job");
+  await openTask(page, "Sort boxes");
+  await addTag(page, "Errand");
+  await page.getByRole("button", { name: "Back" }).click();
+
+  const filter = page.getByRole("group", { name: "Filter by tag" });
+  await filter.getByRole("button", { name: "Errand" }).click();
+  await page.getByRole("button", { name: "Show completed" }).click();
+  await openTask(page, "Sort boxes");
+  await page.getByRole("button", { name: "Back" }).click();
+
+  await expect(filter.getByRole("button", { name: "Errand" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Show completed" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("region", { name: "Basement" }).getByRole("listitem")).toHaveText([/Sort boxes/]);
+});
+
+test('the "+" button in a Project view with a Tag chosen shows the new Task: the filter goes back to All', async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Basement", { project: true });
+  await openList(page, "Basement");
+  await addTask(page, "Sort boxes");
+  await openTask(page, "Sort boxes");
+  await addTag(page, "Errand");
+  await page.getByRole("button", { name: "Back" }).click();
+  const filter = page.getByRole("group", { name: "Filter by tag" });
+  await filter.getByRole("button", { name: "Errand" }).click();
+
+  await addTask(page, "C job");
+
+  await expect(filter.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("region", { name: "Basement" }).getByRole("listitem")).toHaveText([/Sort boxes/, /C job/]);
+});
+
+test("the button that removes a Tag is big enough to hit (24 by 24 pixels at least)", async ({ page }) => {
+  await page.goto("/");
+  await addTask(page, "Sort boxes");
+  await openTask(page, "Sort boxes");
+  await addTag(page, "Errand");
+
+  const box = await page.getByRole("button", { name: "Remove tag Errand" }).boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(24);
+  expect(box!.height).toBeGreaterThanOrEqual(24);
+});
+
+test.describe("a Task that another tab deleted meanwhile", () => {
+  /** Task detail of "Sort boxes" (with the Tag "Errand" when asked) is open here, and another tab then deletes the Task. */
+  async function deletedInAnotherTab(page: Page, context: BrowserContext, { tagged = false } = {}) {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto("/");
+    await addList(page, "Basement");
+    await tab(page, "Today").click();
+    await addTask(page, "Sort boxes");
+    await openTask(page, "Sort boxes");
+    if (tagged) await addTag(page, "Errand");
+
+    const other = await context.newPage();
+    await other.goto("/");
+    await other.getByRole("link", { name: "Sort boxes", exact: true }).click();
+    await other.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(other.getByRole("button", { name: "Undo" })).toBeVisible();
+    await other.close();
+    return errors;
+  }
+
+  test("choosing a List ends calmly, not in an error", async ({ page, context }) => {
+    const errors = await deletedInAnotherTab(page, context);
+    await page.getByRole("combobox", { name: "List", exact: true }).selectOption({ label: "Basement" });
+
+    await expect(page.getByText("This task doesn't exist (any more).")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("adding a Tag ends calmly and makes no Tag nobody has", async ({ page, context }) => {
+    const errors = await deletedInAnotherTab(page, context);
+    // (Not `addTag`: the screen turns to "not found", so the input is gone.)
+    await page.getByRole("combobox", { name: "Add tag" }).fill("Orphan");
+    await page.getByRole("combobox", { name: "Add tag" }).press("Enter");
+    await expect(page.getByText("This task doesn't exist (any more).")).toBeVisible();
+    expect(errors).toEqual([]);
+
+    // Another Task: the suggestions hold no "Orphan".
+    await tab(page, "Today").click();
+    await addTask(page, "Other job");
+    await openTask(page, "Other job");
+    await expect(page.locator("#tag-names option")).toHaveCount(0);
+  });
+
+  test("removing a Tag ends calmly, not in an error", async ({ page, context }) => {
+    const errors = await deletedInAnotherTab(page, context, { tagged: true });
+    await page.getByRole("button", { name: "Remove tag Errand" }).click();
+
+    await expect(page.getByText("This task doesn't exist (any more).")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
