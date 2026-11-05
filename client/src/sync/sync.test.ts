@@ -14,7 +14,7 @@ import { maxNotesLength } from "../data/limits";
 import { openListStore, type ListStore } from "../lists/listStore";
 import { liveList } from "../lists/lists";
 import { openTagStore, type TagStore } from "../tags/tagStore";
-import { openTaskStore, type TaskStore } from "../tasks/taskStore";
+import { openTaskStore, taskRecordType, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { recordTypes } from "./recordTypes";
@@ -434,6 +434,62 @@ describe("Sync between two devices", () => {
         expect(stored.listId).toBe(basement.id);
         expect(liveList(stored, await device.lists.listLists())).toBeUndefined();
       }
+    });
+
+    it("gives a device that synced on the version without Lists and Tags the ones it skipped, once it has updated", async () => {
+      const world = new World();
+      const server = new MemoryServer({ time: () => world.ms });
+      const a = await openDevice(world, server);
+      const basement = await a.lists.addList("Basement", { isProject: true });
+      const errand = await a.tags.findOrAddTag("Errand");
+      const task = await a.tasks.addTask("Sort boxes", undefined, basement.id);
+      await a.tasks.addTaskTag(task.id, errand.id);
+      await a.sync();
+      // Device B is still on database version 3: its engine knows Tasks and Events only, so it skips the List and the
+      // Tag, keeps the Task's `listId` and `tagIds` (it keeps fields it does not know), and moves its cursor past all.
+      const name = freshDbName();
+      const old = await openDB(name, 3, {
+        upgrade(db) {
+          db.createObjectStore("tasks", { keyPath: "id" });
+          db.createObjectStore("events", { keyPath: "id" });
+          createSyncStores(db);
+        },
+      });
+      const oldEngine = await createSyncEngine({ db: old, types: [taskRecordType, eventRecordType], transport: server.transport(), now: world.clock() });
+      await oldEngine.syncNow();
+      old.close();
+
+      // B updates (opening the database at version 4) and syncs: nothing new on the server, yet the List and Tag arrive.
+      const b = await openDevice(world, server, { name });
+      await b.sync();
+
+      expect(await b.lists.listLists()).toEqual([basement]);
+      expect(await b.tags.listTags()).toEqual([errand]);
+      expect(await b.tasks.listTasks()).toMatchObject([{ id: task.id, listId: basement.id, tagIds: [errand.id] }]);
+    });
+
+    it("takes a Task out of any List when A deletes the List it was in, even though B moved it to another List meanwhile (a known limitation)", async () => {
+      const { world, a, b } = await twoDevices();
+      const basement = await a.lists.addList("Basement");
+      const garage = await a.lists.addList("Garage");
+      const task = await a.tasks.addTask("Sort boxes", undefined, basement.id);
+      await a.sync();
+      await b.sync();
+      world.advance();
+      // B, offline, moves the Task to another List.
+      await b.tasks.setTaskList(task.id, garage.id);
+      world.advance();
+      // A, not knowing, deletes the List: `clearList` writes `listId: null` for the Task, later than B's move.
+      await a.lists.deleteList(basement.id);
+      await a.tasks.clearList(basement.id);
+
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      // The later write wins on both devices: the Task has no List, and B's move is lost.
+      expect((await a.tasks.listTasks())[0].listId).toBeNull();
+      expect((await b.tasks.listTasks())[0].listId).toBeNull();
     });
 
     it("keeps only the later device's Tags when two devices changed a Task's Tags apart (one field, last write wins)", async () => {

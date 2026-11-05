@@ -184,17 +184,19 @@ export async function openTaskStore(
 
     async addTaskTag(id, tagId) {
       // Read and written in one transaction, so Tags a sync brought meanwhile are kept; nothing to add, nothing written.
-      if (!(await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? {} : { tagIds: [...current.tagIds, tagId] })))) throw new NoTaskError(id);
+      const added = await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? {} : { tagIds: [...current.tagIds, tagId] }));
+      if (!added) throw new NoTaskError(id);
     },
 
     async removeTaskTag(id, tagId) {
-      if (!(await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? { tagIds: current.tagIds.filter((t) => t !== tagId) } : {})))) {
-        throw new NoTaskError(id);
-      }
+      const removed = await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? { tagIds: current.tagIds.filter((t) => t !== tagId) } : {}));
+      if (!removed) throw new NoTaskError(id);
     },
 
     async clearList(listId) {
-      for (const { id } of await tasks.list()) {
+      // Only the Tasks that are in the List are touched (each in a transaction of its own); the check inside it is for
+      // a sync that moved one meanwhile.
+      for (const { id } of (await tasks.list()).filter((task) => task.listId === listId)) {
         await tasks.update(id, (current) => (current.listId === listId ? { listId: null } : {}));
       }
     },

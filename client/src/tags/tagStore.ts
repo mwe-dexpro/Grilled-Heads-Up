@@ -46,18 +46,17 @@ export async function openTagStore(
   const db = await openAppDb(dbName);
   const tags = await openTable(db, tagRecordType, now);
 
-  const named = async () => (await tags.list()).filter((tag) => tag.name !== "").sort(byName);
+  const withName = (live: Tag[]) => live.filter((tag) => tag.name !== "").sort(byName);
+  const named = async () => withName(await tags.list());
 
   return {
     async findOrAddTag(rawName) {
       const name = rawName.trim();
       if (name === "") throw new Error("A Tag needs a name");
       if (name.length > maxTagLength) throw new Error(`A Tag's name can have up to ${maxTagLength} characters`);
-      const existing = (await named()).find((tag) => sameName(tag.name, name));
-      if (existing) return existing;
       const tag: Tag = { id: crypto.randomUUID(), name, createdAt: now().toISOString(), deletedAt: null };
-      await tags.put(tag);
-      return tag;
+      // Looked up and saved in one transaction: two adds of one name at once make one Tag.
+      return tags.findOrPut(tag, (live) => withName(live).find((other) => sameName(other.name, name)));
     },
 
     listTags: named,

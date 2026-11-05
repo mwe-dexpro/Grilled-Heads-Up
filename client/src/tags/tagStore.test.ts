@@ -63,6 +63,16 @@ describe("Tag store", () => {
     expect(new Set([plain.id, accent.id, longer.id]).size).toBe(3);
   });
 
+  it("makes one Tag when the same name is added twice at once, whatever the case", async () => {
+    const store = await openTagStore(freshDbName());
+
+    const [first, second, third] = await Promise.all([store.findOrAddTag("Errand"), store.findOrAddTag("errand"), store.findOrAddTag(" ERRAND ")]);
+
+    expect(second.id).toBe(first.id);
+    expect(third.id).toBe(first.id);
+    expect(await store.listTags()).toEqual([first]);
+  });
+
   it("lists Tags by name, case-insensitively", async () => {
     const store = await openTagStore(freshDbName());
 

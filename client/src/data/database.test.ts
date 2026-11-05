@@ -36,6 +36,39 @@ describe("App database", () => {
     db.close();
   });
 
+  it("makes a device that synced on version 3 read the server's feed again from the start", async () => {
+    const name = freshName();
+    const old = await openDB(name, 3, {
+      upgrade(db) {
+        db.createObjectStore("tasks", { keyPath: "id" });
+        db.createObjectStore("events", { keyPath: "id" });
+        createSyncStores(db);
+      },
+    });
+    await old.put("syncInfo", 42, "cursor");
+    await old.put("syncInfo", "device-a", "deviceId");
+    old.close();
+
+    const db = await openAppDb(name);
+
+    // Version 3 skipped the Lists and Tags it did not know, and moved its cursor past them: they are pulled again.
+    expect(await db.get("syncInfo", "cursor")).toBeUndefined();
+    expect(await db.get("syncInfo", "deviceId")).toBe("device-a");
+    db.close();
+  });
+
+  it("keeps the cursor of a database that is already at version 4", async () => {
+    const name = freshName();
+    const first = await openAppDb(name);
+    await first.put("syncInfo", 42, "cursor");
+    first.close();
+
+    const again = await openAppDb(name);
+
+    expect(await again.get("syncInfo", "cursor")).toBe(42);
+    again.close();
+  });
+
   it("steps aside for another tab that upgrades it, and says that it did", async () => {
     const name = freshName();
     const open = await openAppDb(name);

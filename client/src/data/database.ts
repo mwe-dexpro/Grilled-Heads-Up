@@ -30,17 +30,21 @@ export function onDatabaseOutdated(listener: () => void): () => void {
 
 /**
  * Opens the app's IndexedDB database, adding the object stores of each version that is missing.
- * To sync a new kind of record, add its object store here in a new version (see "Adding a record type" in the README).
+ * To sync a new kind of record, add its object store here in a new version that also resets the pull cursor (see
+ * "Adding a record type" in the README).
  */
 export async function openAppDb(name: string): Promise<IDBPDatabase<AppDb>> {
   const db = await openDB<AppDb>(name, 4, {
-    upgrade(upgrading, oldVersion) {
+    upgrade(upgrading, oldVersion, _newVersion, upgradeTransaction) {
       if (oldVersion < 1) upgrading.createObjectStore("tasks", { keyPath: "id" });
       if (oldVersion < 2) upgrading.createObjectStore("events", { keyPath: "id" });
       if (oldVersion < 3) createSyncStores(upgrading);
       if (oldVersion < 4) {
         upgrading.createObjectStore("lists", { keyPath: "id" });
         upgrading.createObjectStore("tags", { keyPath: "id" });
+        // A device that synced on version 3 skipped the Lists and Tags it did not know and moved its cursor past them:
+        // read the feed again from the start (applying a Change that is already here does nothing).
+        void upgradeTransaction.objectStore("syncInfo").delete("cursor");
       }
     },
     // Another tab (a newer version of the app) wants to upgrade: step aside, or it would wait forever. This
