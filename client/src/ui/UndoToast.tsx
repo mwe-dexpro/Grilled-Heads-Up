@@ -7,8 +7,8 @@ const undoToastMs = 5000;
 /**
  * "Task deleted · Undo". It sits in the row of the "+" button, to its left, above the tab bar, so it never covers
  * the button or the tabs. It goes after `undoToastMs`, except while the Undo button has the keyboard focus or a mouse
- * is over it: someone who is reaching for it must not have it taken away. The five seconds then start anew. (A
- * finger over it does not hold it: a touch ends with the finger, and a toast that stays would never go.)
+ * is over it: someone who is reaching for it must not have it taken away. The five seconds then start anew. A
+ * finger does not hold it for good: a touch pointer leaves when the finger is lifted, so the toast still goes.
  *
  * Screen readers announce what is added to a live region that is already in the page; one that arrives together
  * with its text is often not read. So the region is always there (empty while no toast is shown) and the toast is
@@ -39,7 +39,7 @@ function Toast({ onUndo, onExpire }: { onUndo(): void; onExpire(): void }) {
   return (
     <div
       className="undo-toast"
-      onPointerEnter={(event) => setHovered(event.pointerType !== "touch")}
+      onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
       <span>{t("toast.taskDeleted")}</span>

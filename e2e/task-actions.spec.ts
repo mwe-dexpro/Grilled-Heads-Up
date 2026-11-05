@@ -434,7 +434,7 @@ test("the undo toast waits while Undo has the keyboard focus, and goes 5 seconds
   await expect(page.getByText("Task deleted")).toBeHidden();
 });
 
-test("the undo toast waits while the mouse is over it, and goes 5 seconds after it leaves; a finger does not hold it", async ({ page }) => {
+test("the undo toast waits while the mouse is over it, and goes 5 seconds after it leaves; a finger does not hold it for good", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Order cake", { date: "2026-10-07" });
   await addTask(page, "Call the plumber", { date: "2026-10-07" });
