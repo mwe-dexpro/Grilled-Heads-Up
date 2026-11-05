@@ -74,16 +74,8 @@ export function App() {
   const actions: TaskActions = {
     complete: completeTask,
     reschedule: (tasks) => setRescheduleIds(tasks.map((task) => task.id)),
-    remove: async (task) => {
-      try {
-        await deleteTask(task.id);
-        setDeleted({ taskId: task.id });
-      } catch (error) {
-        // The Task is gone already (a sync deleted it a moment ago): nothing to delete, nothing to undo.
-        // Any other failure is a real one, and is not hidden.
-        if (!(error instanceof NoTaskError)) throw error;
-      }
-    },
+    // A Task that is gone already (a sync deleted it a moment ago) has nothing to delete and nothing to undo.
+    remove: (task) => ignoreGone(deleteTask(task.id).then(() => setDeleted({ taskId: task.id }))),
     openMenu: (task) => setMenuId(task.id),
   };
 
@@ -104,7 +96,9 @@ export function App() {
 
   return (
     <div className="app">
-      <main>{data.ready || route.name === "today" ? <Screen
+      <main>
+        {data.ready || route.name === "today" ? (
+          <Screen
             route={route}
             data={data}
             datedTasks={datedTasks}
@@ -112,7 +106,9 @@ export function App() {
             actions={actions}
             projectViews={projectViews}
             onProjectView={(id, view) => setProjectViews((views) => ({ ...views, [id]: view }))}
-          /> : null}</main>
+          />
+        ) : null}
+      </main>
 
       {/* Quick add sits on every screen. */}
       <button type="button" className="fab" aria-label={t("newTask.open")} disabled={!data.ready} onClick={() => setAdding(true)}>
@@ -158,7 +154,7 @@ export function App() {
   );
 }
 
-/** A change of a Task that is gone already (deleted in another tab, or by a sync): the screen says so; any other failure is not hidden. */
+/** A change of a Task that is gone already (deleted in another tab, or by a sync) ends calmly; any other failure is not hidden. */
 async function ignoreGone(change: Promise<unknown>): Promise<void> {
   try {
     await change;

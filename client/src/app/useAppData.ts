@@ -121,7 +121,8 @@ export function useAppData() {
   const addTaskTag = useCallback(
     (id: string, name: string) =>
       changeStores(async (s) => {
-        // A Task that is gone gets no Tag, and no Tag is made for it that nothing would use.
+        // A Task that is gone gets no Tag, and normally no Tag is made for it that nothing would use (a sync that deletes
+        // the Task between this check and the next step can still leave one: an unused name among the suggestions).
         if (!(await s.tasks.listTasks()).some((task) => task.id === id)) throw new NoTaskError(id);
         const tag = await s.tags.findOrAddTag(name);
         await s.tasks.addTaskTag(id, tag.id);

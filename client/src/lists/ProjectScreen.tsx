@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { navigate } from "../app/navigation";
+import { parseRoute } from "../app/routes";
 import { bucketOf } from "../home/buckets";
 import { dayOf } from "../home/days";
 import { TaskRow } from "../home/TaskRow";
@@ -45,6 +46,14 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
   // The List was deleted from here and the screen is on its way out: nothing to show (and no "not found") meanwhile.
   const [leaving, setLeaving] = useState(false);
 
+  // A chosen Tag that no Task of the List has any more (removed meanwhile) filters nothing out of a view it can't show.
+  const chips = list ? tagsInList(tasks, list.id, tags) : [];
+  const chosen = chips.some((tag) => tag.id === tagId) ? tagId : null;
+  // And it is forgotten, not only hidden: it must not filter again when a Task gets that Tag back.
+  useEffect(() => {
+    if (list && tagId !== null && chosen === null) onView({ ...view, tagId: null });
+  }, [list, tagId, chosen]);
+
   if (leaving) return null;
   if (!list) {
     return (
@@ -57,9 +66,6 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
 
   const today = dayOf(now);
   const progress = listProgress(tasks, list.id);
-  const chips = tagsInList(tasks, list.id, tags);
-  // A chosen Tag that no Task of the List has any more (removed meanwhile) filters nothing out of a view it can't show.
-  const chosen = chips.some((tag) => tag.id === tagId) ? tagId : null;
   const shown = projectViewTasks(tasks, list.id, { showCompleted, tagId: chosen }, today);
   const eventsById = new Map(events.map((event) => [event.id, event]));
 
@@ -153,7 +159,9 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
               setLeaving(false);
               throw error;
             }
-            navigate({ name: "projects" }, { replace: true });
+            // Only while this List is still the route: after Back, the entry that was gone back to stays as it is.
+            const route = parseRoute(window.location.hash);
+            if (route.name === "list" && route.id === list.id) navigate({ name: "projects" }, { replace: true });
           }}
           onClose={() => setEditing(false)}
         />

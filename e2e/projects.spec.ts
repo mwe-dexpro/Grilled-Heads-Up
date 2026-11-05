@@ -512,6 +512,30 @@ test("deleting a List from its Project view goes to the Projects tab at once, an
   await expect(page.getByRole("heading", { name: "Projects", level: 1 })).toBeVisible();
 });
 
+test("Back pressed while a List is being deleted stays where Back went: the entry is not replaced by the Projects tab", async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Basement");
+  await openList(page, "Basement");
+  await addTask(page, "Sort boxes", { date: "2026-10-07" });
+  // The List is opened from a Task row on Today, so Today is the entry behind it.
+  await tab(page, "Today").click();
+  await row(page, "Sort boxes").getByRole("link", { name: "Basement" }).click();
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("button", { name: "Delete list" }).click();
+
+  // Delete and Back in the same task: Back arrives while the delete is still being written.
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    window.history.back();
+  });
+
+  // Once the delete is through (the Task has lost its List), the app must still be where Back went.
+  await expect(row(page, "Sort boxes")).toBeVisible();
+  await expect(row(page, "Sort boxes")).not.toContainText("Basement");
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/#\/$/);
+});
+
 /** Opens the Task detail of a Task from the Project view or the home screen. */
 const openTask = (page: Page, title: string) => page.getByRole("link", { name: title, exact: true }).click();
 
@@ -542,6 +566,34 @@ test("the Tag filter and Show completed of a Project view are still set after a 
   await expect(filter.getByRole("button", { name: "Errand" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Show completed" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("region", { name: "Basement" }).getByRole("listitem")).toHaveText([/Sort boxes/]);
+});
+
+test("a Tag chosen earlier does not become the filter again when a Task gets that Tag back", async ({ page }) => {
+  await page.goto("/");
+  await addList(page, "Basement", { project: true });
+  await openList(page, "Basement");
+  await addTask(page, "Sort boxes");
+  await addTask(page, "Plain job");
+  await openTask(page, "Sort boxes");
+  await addTag(page, "Errand");
+  await page.getByRole("button", { name: "Back" }).click();
+  const filter = page.getByRole("group", { name: "Filter by tag" });
+  await filter.getByRole("button", { name: "Errand" }).click();
+
+  // The only Task with the Tag loses it: the chips are gone, and every Task shows.
+  await openTask(page, "Sort boxes");
+  await page.getByRole("region", { name: "Tags" }).getByRole("button", { name: "Remove tag Errand" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(filter).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Basement" }).getByRole("listitem")).toHaveText([/Sort boxes/, /Plain job/]);
+
+  // Another Task gets the Tag: the choice was forgotten, so it shows as All, not as the old filter.
+  await openTask(page, "Plain job");
+  await addTag(page, "Errand");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(filter.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+  await expect(filter.getByRole("button", { name: "Errand" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("region", { name: "Basement" }).getByRole("listitem")).toHaveText([/Sort boxes/, /Plain job/]);
 });
 
 test('the "+" button in a Project view with a Tag chosen shows the new Task: the filter goes back to All', async ({ page }) => {
