@@ -11,6 +11,7 @@ describe("routes", () => {
     ["#/event/abc-123", { name: "event", id: "abc-123" }],
     ["#/event/abc-123/edit", { name: "editEvent", id: "abc-123" }],
     ["#/task/t-9", { name: "task", id: "t-9" }],
+    ["#/trash", { name: "trash" }],
   ])("reads %s", (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
     expect(parseRoute(hrefOf(route))).toEqual(route);
@@ -28,6 +29,7 @@ describe("routes", () => {
       "#/project/a",
       "#/a/b/c",
       "#/calendar/x",
+      "#/trash/x",
       "#/task/",
       "#garbage",
     ]) {

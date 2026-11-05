@@ -39,9 +39,19 @@ export interface Table<T extends Synced> {
   update(id: string, change: Patch<T> | ((current: T) => Patch<T>)): Promise<T | undefined>;
   /** Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. */
   delete(id: string): Promise<void>;
+  /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
+  getDeleted(id: string): Promise<T | undefined>;
+  /** Deleted records (tombstones), in no particular order. */
+  listDeleted(): Promise<T[]>;
+  /**
+   * Un-deletes a deleted record: writes `deletedAt` = null under a new clock (one field, one outbox entry), in
+   * one transaction. That is an ordinary last-write-wins write, so it beats the older deletion on every device.
+   * Returns the record as saved, or undefined when it is missing or not deleted.
+   */
+  restore(id: string): Promise<T | undefined>;
 }
 
-/** Fields of a record that a store operation sets; never the id, and not `deletedAt`, which only `delete` writes. */
+/** Fields of a record that a store operation sets; never the id, and not `deletedAt`, which only `delete` and `restore` write. */
 export type Patch<T extends Synced> = Partial<Omit<T, "id" | "deletedAt">>;
 
 /**
@@ -149,6 +159,30 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const at = now();
       if (prev && prev.deletedAt === null) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
       await tx.done;
+    },
+
+    async getDeleted(id) {
+      const record = await stored(id);
+      return record?.deletedAt === null ? undefined : record;
+    },
+
+    async listDeleted() {
+      const all = (await db.getAll(storeName)) as Array<Partial<T> & { id: string }>;
+      return all.map(withDefaults).filter((record) => record.deletedAt !== null);
+    },
+
+    async restore(id) {
+      const tx = transactionOver(db, [storeName]);
+      const raw = (await tx.objectStore(storeName).get(id)) as (Partial<T> & { id: string }) | undefined;
+      const prev = raw && withDefaults(raw);
+      if (!prev || prev.deletedAt === null) {
+        await tx.done;
+        return undefined;
+      }
+      const next = { ...prev, deletedAt: null };
+      await writeRecord(tx, recordType, next, ["deletedAt"] as Array<keyof T & string>, now());
+      await tx.done;
+      return next;
     },
   };
 }

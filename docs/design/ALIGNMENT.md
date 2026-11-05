@@ -55,7 +55,7 @@ The prototype uses terms CONTEXT.md avoids. Use the right-hand wording in the EN
 - Smart hint "rescheduled 3×" (4a): after v1 (#4). For v1 just show the age.
 
 ## 5. v1 features with no screen yet (Claude Code: build these in the same visual language)
-Suggested order: Later + Inbox buckets and quick add on every screen → Delete/undo/Trash → Critical → Reminders editor → Calendar week/day views → Series editor → Zen mode → bulk-select → Settings, sign-in, empty states.
+Suggested order: Later + Inbox buckets and quick add on every screen → Delete/undo/Trash (built, #6) → Critical → Reminders editor → Calendar week/day views → Series editor → Zen mode → bulk-select → Settings, sign-in, empty states.
 
 Home
 - **Later** and **Inbox** buckets (the prototype stops at Next 3 days)
@@ -64,8 +64,8 @@ Home
 - **"Show completed"** toggle (per List/Project/Event)
 
 Task actions
-- **Delete** swipe action + **undo toast** (above the tab bar, never under the FAB) + **Trash** (30 days)
-- Reschedule a Linked task past its Event → warning (4d hints at it; also needed in Task detail)
+- ~~**Delete** swipe action + **undo toast** (above the tab bar, never under the FAB) + **Trash** (30 days)~~ Built (#6): swipe left shows Reschedule, Complete, Delete (also from a long press, and in Task detail); the 5-second undo toast sits in the "+" button's row, left of it; the Trash is `#/trash`, reached from a "Trash" link in the home footer until Settings exist (then it moves there). The Reschedule sheet (4d) is built with the copy fixes of §2, without the reschedule count (§1), and with "Reschedule all…" in the Overdue header.
+- Reschedule a Linked task past its Event → warning (4d hints at it; also needed in Task detail). Still open (#11), like the sheet's "Day before the event" option: today the sheet offers Tomorrow, Day after tomorrow, Next week and Pick a date, and a Linked task can be rescheduled past its Event without a warning.
 - **Reminders** editor (§1)
 - **Tags** on Tasks; assigning List/Event in Task detail
 
@@ -80,5 +80,5 @@ Events
 App
 - Quick add **"+" on every screen** (prototype: home only) → Inbox; Android share-sheet target
 - Passkey sign-in + recovery code (built in #3 without a design, from the detail screens' parts; *Add a passkey*, *New recovery code* and *Sign out* sit in the home footer until Settings exist), push-permission prompt, sync/offline status (the sync line and *Sync now* sit in the home footer since #4, built without a design: a small calm line, "Synced 14:32" / "Offline · last synced 14:32" / "Sync failed" / "Some changes could not be synced"; a tab whose database another tab upgraded shows a plain full-screen "Reload to continue", also without a design; the sync line needs a designed home, e.g. in Settings or a banner when changes are only local)
-- Settings: language EN/DE, default reminder time, JSON export, Trash
+- Settings: language EN/DE, default reminder time, JSON export, Trash (the Trash screen exists, #6; its link is in the home footer until Settings do)
 - Empty states (empty Overdue = a calm "nothing overdue" line, empty day, empty Project)

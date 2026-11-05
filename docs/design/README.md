@@ -42,13 +42,13 @@ Spacing and radii
 - Pills (chips, CTAs, segmented): radius 999px. Bottom sheet: top radius 18px. Icon tile: 40×40, radius 10px, bg `#f5f5f7`.
 - Progress bars: 4–5px high, radius 999px; segmented per Task (gap 4px) or continuous.
 
-Icons: **Lucide** at 1.5px stroke, `currentColor`: `sun, calendar, list-checks, folder, plus, check, clock, triangle-alert, map-pin, repeat, sparkles, grip-vertical, chevron-left, chevron-right, ellipsis, x`.
+Icons: **Lucide** at 1.5px stroke, `currentColor`: `sun, calendar, list-checks, folder, plus, check, clock, triangle-alert, map-pin, repeat, sparkles, grip-vertical, chevron-left, chevron-right, ellipsis, x, trash-2`.
 
 Motion: press = `scale(0.95)` over 120ms `cubic-bezier(.25,.1,.25,1)` on every button/FAB. Otherwise short fades only, no bounce.
 
 ## Shared components
 - **Task row**: 22px check circle (1.5px `#d2d2d7`; overdue 1.5px amber; completed = filled `#0066cc` with a white 1.8px check, title struck through, row text `#6e6e73`) · title 17/400 · meta line 14px: the Event name in blue (tappable, opens Event detail), then " · " and the Offset ("7 days before") or date · optional trailing chevron `#d2d2d7` 16px.
-- **Swipe actions** (swipe left on any Task row): actions revealed at 78px each, label 12px under an 18px icon. Shown: Reschedule (bg `#d2d2d7`, ink, `clock`) then Complete (bg `#0066cc`, white, `check`). Delete is still missing (see ALIGNMENT).
+- **Swipe actions** (swipe left on any Task row): actions revealed at 78px each, label 12px under an 18px icon. Shown: Reschedule (bg `#d2d2d7`, ink, `clock`) then Complete (bg `#0066cc`, white, `check`); built with Delete (bg ink `#1d1d1f`, white, `trash-2`) as a third action (ALIGNMENT §1). A Completed Task offers Delete only.
 - **Tab bar**: white, 1px top hairline, padding 8/8/30, equal columns. Each tab is a 22px icon over a 10px label; active `#0066cc`, inactive `#6e6e73`. v1 tabs: Today `sun` · Calendar `calendar` · Projects `folder` (the drawn Plan tab `list-checks` returns with the Planning wizard after v1).
 - **FAB (Quick add)**: 56px circle `#0066cc`, white `plus` 26px, right 20px, bottom = 16px above the tab bar. It never overlaps the tab bar. No shadow.
 - **Nav bar**: 44px tall, 17px blue text. Left: `chevron-left` 20px + parent name; right: text action ("Edit", "Done") or `ellipsis`.

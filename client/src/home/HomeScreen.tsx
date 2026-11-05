@@ -6,6 +6,8 @@ import { languages, type Language } from "../i18n/i18n";
 import { formatSyncState } from "../sync/formatSync";
 import type { SyncState } from "../sync/engine";
 import type { Task } from "../tasks/taskStore";
+import type { TaskActions } from "../tasks/TaskSwipeRow";
+import { hrefOf } from "../app/routes";
 import { SignInSettings } from "../auth/SignInSettings";
 import { ProgressRing } from "../ui/ProgressRing";
 import { arrangeHome, isOverdueEmphasised, type Bucket } from "./buckets";
@@ -20,10 +22,10 @@ interface HomeScreenProps {
   now: Date;
   sync: SyncState;
   onSyncNow(): void;
-  onComplete(id: string): void;
+  actions: TaskActions;
 }
 
-export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onComplete }: HomeScreenProps) {
+export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, actions }: HomeScreenProps) {
   const { language, setLanguage, t } = useI18n();
   const buckets = arrangeHome(tasks, now, events);
   const [overdue, today, ...rest] = buckets;
@@ -38,7 +40,8 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onCompl
         bucket={bucket.kind}
         now={now}
         event={task.eventId === null ? undefined : eventsById.get(task.eventId)}
-        onComplete={onComplete}
+        eventIds={eventsById}
+        actions={actions}
       />
     ));
 
@@ -97,6 +100,15 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onCompl
                     {overdue.open}
                   </span>
                 )}
+                {overdue.open > 0 && (
+                  <button
+                    type="button"
+                    className="button-text overdue-action"
+                    onClick={() => actions.reschedule(overdue.tasks.filter((task) => task.completedAt === null))}
+                  >
+                    {t("bucket.rescheduleAll")}
+                  </button>
+                )}
               </div>
               <ul className="task-list">{taskRows(overdue)}</ul>
             </section>
@@ -123,6 +135,9 @@ export function HomeScreen({ ready, tasks, events, now, sync, onSyncNow, onCompl
             {t("sync.now")}
           </button>
         </div>
+        <a className="footer-link" href={hrefOf({ name: "trash" })}>
+          {t("home.trash")}
+        </a>
         <label className="language">
           {t("language.label")}
           <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>

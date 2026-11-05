@@ -20,6 +20,7 @@ function task(fields: Partial<Task> = {}): Task {
     offsetDays: null,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    rescheduleCount: 0,
     deletedAt: null,
     ...fields,
   };
@@ -129,6 +130,18 @@ describe("arrangeHome", () => {
     expect(home.find((b) => b.kind === "today")!.tasks).toEqual([completedToday]);
     expect(home.find((b) => b.kind === "overdue")!.tasks).toEqual([overdueCompletedToday]);
     expect(home.find((b) => b.kind === "inbox")!.tasks).toEqual([]);
+  });
+
+  it("keeps a Task Completed today crossed out until 23:59 and drops it from its Bucket at midnight", () => {
+    const completed = task({ date: today, completedAt: new Date(2026, 9, 4, 8, 0).toISOString() });
+    const openOne = task({ date: today });
+    const shownAt = (moment: Date) => arrangeHome([completed, openOne], moment).flatMap((b) => b.tasks).map((t) => [t.id, t.completedAt !== null]);
+
+    expect(shownAt(new Date(2026, 9, 4, 23, 59, 59))).toEqual([
+      [completed.id, true],
+      [openOne.id, false],
+    ]);
+    expect(shownAt(new Date(2026, 9, 5, 0, 0, 0))).toEqual([[openOne.id, false]]);
   });
 
   it("computes Progress and the open count from the Tasks a Bucket shows", () => {

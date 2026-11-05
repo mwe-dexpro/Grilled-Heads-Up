@@ -6,12 +6,13 @@ export type Route =
   | { name: "newEvent" }
   | { name: "event"; id: string }
   | { name: "editEvent"; id: string }
-  | { name: "task"; id: string };
+  | { name: "task"; id: string }
+  | { name: "trash" };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   const [first, second, third] = parts;
-  if (parts.length === 1 && (first === "calendar" || first === "projects")) return { name: first };
+  if (parts.length === 1 && (first === "calendar" || first === "projects" || first === "trash")) return { name: first };
   if (first === "event" && second === "new" && parts.length === 2) return { name: "newEvent" };
   if (first === "event" && parts.length === 2) return { name: "event", id: second };
   if (first === "event" && third === "edit" && parts.length === 3) return { name: "editEvent", id: second };
@@ -25,6 +26,7 @@ export function hrefOf(route: Route): string {
       return "#/";
     case "calendar":
     case "projects":
+    case "trash":
       return `#/${route.name}`;
     case "newEvent":
       return "#/event/new";

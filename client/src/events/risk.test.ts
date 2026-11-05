@@ -35,6 +35,7 @@ function linked(offsetDays: number, fields: Partial<Task> = {}): Task {
     offsetDays,
     createdAt: new Date(2026, 8, 1, 9, 0, counter).toISOString(),
     completedAt: null,
+    rescheduleCount: 0,
     deletedAt: null,
     ...fields,
   };

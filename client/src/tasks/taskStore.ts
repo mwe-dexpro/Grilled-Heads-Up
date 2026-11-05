@@ -1,7 +1,9 @@
 import { defaultDatabaseName, openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
-import type { Day, TimeOfDay } from "../home/days";
+import { dayOf, type Day, type TimeOfDay } from "../home/days";
 import { openTable, type Patch, type RecordType } from "../sync/replica";
+import { atEarliest, reschedulePatch } from "./reschedule";
+import { isExpired } from "./trash";
 
 export interface Task {
   id: string;
@@ -16,8 +18,18 @@ export interface Task {
   offsetDays: number | null;
   createdAt: string;
   completedAt: string | null;
-  /** When the Task was deleted; it then stays stored so the deletion syncs (Trash will build on it). */
+  /** How often the Task was rescheduled; synced, but not shown in v1. Last write wins, so it is a hint, not an audit. */
+  rescheduleCount: number;
+  /** When the Task was deleted; it then stays stored so the deletion syncs, and the Trash lists it for 30 days. */
   deletedAt: string | null;
+}
+
+/** A change was asked for a Task that is not there (never was, or a sync has deleted it). Other failures are not this. */
+export class NoTaskError extends Error {
+  constructor(id: string) {
+    super(`No Task with id ${id}`);
+    this.name = "NoTaskError";
+  }
 }
 
 export interface TaskWhen {
@@ -36,10 +48,35 @@ export interface TaskStore {
   linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
   unlinkTask(id: string, date: Day | null): Promise<void>;
-  /** Deletes a Task (it leaves every list and syncs as deleted); the swipe, undo and Trash come later. */
+  /**
+   * The strict single-Task Reschedule: the day is taken as given, so one that is no longer allowed is refused. The
+   * app does not use it (its screens go through `rescheduleTasks`, which takes a stale day to the earliest allowed
+   * one); it is the plain rule on the store, for callers that want the refusal, and what the store and sync tests
+   * use to change one Task.
+   *
+   * Gives a Task a new date (a Linked task a new Offset, from `eventStart`, the start day of the Event it belongs to)
+   * and counts the Reschedule; see `reschedulePatch`. Throws for a day that is not allowed (never today for an
+   * Overdue Task, never a day in the past). A Task that is missing or deleted is ignored, like in `completeTask`.
+   */
+  rescheduleTask(id: string, day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  /**
+   * Reschedules several Tasks to `day`, one after the other (the Reschedule sheet, and "Reschedule all…"). The day
+   * was chosen on a screen that may be a little behind (midnight passed since): for a Task it is no longer allowed
+   * on, it is taken to the earliest day the Task may have (see `atEarliest`), so no Task stops the others. Tasks
+   * that are missing or deleted are ignored.
+   */
+  rescheduleTasks(ids: string[], day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  /** Deletes a Task: it moves to the Trash (it leaves every list and syncs as deleted). */
   deleteTask(id: string): Promise<void>;
+  /**
+   * Takes a Task out of the Trash, exactly as it was. Only a Task that is in the Trash (deleted, and not for 30
+   * days yet) is restored; one that is live, missing or expired is left alone, without an error.
+   */
+  restoreTask(id: string): Promise<void>;
   /** Tasks in the order they were added; deleted ones are left out. */
   listTasks(): Promise<Task[]>;
+  /** The Trash: Tasks deleted less than 30 days ago, the latest deletion first. */
+  listTrash(): Promise<Task[]>;
   close(): void;
 }
 
@@ -60,6 +97,7 @@ export const taskRecordType: RecordType<Task> = {
     offsetDays: task.offsetDays ?? null,
     createdAt: task.createdAt ?? "",
     completedAt: task.completedAt ?? null,
+    rescheduleCount: task.rescheduleCount ?? 0,
     deletedAt: task.deletedAt ?? null,
   }),
 };
@@ -83,7 +121,7 @@ export async function openTaskStore(
 
   /** Changes a live Task in one transaction (see `Table.update`), so a sync landing meanwhile is not overwritten. */
   async function change(id: string, patch: Patch<Task>): Promise<void> {
-    if (!(await tasks.update(id, patch))) throw new Error(`No Task with id ${id}`);
+    if (!(await tasks.update(id, patch))) throw new NoTaskError(id);
   }
 
   return {
@@ -103,6 +141,7 @@ export async function openTaskStore(
         offsetDays,
         createdAt: now().toISOString(),
         completedAt: null,
+        rescheduleCount: 0,
         deletedAt: null,
       };
       await tasks.put(task);
@@ -122,13 +161,40 @@ export async function openTaskStore(
       await change(id, { eventId: null, offsetDays: null, date });
     },
 
+    async rescheduleTask(id, day, eventStart) {
+      // The rule runs on the stored Task inside the transaction, so a sync that landed meanwhile is respected.
+      const today = dayOf(now());
+      await tasks.update(id, (current) => reschedulePatch(current, day, eventStart, today) ?? {});
+    },
+
+    async rescheduleTasks(ids, day, eventStart) {
+      const today = dayOf(now());
+      for (const id of ids) {
+        await tasks.update(id, (current) => reschedulePatch(current, atEarliest(current, day, eventStart, today), eventStart, today) ?? {});
+      }
+    },
+
     async deleteTask(id) {
-      if (!(await tasks.get(id))) throw new Error(`No Task with id ${id}`);
+      if (!(await tasks.get(id))) throw new NoTaskError(id);
       await tasks.delete(id);
+    },
+
+    async restoreTask(id) {
+      const at = now();
+      const deleted = await tasks.getDeleted(id);
+      if (deleted && !isExpired(deleted.deletedAt!, at)) await tasks.restore(id);
     },
 
     async listTasks() {
       return (await tasks.list()).map(wholeLink).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+
+    async listTrash() {
+      const at = now();
+      return (await tasks.listDeleted())
+        .filter((task) => !isExpired(task.deletedAt!, at))
+        .map(wholeLink)
+        .sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!));
     },
 
     close() {
