@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 
 /** How long the toast offers the undo. */
@@ -30,7 +30,9 @@ function Toast({ onUndo, onExpire }: { onUndo(): void; onExpire(): void }) {
   const [hovered, setHovered] = useState(false);
   const held = focused || hovered;
 
-  useEffect(() => {
+  // A layout effect, so that the timer is set in the same commit that shows `data-held`: whoever sees the toast
+  // released (the end-to-end tests do) knows its five seconds are running.
+  useLayoutEffect(() => {
     if (held) return;
     const timer = setTimeout(onExpire, undoToastMs);
     return () => clearTimeout(timer);
@@ -39,6 +41,7 @@ function Toast({ onUndo, onExpire }: { onUndo(): void; onExpire(): void }) {
   return (
     <div
       className="undo-toast"
+      data-held={held ? "" : undefined}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >

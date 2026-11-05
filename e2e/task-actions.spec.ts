@@ -283,6 +283,8 @@ test("a Reschedule that fails in the store is not hidden: the page reports it an
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
+  // The sheet closes before the add has been written; the lists show the Task only once it has. Only then do writes fail.
+  await expect(bucket(page, "Overdue")).toContainText("Pay dentist invoice");
   await failWrites(page);
 
   await swipeLeft(page, "Pay dentist invoice");
@@ -299,6 +301,8 @@ test("a Delete that fails in the store is not hidden: the page reports it, and t
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await addTask(page, "Order cake", { date: "2026-10-07" });
+  // The sheet closes before the add has been written; the lists show the Task only once it has. Only then do writes fail.
+  await expect(bucket(page, "Today")).toContainText("Order cake");
   await failWrites(page);
 
   await swipeLeft(page, "Order cake");
@@ -423,11 +427,13 @@ test("the undo toast waits while Undo has the keyboard focus, and goes 5 seconds
 
   // The Owner tabs to Undo; the five seconds pass and the toast is still there to be pressed.
   await page.getByRole("button", { name: "Undo" }).focus();
+  await expect(page.locator(".undo-toast")).toHaveAttribute("data-held", "");
   await page.clock.fastForward(8_000);
   await expect(page.getByText("Task deleted")).toBeVisible();
   await expect(page.getByRole("button", { name: "Undo" })).toBeFocused();
 
   await page.getByRole("button", { name: "Undo" }).blur();
+  await expect(page.locator(".undo-toast")).not.toHaveAttribute("data-held");
   await page.clock.fastForward(4_000);
   await expect(page.getByText("Task deleted")).toBeVisible();
   await page.clock.fastForward(1_500);
@@ -443,13 +449,17 @@ test("the undo toast waits while the mouse is over it, and goes 5 seconds after 
   const toast = page.locator(".undo-toast");
   await expect(toast).toBeVisible();
 
+  // The toast says when it is held (`data-held`); the clock is moved only once that has been seen to change, so the
+  // five seconds are not counted before the toast has noticed the mouse arriving or leaving.
   const box = await rectOf(toast);
   await page.mouse.move(5, 5);
   await page.mouse.move(box.x + 8, box.y + box.height / 2);
+  await expect(toast).toHaveAttribute("data-held", "");
   await page.clock.fastForward(8_000);
   await expect(toast).toBeVisible();
 
   await page.mouse.move(5, 300);
+  await expect(toast).not.toHaveAttribute("data-held");
   await page.clock.fastForward(4_000);
   await expect(toast).toBeVisible();
   await page.clock.fastForward(1_500);
@@ -466,6 +476,8 @@ test("the undo toast waits while the mouse is over it, and goes 5 seconds after 
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await cdp.detach();
+  // The finger is up: whatever the touch did to the toast is over before the clock moves.
+  await expect(toast).not.toHaveAttribute("data-held");
   await page.clock.fastForward(5_500);
   await expect(toast).toBeHidden();
 });
@@ -585,6 +597,34 @@ test("Back in an app screen goes back a step of the app, and after a reload of t
   // It went back in the history, not forward to a new Today: Forward is Trash again.
   await page.goForward();
   await expect(page.getByRole("heading", { name: "Trash", level: 1 })).toBeVisible();
+});
+
+test("a double tap on Back stays in the app: it goes back once, not out of it", async ({ page }) => {
+  await page.goto("about:blank");
+  await page.goto("/");
+  await page.getByRole("link", { name: "Trash" }).click();
+  await expect(page.getByRole("heading", { name: "Trash", level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: "Back" }).dblclick();
+
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/(#\/)?$/);
+});
+
+test("Back from a new Event, opened straight from a link, stays in the app: saving replaces the form, it does not add a step", async ({ page }) => {
+  await page.goto("about:blank");
+  await page.goto("/#/event/new");
+  await page.getByRole("textbox", { name: "Title" }).fill("Mom's birthday");
+  await page.getByLabel("Start date").fill("2026-10-14");
+  await page.getByLabel("Start time").fill("12:30");
+  await page.getByLabel("End time").fill("15:00");
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByRole("heading", { name: "Mom's birthday", level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: "Back" }).click();
+
+  await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/(#\/)?$/);
 });
 
 test("Rescheduling a Linked task in the Event view changes its Offset, so it keeps following the Event", async ({ page }) => {

@@ -32,8 +32,12 @@ export function navigate(route: Route, { replace = false } = {}): void {
  * to Today instead.
  */
 export function goBack(): void {
-  if (canGoBack(depth)) window.history.back();
-  else navigate({ name: "today" }, { replace: true });
+  if (canGoBack(depth)) {
+    // The step is counted now, not when the `hashchange` arrives: a second tap in between must not go back again,
+    // past the first entry of the app and out of it.
+    depth -= 1;
+    window.history.back();
+  } else navigate({ name: "today" }, { replace: true });
 }
 
 export function useRoute(): Route {
