@@ -97,6 +97,21 @@ describe("Subtask store", () => {
     expect(await after.listSubtasks()).toEqual([boots, jacket]);
   });
 
+  it("stamps a Subtask with the real time unless the store is given a clock", async () => {
+    const dbName = freshDbName();
+    const tasks = await openTaskStore(dbName);
+    const task = await tasks.addTask("Pack");
+    const subtasks = await openSubtaskStore(dbName);
+    const before = Date.now();
+
+    const boots = await subtasks.addSubtask(task.id, "Boots");
+    await subtasks.setSubtaskDone(boots.id, true);
+
+    expect(Date.parse(boots.createdAt)).toBeGreaterThanOrEqual(before - 1000);
+    expect(Date.parse(boots.createdAt)).toBeLessThanOrEqual(Date.now());
+    expect(Date.parse((await subtasks.listSubtasks())[0].completedAt!)).toBeLessThanOrEqual(Date.now());
+  });
+
   it("refuses an empty, a blank and a too long title, and takes one of exactly the limit", async () => {
     const { subtasks, task } = await open();
 
@@ -251,6 +266,51 @@ describe("Subtask store", () => {
       await Promise.all([subtasks.moveSubtask(a.id, 1), subtasks.moveSubtask(c.id, 1)]);
 
       expect(await titles(subtasks, task.id)).toEqual(["B", "C", "A", "D"]);
+    });
+
+    it("refuses to move a Subtask that is not there, and moves no other", async () => {
+      const { subtasks, task } = await four();
+
+      await expect(subtasks.moveSubtask("missing", 0)).rejects.toBeInstanceOf(NoSubtaskError);
+
+      expect(await titles(subtasks, task.id)).toEqual(["A", "B", "C", "D"]);
+    });
+
+    it("writes nothing for a move that changes nothing, also when the positions are not 0, 1, 2…", async () => {
+      const { dbName, subtasks, tasks } = await open();
+      const task = await tasks.addTask("Sparse");
+      await seed(dbName, [
+        { id: "a", taskId: task.id, createdAt: "2026-10-01T09:00:00.000Z", position: 0 },
+        { id: "b", taskId: task.id, createdAt: "2026-10-01T09:00:01.000Z", position: 5 },
+        { id: "c", taskId: task.id, createdAt: "2026-10-01T09:00:02.000Z", position: 9 },
+      ]);
+      const before = await outbox(dbName);
+
+      await subtasks.moveSubtask("b", 1);
+      await subtasks.moveSubtask("c", 2);
+      await subtasks.moveSubtask("a", 0);
+
+      expect(await outbox(dbName)).toEqual(before);
+      expect((await subtasks.listSubtasks()).map((s) => s.position)).toEqual([0, 5, 9]);
+    });
+
+    it("renumbers only the Subtasks whose position changes", async () => {
+      const { dbName, subtasks, tasks } = await open();
+      const task = await tasks.addTask("Tied");
+      await seed(dbName, [
+        { id: "a", taskId: task.id, createdAt: "2026-10-01T09:00:00.000Z", position: 0 },
+        { id: "b", taskId: task.id, createdAt: "2026-10-01T09:00:01.000Z", position: 1 },
+        { id: "c", taskId: task.id, createdAt: "2026-10-01T09:00:02.000Z", position: 1 },
+        { id: "d", taskId: task.id, createdAt: "2026-10-01T09:00:03.000Z", position: 1 },
+      ]);
+      const [beforeA, beforeB] = [await queued(dbName, "a", "position"), await queued(dbName, "b", "position")];
+
+      await subtasks.moveSubtask("d", 2);
+
+      expect(await titles(subtasks, task.id)).toEqual(["A", "B", "D", "C"]);
+      expect((await subtasks.listSubtasks()).map((s) => s.position)).toEqual([0, 1, 2, 3]);
+      expect(await queued(dbName, "a", "position")).toEqual(beforeA);
+      expect(await queued(dbName, "b", "position")).toEqual(beforeB);
     });
 
     it("clamps an index outside the list", async () => {
