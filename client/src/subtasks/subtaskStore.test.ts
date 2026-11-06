@@ -124,6 +124,25 @@ describe("Subtask store", () => {
     expect(await titles(subtasks, task.id)).toEqual(["B", "C"]);
   });
 
+  it("keeps Subtasks added at once (typed quickly, one after another) in the order they were asked for", async () => {
+    // A clock that stands still: nothing but the order of the calls can tell the Subtasks apart.
+    const { subtasks, task } = await open(freshDbName(), () => new Date("2026-10-04T11:05:00.000Z"));
+
+    await Promise.all(["Boots", "Rain jacket", "Chargers", "Swimwear"].map((title) => subtasks.addSubtask(task.id, title)));
+
+    expect(await titles(subtasks, task.id)).toEqual(["Boots", "Rain jacket", "Chargers", "Swimwear"]);
+    expect((await subtasks.listSubtasks()).map((s) => s.position)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("goes on adding after an add that failed", async () => {
+    const { subtasks, task } = await open();
+
+    const results = await Promise.allSettled([subtasks.addSubtask(task.id, ""), subtasks.addSubtask("missing", "Nope"), subtasks.addSubtask(task.id, "Boots")]);
+
+    expect(results.map((r) => r.status)).toEqual(["rejected", "rejected", "fulfilled"]);
+    expect(await titles(subtasks)).toEqual(["Boots"]);
+  });
+
   it("adds to a Task that is missing, deleted, or not a Task at all, with a NoTaskError", async () => {
     const { subtasks, tasks, task } = await open();
     const sub = await subtasks.addSubtask(task.id, "Boots");
@@ -223,6 +242,15 @@ describe("Subtask store", () => {
       expect((await queued(dbName, a.id, "position"))[0].value).toBe(2.5);
       expect(await queued(dbName, b.id, "position")).toHaveLength(1);
       expect(await queued(dbName, b.id, "title")).toHaveLength(1);
+    });
+
+    it("takes moves made at once one after the other, each from the order the one before left", async () => {
+      const { subtasks, task, a, c } = await four();
+
+      // A goes to the second place (B, A, C, D); then C goes to the second place of that order.
+      await Promise.all([subtasks.moveSubtask(a.id, 1), subtasks.moveSubtask(c.id, 1)]);
+
+      expect(await titles(subtasks, task.id)).toEqual(["B", "C", "A", "D"]);
     });
 
     it("clamps an index outside the list", async () => {

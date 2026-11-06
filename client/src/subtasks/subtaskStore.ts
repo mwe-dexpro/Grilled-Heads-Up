@@ -93,22 +93,54 @@ export async function openSubtaskStore(
   /** Live Subtasks with a Task and a title, in order. */
   const listed = async () => orderSubtasks((await subtasks.list()).filter((subtask) => subtask.taskId !== "" && subtask.title !== ""));
 
+  // Adds and moves run one after the other: each reads the order the one before left, which is there only once that
+  // one is saved (a person typing a packing list adds faster than a save, and a held arrow key moves faster still).
+  let last: Promise<unknown> = Promise.resolve();
+  function inOrder<T>(run: () => Promise<T>): Promise<T> {
+    const result = last.then(run);
+    last = result.catch(() => undefined);
+    return result;
+  }
+
+  async function add(taskId: string, title: string): Promise<Subtask> {
+    // `get` finds a record of the Task table only, so the id of a Subtask (or any other record) is no parent.
+    if (!(await tasks.get(taskId))) throw new NoTaskError(taskId);
+    const subtask: Subtask = {
+      id: crypto.randomUUID(),
+      taskId,
+      title,
+      position: appendPosition(subtasksOf(taskId, await listed())),
+      completedAt: null,
+      createdAt: now().toISOString(),
+      deletedAt: null,
+    };
+    await subtasks.put(subtask);
+    return subtask;
+  }
+
+  async function move(id: string, toIndex: number): Promise<void> {
+    const all = await listed();
+    const moving = all.find((subtask) => subtask.id === id);
+    if (!moving) throw new NoSubtaskError(id);
+    const siblings = subtasksOf(moving.taskId, all);
+    const order = movedOrder(siblings, id, toIndex);
+    if (order.every((subtask, index) => subtask.id === siblings[index].id)) return;
+
+    const position = positionAt(siblings, id, toIndex);
+    if (position !== null) {
+      if (!(await subtasks.update(id, { position }))) throw new NoSubtaskError(id);
+      return;
+    }
+    // Nothing fits between the neighbours: number the Task's Subtasks again, in their new order.
+    for (const [index, subtask] of order.entries()) {
+      await subtasks.update(subtask.id, (current) => (current.position === index ? {} : { position: index }));
+    }
+  }
+
   return {
     async addSubtask(taskId, rawTitle) {
       const title = checkedTitle(rawTitle);
-      // `get` finds a record of the Task table only, so the id of a Subtask (or any other record) is no parent.
-      if (!(await tasks.get(taskId))) throw new NoTaskError(taskId);
-      const subtask: Subtask = {
-        id: crypto.randomUUID(),
-        taskId,
-        title,
-        position: appendPosition(subtasksOf(taskId, await listed())),
-        completedAt: null,
-        createdAt: now().toISOString(),
-        deletedAt: null,
-      };
-      await subtasks.put(subtask);
-      return subtask;
+      return inOrder(() => add(taskId, title));
     },
 
     async renameSubtask(id, title) {
@@ -124,23 +156,7 @@ export async function openSubtaskStore(
       if (!changed) throw new NoSubtaskError(id);
     },
 
-    async moveSubtask(id, toIndex) {
-      const moving = await subtasks.get(id);
-      if (!moving) throw new NoSubtaskError(id);
-      const siblings = subtasksOf(moving.taskId, await listed());
-      const order = movedOrder(siblings, id, toIndex);
-      if (order.every((subtask, index) => subtask.id === siblings[index].id)) return;
-
-      const position = positionAt(siblings, id, toIndex);
-      if (position !== null) {
-        if (!(await subtasks.update(id, { position }))) throw new NoSubtaskError(id);
-        return;
-      }
-      // Nothing fits between the neighbours: number the Task's Subtasks again, in their new order.
-      for (const [index, subtask] of order.entries()) {
-        await subtasks.update(subtask.id, (current) => (current.position === index ? {} : { position: index }));
-      }
-    },
+    moveSubtask: (id, toIndex) => inOrder(() => move(id, toIndex)),
 
     async deleteSubtask(id) {
       await subtasks.delete(id);
