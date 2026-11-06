@@ -34,6 +34,8 @@ const task = (fields: Partial<Task> = {}): Task => ({
   time: null,
   eventId: null,
   offsetDays: null,
+  listId: null,
+  tagIds: [],
   createdAt: "2026-10-01T09:00:00.000Z",
   completedAt: null,
   rescheduleCount: 0,
@@ -41,7 +43,7 @@ const task = (fields: Partial<Task> = {}): Task => ({
   ...fields,
 });
 
-const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "offsetDays", "rescheduleCount", "time", "title"];
+const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "listId", "offsetDays", "rescheduleCount", "tagIds", "time", "title"];
 
 describe("Replica table", () => {
   it("sends every field of a new record, all under one clock, and none for the id", async () => {
@@ -297,6 +299,58 @@ describe("Replica table", () => {
 
       expect(await tasks.get("t1")).toEqual(task());
       expect((await push()).deletedAt.value).toBeNull();
+    });
+  });
+
+  describe("findOrPut", () => {
+    it("saves a new record when none of the live ones is picked, and returns it", async () => {
+      const { tasks, push } = await open();
+
+      const saved = await tasks.findOrPut(task(), () => undefined);
+
+      expect(saved).toEqual(task());
+      expect(await tasks.list()).toEqual([task()]);
+      expect((await push()).title.value).toBe("Buy gift");
+    });
+
+    it("returns the picked live record and writes nothing, and offers only live records to the pick", async () => {
+      const { tasks, db } = await open();
+      await tasks.put(task({ id: "t1", title: "Same" }));
+      await tasks.put(task({ id: "t2", title: "Gone" }));
+      await tasks.delete("t2");
+      const outboxBefore = await db.count("outbox");
+      let offered: string[] = [];
+
+      const found = await tasks.findOrPut(task({ id: "t3", title: "Same" }), (live) => {
+        offered = live.map((t) => t.id);
+        return live.find((t) => t.title === "Same");
+      });
+
+      expect(found.id).toBe("t1");
+      expect(offered).toEqual(["t1"]);
+      expect((await tasks.list()).map((t) => t.id)).toEqual(["t1"]);
+      expect(await db.count("outbox")).toBe(outboxBefore);
+    });
+
+    it("makes one record for two calls at once that pick the same title", async () => {
+      const { tasks } = await open();
+      const pick = (live: Task[]) => live.find((t) => t.title === "Same");
+
+      const [first, second] = await Promise.all([
+        tasks.findOrPut(task({ id: "t1", title: "Same" }), pick),
+        tasks.findOrPut(task({ id: "t2", title: "Same" }), pick),
+      ]);
+
+      expect(second.id).toBe(first.id);
+      expect(await tasks.list()).toHaveLength(1);
+    });
+
+    it("refuses an id that is taken by a deleted record, like put", async () => {
+      const { tasks } = await open();
+      await tasks.put(task());
+      await tasks.delete("t1");
+
+      await expect(tasks.findOrPut(task({ title: "Again" }), () => undefined)).rejects.toThrow("exists already");
     });
   });
 });

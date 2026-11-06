@@ -13,6 +13,8 @@ function task(fields: Partial<Task> = {}): Task {
     time: null,
     eventId: null,
     offsetDays: null,
+    listId: null,
+    tagIds: [],
     createdAt: "2026-09-01T09:00:00.000Z",
     completedAt: null,
     deletedAt: null,

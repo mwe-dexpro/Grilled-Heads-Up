@@ -7,6 +7,7 @@ export type Route =
   | { name: "event"; id: string }
   | { name: "editEvent"; id: string }
   | { name: "task"; id: string }
+  | { name: "list"; id: string }
   | { name: "trash" };
 
 export function parseRoute(hash: string): Route {
@@ -17,6 +18,7 @@ export function parseRoute(hash: string): Route {
   if (first === "event" && parts.length === 2) return { name: "event", id: second };
   if (first === "event" && third === "edit" && parts.length === 3) return { name: "editEvent", id: second };
   if (first === "task" && parts.length === 2) return { name: "task", id: second };
+  if (first === "list" && parts.length === 2) return { name: "list", id: second };
   return { name: "today" };
 }
 
@@ -36,5 +38,7 @@ export function hrefOf(route: Route): string {
       return `#/event/${encodeURIComponent(route.id)}/edit`;
     case "task":
       return `#/task/${encodeURIComponent(route.id)}`;
+    case "list":
+      return `#/list/${encodeURIComponent(route.id)}`;
   }
 }

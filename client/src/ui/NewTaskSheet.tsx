@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
+import type { List } from "../lists/listStore";
 import type { TaskWhen } from "../tasks/taskStore";
 
 interface NewTaskSheetProps {
   open: boolean;
-  onAdd(title: string, when: TaskWhen): void;
+  /** The List the Project view is showing: the Task is added to it. Elsewhere there is none. */
+  list?: List;
+  onAdd(title: string, when: TaskWhen, listId: string | null): void;
   onNewEvent(): void;
   onClose(): void;
 }
 
 /** Quick add: a title, and optionally a date and time. Without a date the Task goes to the Inbox. */
-export function NewTaskSheet({ open, onAdd, onNewEvent, onClose }: NewTaskSheetProps) {
+export function NewTaskSheet({ open, list, onAdd, onNewEvent, onClose }: NewTaskSheetProps) {
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
   const [title, setTitle] = useState("");
@@ -28,7 +31,7 @@ export function NewTaskSheet({ open, onAdd, onNewEvent, onClose }: NewTaskSheetP
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (title.trim() === "") return;
-    onAdd(title, { date: date || null, time: date && time ? time : null });
+    onAdd(title, { date: date || null, time: date && time ? time : null }, list?.id ?? null);
     setTitle("");
     setDate("");
     setTime("");
@@ -64,7 +67,10 @@ export function NewTaskSheet({ open, onAdd, onNewEvent, onClose }: NewTaskSheetP
             <input type="time" value={time} disabled={!date} onChange={(e) => setTime(e.target.value)} />
           </label>
         </div>
-        <p className="hint">{t("newTask.hint")}</p>
+        <p className="hint">
+          {t("newTask.hint")}
+          {list && ` ${t("newTask.inList", { name: list.name })}`}
+        </p>
         <div className="sheet-actions">
           <button
             type="button"

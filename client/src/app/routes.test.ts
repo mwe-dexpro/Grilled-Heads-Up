@@ -12,6 +12,7 @@ describe("routes", () => {
     ["#/event/abc-123/edit", { name: "editEvent", id: "abc-123" }],
     ["#/task/t-9", { name: "task", id: "t-9" }],
     ["#/trash", { name: "trash" }],
+    ["#/list/l-1", { name: "list", id: "l-1" }],
   ])("reads %s", (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
     expect(parseRoute(hrefOf(route))).toEqual(route);
@@ -31,6 +32,11 @@ describe("routes", () => {
       "#/calendar/x",
       "#/trash/x",
       "#/task/",
+      "#/list",
+      "#/list/",
+      "#/list/a/b",
+      "#/list/a/edit",
+      "#/lists/a",
       "#garbage",
     ]) {
       expect(parseRoute(hash)).toEqual({ name: "today" });
@@ -44,5 +50,7 @@ describe("routes", () => {
 
   it("keeps ids with special characters intact", () => {
     expect(parseRoute(hrefOf({ name: "task", id: "a/b c" }))).toEqual({ name: "task", id: "a/b c" });
+    expect(hrefOf({ name: "list", id: "a/b c" })).toBe("#/list/a%2Fb%20c");
+    expect(parseRoute(hrefOf({ name: "list", id: "a/b c" }))).toEqual({ name: "list", id: "a/b c" });
   });
 });

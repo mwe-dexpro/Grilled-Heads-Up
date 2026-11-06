@@ -12,12 +12,14 @@ import { dayOf } from "./home/days";
 import { HomeScreen } from "./home/HomeScreen";
 import { useNow } from "./home/useNow";
 import { useI18n } from "./i18n/I18nProvider";
+import { defaultProjectView, ProjectScreen, type ProjectView } from "./lists/ProjectScreen";
+import { ProjectsScreen } from "./lists/ProjectsScreen";
 import { availableActions, type TaskAction } from "./tasks/availableActions";
 import { earliestRescheduleDay } from "./tasks/reschedule";
 import { RescheduleSheet } from "./tasks/RescheduleSheet";
 import { TaskActionsSheet } from "./tasks/TaskActionsSheet";
 import { TaskScreen } from "./tasks/TaskScreen";
-import { NoTaskError } from "./tasks/taskStore";
+import { NoTaskError, type Task, type TaskWhen } from "./tasks/taskStore";
 import type { TaskActions } from "./tasks/TaskSwipeRow";
 import { TrashScreen } from "./tasks/TrashScreen";
 import { NewTaskSheet } from "./ui/NewTaskSheet";
@@ -37,6 +39,9 @@ export function App() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [rescheduleIds, setRescheduleIds] = useState<string[]>([]);
   const [deleted, setDeleted] = useState<{ taskId: string } | null>(null);
+  // What each Project view shows (Tag filter, "Show completed"): kept here, so that it is still set after a Task of the
+  // List was opened and Back was pressed (the screen is gone meanwhile).
+  const [projectViews, setProjectViews] = useState<Record<string, ProjectView>>({});
   const currentTab = tabs.find((tab) => tab === route.name);
 
   // The server no longer knows this session (it expired): go and sign in again. Local data stays; sync resumes after.
@@ -52,21 +57,25 @@ export function App() {
   const datedTasks = useMemo(() => withEventDates(data.tasks, data.events), [data.tasks, data.events]);
   const eventIds = useMemo(() => new Set(data.events.map((event) => event.id)), [data.events]);
   const today = dayOf(now);
+  // The "+" button adds to the List whose Project view is open.
+  const currentList = route.name === "list" ? data.lists.find((list) => list.id === route.id) : undefined;
+
+  const { addTask } = data;
+  const addToCurrent = useCallback(
+    (title: string, when: TaskWhen, listId: string | null) => {
+      // A Tag chosen in the Project view would hide the new Task, which has no Tag: show them all again.
+      if (listId !== null) setProjectViews((views) => ({ ...views, [listId]: { ...(views[listId] ?? defaultProjectView), tagId: null } }));
+      return addTask(title, when, listId);
+    },
+    [addTask],
+  );
 
   const { deleteTask, restoreTask, completeTask, rescheduleTasks } = data;
   const actions: TaskActions = {
     complete: completeTask,
     reschedule: (tasks) => setRescheduleIds(tasks.map((task) => task.id)),
-    remove: async (task) => {
-      try {
-        await deleteTask(task.id);
-        setDeleted({ taskId: task.id });
-      } catch (error) {
-        // The Task is gone already (a sync deleted it a moment ago): nothing to delete, nothing to undo.
-        // Any other failure is a real one, and is not hidden.
-        if (!(error instanceof NoTaskError)) throw error;
-      }
-    },
+    // A Task that is gone already (a sync deleted it a moment ago) has nothing to delete and nothing to undo.
+    remove: (task) => ignoreGone(deleteTask(task.id).then(() => setDeleted({ taskId: task.id }))),
     openMenu: (task) => setMenuId(task.id),
   };
 
@@ -87,7 +96,19 @@ export function App() {
 
   return (
     <div className="app">
-      <main>{data.ready || route.name === "today" ? <Screen route={route} data={data} now={now} actions={actions} /> : null}</main>
+      <main>
+        {data.ready || route.name === "today" ? (
+          <Screen
+            route={route}
+            data={data}
+            datedTasks={datedTasks}
+            now={now}
+            actions={actions}
+            projectViews={projectViews}
+            onProjectView={(id, view) => setProjectViews((views) => ({ ...views, [id]: view }))}
+          />
+        ) : null}
+      </main>
 
       {/* Quick add sits on every screen. */}
       <button type="button" className="fab" aria-label={t("newTask.open")} disabled={!data.ready} onClick={() => setAdding(true)}>
@@ -95,7 +116,8 @@ export function App() {
       </button>
       <NewTaskSheet
         open={adding}
-        onAdd={data.addTask}
+        list={currentList}
+        onAdd={addToCurrent}
         onNewEvent={() => navigate({ name: "newEvent" })}
         onClose={() => setAdding(false)}
       />
@@ -132,6 +154,15 @@ export function App() {
   );
 }
 
+/** A change of a Task that is gone already (deleted in another tab, or by a sync) ends calmly; any other failure is not hidden. */
+async function ignoreGone(change: Promise<unknown>): Promise<void> {
+  try {
+    await change;
+  } catch (error) {
+    if (!(error instanceof NoTaskError)) throw error;
+  }
+}
+
 /** Another tab upgraded the database and this tab let go of it; nothing could be saved here any more. */
 function ReloadScreen() {
   const { t } = useI18n();
@@ -153,7 +184,24 @@ function ReloadScreen() {
   );
 }
 
-function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<typeof useAppData>; now: Date; actions: TaskActions }) {
+function Screen({
+  route,
+  data,
+  datedTasks,
+  now,
+  actions,
+  projectViews,
+  onProjectView,
+}: {
+  route: Route;
+  data: ReturnType<typeof useAppData>;
+  /** The Tasks with their Events' dates, for the screens that sort and count by date. */
+  datedTasks: Task[];
+  now: Date;
+  actions: TaskActions;
+  projectViews: Record<string, ProjectView>;
+  onProjectView(listId: string, view: ProjectView): void;
+}) {
   const { t } = useI18n();
   switch (route.name) {
     case "today":
@@ -162,6 +210,7 @@ function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<
           ready={data.ready}
           tasks={data.tasks}
           events={data.events}
+          lists={data.lists}
           now={now}
           sync={data.sync}
           onSyncNow={data.syncNow}
@@ -169,14 +218,32 @@ function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<
         />
       );
     case "calendar":
-    case "projects":
       return (
         <div className="screen">
           <header className="screen-header">
-            <h1 className="large-title">{t(`tabs.${route.name}`)}</h1>
+            <h1 className="large-title">{t("tabs.calendar")}</h1>
           </header>
           <p className="calm">{t("screen.notBuilt")}</p>
         </div>
+      );
+    case "projects":
+      return <ProjectsScreen lists={data.lists} tasks={datedTasks} now={now} onAddList={data.addList} />;
+    case "list":
+      return (
+        <ProjectScreen
+          key={route.id}
+          list={data.lists.find((list) => list.id === route.id)}
+          view={projectViews[route.id] ?? defaultProjectView}
+          onView={(view) => onProjectView(route.id, view)}
+          tasks={datedTasks}
+          events={data.events}
+          tags={data.tags}
+          now={now}
+          actions={actions}
+          onRename={data.renameList}
+          onSetProject={data.setListProject}
+          onDelete={data.deleteList}
+        />
       );
     case "newEvent":
       return (
@@ -221,6 +288,8 @@ function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<
           task={data.tasks.find((task) => task.id === route.id)}
           tasks={data.tasks}
           events={data.events}
+          lists={data.lists}
+          tags={data.tags}
           now={now}
           onComplete={data.completeTask}
           onReschedule={(id, day) => void data.rescheduleTask(id, day)}
@@ -230,6 +299,9 @@ function Screen({ route, data, now, actions }: { route: Route; data: ReturnType<
           }}
           onLink={data.linkTask}
           onUnlink={data.unlinkTask}
+          onSetList={(id, listId) => void ignoreGone(data.setTaskList(id, listId))}
+          onAddTag={(id, name) => void ignoreGone(data.addTaskTag(id, name))}
+          onRemoveTag={(id, tagId) => void ignoreGone(data.removeTaskTag(id, tagId))}
         />
       );
     case "trash":

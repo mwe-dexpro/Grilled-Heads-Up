@@ -48,6 +48,8 @@ describe("formatRiskExplanation", () => {
     time: null,
     eventId: "e",
     offsetDays: -1,
+    listId: null,
+    tagIds: [],
     createdAt: "",
     completedAt: null,
     rescheduleCount: 0,

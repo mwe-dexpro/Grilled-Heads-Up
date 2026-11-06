@@ -16,6 +16,10 @@ export interface Task {
   eventId: string | null;
   /** Days from the Event's start day (negative = before); set exactly when `eventId` is. */
   offsetDays: number | null;
+  /** The List the Task belongs to; null = none. */
+  listId: string | null;
+  /** The Tags on the Task, in the order they were added, no duplicates. One last-write-wins field (see the README). */
+  tagIds: string[];
   createdAt: string;
   completedAt: string | null;
   /** How often the Task was rescheduled; synced, but not shown in v1. Last write wins, so it is a hint, not an audit. */
@@ -41,7 +45,7 @@ export interface TaskWhen {
 }
 
 export interface TaskStore {
-  addTask(title: string, when?: TaskWhen): Promise<Task>;
+  addTask(title: string, when?: TaskWhen, listId?: string | null): Promise<Task>;
   /** Completes a Task; one that is missing or deleted (say, by a sync a moment ago) is ignored. */
   completeTask(id: string): Promise<void>;
   /** Attaches a Task to an Event at an Offset; from then on its date comes from the Event. */
@@ -66,6 +70,14 @@ export interface TaskStore {
    * that are missing or deleted are ignored.
    */
   rescheduleTasks(ids: string[], day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  /** Puts the Task in a List, or in none (null). A Task that is missing or deleted throws `NoTaskError`, like `linkTask`. */
+  setTaskList(id: string, listId: string | null): Promise<void>;
+  /** Adds a Tag; one the Task has already changes nothing (no write, nothing to sync). Missing or deleted: `NoTaskError`. */
+  addTaskTag(id: string, tagId: string): Promise<void>;
+  /** Removes a Tag; one the Task does not have changes nothing. Missing or deleted: `NoTaskError`. */
+  removeTaskTag(id: string, tagId: string): Promise<void>;
+  /** Every live Task in the List loses its List (used when the List is deleted); Tasks in the Trash keep theirs. */
+  clearList(listId: string): Promise<void>;
   /** Deletes a Task: it moves to the Trash (it leaves every list and syncs as deleted). */
   deleteTask(id: string): Promise<void>;
   /**
@@ -95,6 +107,9 @@ export const taskRecordType: RecordType<Task> = {
     time: task.time ?? null,
     eventId: task.eventId ?? null,
     offsetDays: task.offsetDays ?? null,
+    listId: task.listId ?? null,
+    // Not an array when it arrives as something else; a Task never shows a Tag list it can't read.
+    tagIds: Array.isArray(task.tagIds) ? task.tagIds : [],
     createdAt: task.createdAt ?? "",
     completedAt: task.completedAt ?? null,
     rescheduleCount: task.rescheduleCount ?? 0,
@@ -125,7 +140,7 @@ export async function openTaskStore(
   }
 
   return {
-    async addTask(rawTitle, { date = null, time = null, eventId = null, offsetDays = null } = {}) {
+    async addTask(rawTitle, { date = null, time = null, eventId = null, offsetDays = null } = {}, listId = null) {
       const title = rawTitle.trim();
       if (title === "") throw new Error("A Task needs a title");
       if (title.length > maxTitleLength) throw new Error(`A Task's title can have up to ${maxTitleLength} characters`);
@@ -139,6 +154,8 @@ export async function openTaskStore(
         time,
         eventId,
         offsetDays,
+        listId,
+        tagIds: [],
         createdAt: now().toISOString(),
         completedAt: null,
         rescheduleCount: 0,
@@ -159,6 +176,29 @@ export async function openTaskStore(
 
     async unlinkTask(id, date) {
       await change(id, { eventId: null, offsetDays: null, date });
+    },
+
+    async setTaskList(id, listId) {
+      await change(id, { listId });
+    },
+
+    async addTaskTag(id, tagId) {
+      // Read and written in one transaction, so Tags a sync brought meanwhile are kept; nothing to add, nothing written.
+      const added = await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? {} : { tagIds: [...current.tagIds, tagId] }));
+      if (!added) throw new NoTaskError(id);
+    },
+
+    async removeTaskTag(id, tagId) {
+      const removed = await tasks.update(id, (current) => (current.tagIds.includes(tagId) ? { tagIds: current.tagIds.filter((t) => t !== tagId) } : {}));
+      if (!removed) throw new NoTaskError(id);
+    },
+
+    async clearList(listId) {
+      // Only the Tasks that are in the List are touched (each in a transaction of its own); the check inside it is for
+      // a sync that moved one meanwhile.
+      for (const { id } of (await tasks.list()).filter((task) => task.listId === listId)) {
+        await tasks.update(id, (current) => (current.listId === listId ? { listId: null } : {}));
+      }
     },
 
     async rescheduleTask(id, day, eventStart) {

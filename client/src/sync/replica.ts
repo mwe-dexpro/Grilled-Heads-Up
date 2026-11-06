@@ -31,6 +31,12 @@ export interface Table<T extends Synced> {
    */
   put(record: T): Promise<void>;
   /**
+   * Saves `record` unless `pick` chooses one of the live records: it is given them all and returns the one that
+   * counts as the same, which is then returned and nothing is written. Looking and saving are one transaction, so two
+   * calls at once for the same thing make one record, not two. Throws when the id is taken, like `put`.
+   */
+  findOrPut(record: T, pick: (live: T[]) => T | undefined): Promise<T>;
+  /**
    * Changes a live record: reads it, applies the change and writes it in one transaction, so a sync that lands
    * meanwhile is never overwritten. Every field the change names is synced under one shared clock, also when its
    * value stays the same, so that fields set together are won or lost together. Returns the record as saved,
@@ -135,6 +141,24 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const next = { ...withDefaults(record), deletedAt: null };
       await writeRecord(tx, recordType, next, fieldsOf(next), now());
       await tx.done;
+    },
+
+    async findOrPut(record, pick) {
+      const tx = transactionOver(db, [storeName]);
+      const all = (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>;
+      const found = pick(all.map(withDefaults).filter((other) => other.deletedAt === null));
+      if (found) {
+        await tx.done;
+        return found;
+      }
+      if (await tx.objectStore(storeName).get(record.id)) {
+        await tx.done;
+        throw new Error(`Record ${record.id} exists already; use update to change it`);
+      }
+      const next = { ...withDefaults(record), deletedAt: null };
+      await writeRecord(tx, recordType, next, fieldsOf(next), now());
+      await tx.done;
+      return next;
     },
 
     async update(id, change) {

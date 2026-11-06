@@ -61,13 +61,17 @@ Home
 - **Later** and **Inbox** buckets (the prototype stops at Next 3 days)
 - **Zen mode** view + toggle: today only, no risk colours, Overdue collapsed to one line
 - **Bulk-select** + assign date (home, Inbox, Project view)
-- **"Show completed"** toggle (per List/Project/Event)
+- **"Show completed"** toggle (per List/Project/Event): built for Lists and Projects (#7, a toggle button under the Task rows of the Project view); the Event view always shows Completed Tasks.
 
 Task actions
 - ~~**Delete** swipe action + **undo toast** (above the tab bar, never under the FAB) + **Trash** (30 days)~~ Built (#6): swipe left shows Reschedule, Complete, Delete (also from a long press, and in Task detail); the 5-second undo toast sits in the "+" button's row, left of it; the Trash is `#/trash`, reached from a "Trash" link in the home footer until Settings exist (then it moves there). The Reschedule sheet (4d) is built with the copy fixes of §2, without the reschedule count (§1), and with "Reschedule all…" in the Overdue header.
 - Reschedule a Linked task past its Event → warning (4d hints at it; also needed in Task detail). Still open (#11), like the sheet's "Day before the event" option: today the sheet offers Tomorrow, Day after tomorrow, Next week and Pick a date, and a Linked task can be rescheduled past its Event without a warning.
 - **Reminders** editor (§1)
-- **Tags** on Tasks; assigning List/Event in Task detail
+- ~~**Tags** on Tasks; assigning List in Task detail~~ Built (#7): Task detail has a "List" select ("No list" + every List) and a "Tags" section (chips with a remove button, an "Add tag" input with the existing names suggested; a name typed in another case reuses the Tag). German UI calls a Tag "Kategorie". Assigning an Event in Task detail already exists ("Link to an event").
+
+Projects
+- ~~**Projects tab** and **Project view**~~ Built (#7), without the "Events" segment: the tab shows Projects as cards (name, amber "N overdue" or grey "On track" / "No deadline", a segmented Progress bar with Overdue segments amber, "N of M · next task" with the next Task in amber when it is Overdue, "Open ›"), the other Lists as rows below them ("N of M", or "No tasks yet" instead of "0 of 0" on a card and on a row when a List has no Tasks), and a "New list" button; no segmented control until a second segment exists. The Project view (`#/list/<id>`) shows the List or Project with its Progress, a Tag filter (shown once a Task has a Tag), the Task rows (swipe and long press as everywhere; the "+" button adds to the List, and shows all Tags again when one was chosen, as the new Task has none), "Show completed" (the Tag filter and the toggle are kept per List while the app is open, also across a visit to Task detail; a chosen Tag that no Task has any more is forgotten), and Edit (rename, mark or unmark as Project, delete after a question saying its Tasks stay). A Task row's second line names the List in blue (a link to the Project view) when the Task is not Linked.
+- **Still open**: the Projects tab's **"Events" segment** (upcoming Events with Linked tasks, At risk first) and Events belonging to a List (a Project showing its Events and their Progress); renaming, merging and deleting Tags; Tag filters outside the Project view.
 
 Events
 - **Follow-up tasks**: a separate "Follow-up" group in Event detail
