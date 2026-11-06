@@ -211,5 +211,18 @@
   "task.addTag": "Kategorie hinzufügen",
   "task.addTagButton": "Hinzufügen",
   "task.removeTag": "Kategorie {name} entfernen",
-  "project.noTasks": "Noch keine Aufgaben"
+  "project.noTasks": "Noch keine Aufgaben",
+  "subtask.heading": "Unteraufgaben",
+  "subtask.count": "{done} von {total}",
+  "subtask.progressLabel": "Erledigte Unteraufgaben",
+  "subtask.countShort": "{done}/{total}",
+  "subtask.countLong": "{done} von {total} Unteraufgaben erledigt",
+  "subtask.add": "Unteraufgabe hinzufügen",
+  "subtask.rename": "{title} umbenennen",
+  "subtask.reorder": "{title} verschieben",
+  "subtask.delete": "Unteraufgabe {title} löschen",
+  "subtask.allDone": "Alle Unteraufgaben sind erledigt. Aufgabe erledigen?",
+  "subtask.completeTask": "Erledigen",
+  "subtask.notNow": "Nicht jetzt",
+  "toast.subtaskDeleted": "Unteraufgabe gelöscht"
 }

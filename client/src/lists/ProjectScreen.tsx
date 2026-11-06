@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { navigate } from "../app/navigation";
 import { parseRoute } from "../app/routes";
-import { bucketOf } from "../home/buckets";
+import { bucketOf, type Progress } from "../home/buckets";
 import { dayOf } from "../home/days";
 import { TaskRow } from "../home/TaskRow";
 import { useI18n } from "../i18n/I18nProvider";
@@ -33,13 +33,15 @@ interface ProjectScreenProps {
   tags: Tag[];
   now: Date;
   actions: TaskActions;
+  /** Each Task's Subtask count (only Tasks that have Subtasks). */
+  counts: Map<string, Progress>;
   onRename(id: string, name: string): Promise<void> | void;
   onSetProject(id: string, isProject: boolean): Promise<void> | void;
   onDelete(id: string): Promise<void> | void;
 }
 
 /** The Project view: one List or Project with its open Tasks and Progress, "Show completed" and a Tag filter. */
-export function ProjectScreen({ list, view, onView, tasks, events, tags, now, actions, onRename, onSetProject, onDelete }: ProjectScreenProps) {
+export function ProjectScreen({ list, view, onView, tasks, events, tags, now, actions, counts, onRename, onSetProject, onDelete }: ProjectScreenProps) {
   const { t } = useI18n();
   const { showCompleted, tagId } = view;
   const [editing, setEditing] = useState(false);
@@ -122,6 +124,7 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
                 event={task.eventId === null ? undefined : eventsById.get(task.eventId)}
                 eventIds={eventsById}
                 actions={actions}
+                subtasks={counts.get(task.id)}
               />
             ))}
           </ul>

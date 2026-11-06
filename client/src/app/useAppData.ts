@@ -3,6 +3,7 @@ import type { Event, EventFields } from "../events/event";
 import { openEventStore, type EventStore } from "../events/eventStore";
 import type { Day } from "../home/days";
 import { openListStore, type List, type ListStore } from "../lists/listStore";
+import { openSubtaskStore, type Subtask, type SubtaskStore } from "../subtasks/subtaskStore";
 import { openTagStore, type Tag, type TagStore } from "../tags/tagStore";
 import { useSync } from "../sync/useSync";
 import { createListReader } from "./listReader";
@@ -13,10 +14,11 @@ interface Stores {
   events: EventStore;
   lists: ListStore;
   tags: TagStore;
+  subtasks: SubtaskStore;
 }
 
 /**
- * The app's Tasks, Events, Lists and Tags, loaded from IndexedDB, with the actions that change them. Also keeps them in sync
+ * The app's Tasks, Events, Lists, Tags and Subtasks, loaded from IndexedDB, with the actions that change them. Also keeps them in sync
  * with the Owner's other devices: each change is sent soon after, and changes from elsewhere are shown when they arrive.
  */
 export function useAppData() {
@@ -27,6 +29,7 @@ export function useAppData() {
   const [events, setEvents] = useState<Event[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
 
   // Reads from the stores as they are when it runs, so a sync that reports changes while the stores are still
   // opening is not lost: the stores are set before the first read. Screens stay mounted, so an open form
@@ -42,6 +45,7 @@ export function useAppData() {
                 events: await stores.current.events.listEvents(),
                 lists: await stores.current.lists.listLists(),
                 tags: await stores.current.tags.listTags(),
+                subtasks: await stores.current.subtasks.listSubtasks(),
               }
             : null,
         (read) => {
@@ -50,6 +54,7 @@ export function useAppData() {
           setEvents(read.events);
           setLists(read.lists);
           setTags(read.tags);
+          setSubtasks(read.subtasks);
         },
       ),
     [],
@@ -60,8 +65,8 @@ export function useAppData() {
   useEffect(() => {
     let opened: Stores | null = null;
     let cancelled = false;
-    Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore()]).then(async ([taskStore, eventStore, listStore, tagStore]) => {
-      opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore };
+    Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
+      opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
       if (cancelled) return close(opened);
       stores.current = opened;
       await reload();
@@ -144,6 +149,13 @@ export function useAppData() {
     [changeStores],
   );
 
+  const addSubtask = useCallback((taskId: string, title: string) => changeStores((s) => s.subtasks.addSubtask(taskId, title)), [changeStores]);
+  const renameSubtask = useCallback((id: string, title: string) => changeStores((s) => s.subtasks.renameSubtask(id, title)), [changeStores]);
+  const setSubtaskDone = useCallback((id: string, done: boolean) => changeStores((s) => s.subtasks.setSubtaskDone(id, done)), [changeStores]);
+  const moveSubtask = useCallback((id: string, toIndex: number) => changeStores((s) => s.subtasks.moveSubtask(id, toIndex)), [changeStores]);
+  const deleteSubtask = useCallback((id: string) => changeStores((s) => s.subtasks.deleteSubtask(id)), [changeStores]);
+  const restoreSubtask = useCallback((id: string) => changeStores((s) => s.subtasks.restoreSubtask(id)), [changeStores]);
+
   const addEvent = useCallback(
     async (fields: EventFields): Promise<Event | null> => {
       if (!stores.current) return null;
@@ -171,6 +183,7 @@ export function useAppData() {
     events,
     lists,
     tags,
+    subtasks,
     sync: sync.state,
     syncNow: sync.syncNow,
     addTask,
@@ -188,6 +201,12 @@ export function useAppData() {
     deleteList,
     deleteTask,
     restoreTask,
+    addSubtask,
+    renameSubtask,
+    setSubtaskDone,
+    moveSubtask,
+    deleteSubtask,
+    restoreSubtask,
     addEvent,
     updateEvent,
   };
@@ -200,4 +219,5 @@ function close(stores: Stores) {
   stores.events.close();
   stores.lists.close();
   stores.tags.close();
+  stores.subtasks.close();
 }

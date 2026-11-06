@@ -3,7 +3,9 @@ import { useState, type ReactNode } from "react";
 import { hrefOf } from "../app/routes";
 import { dayOf } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
+import type { Progress } from "../home/buckets";
 import { useI18n } from "../i18n/I18nProvider";
+import { SubtaskCount } from "../subtasks/SubtaskCount";
 import type { Task } from "../tasks/taskStore";
 import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { NavBar } from "../ui/NavBar";
@@ -21,11 +23,13 @@ interface EventScreenProps {
   tasks: Task[];
   now: Date;
   actions: TaskActions;
+  /** Each Task's Subtask count (only Tasks that have Subtasks). */
+  counts: Map<string, Progress>;
   onAddTask(title: string, offsetDays: number): void;
 }
 
 /** The Event view: when and where, its Progress and risk, and its Preparation and Follow-up tasks with their Offsets. */
-export function EventScreen({ event, tasks, now, actions, onAddTask }: EventScreenProps) {
+export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: EventScreenProps) {
   const { language, t } = useI18n();
   const [adding, setAdding] = useState(false);
 
@@ -58,6 +62,7 @@ export function EventScreen({ event, tasks, now, actions, onAddTask }: EventScre
       {list.map((task) => {
         const completed = task.completedAt !== null;
         const overdue = isOverdue(task, today);
+        const subtasks = counts.get(task.id);
         const meta = [formatOffset(task.offsetDays!, t), formatShortDay(task.date!, language), task.time && formatTime(task.time, language)]
           .filter(Boolean)
           .join(" · ");
@@ -81,7 +86,15 @@ export function EventScreen({ event, tasks, now, actions, onAddTask }: EventScre
               <a className="task-title" href={hrefOf({ name: "task", id: task.id })}>
                 {task.title}
               </a>
-              <span className={overdue ? "task-meta warning" : "task-meta"}>{meta}</span>
+              <span className={overdue ? "task-meta warning" : "task-meta"}>
+                {meta}
+                {subtasks && (
+                  <>
+                    {" · "}
+                    <SubtaskCount progress={subtasks} />
+                  </>
+                )}
+              </span>
             </div>
           </TaskSwipeRow>
         );
