@@ -174,7 +174,9 @@ jobs:
       - run: npm ci
       - run: npm run security:allowlist
       - run: npm run security:audit
-      - run: npm audit signatures
+      # With npm 11: the npm 10 that comes with Node 22 cannot find the key for the attestation of @peculiar/x509 2.2.0
+      # (EMISSINGSIGNATUREKEY, with the same tree, on the commit before this check existed); npm 11.21.2 verifies all of them.
+      - run: npx --yes npm@11.21.2 audit signatures
 
   dependency-review:
     name: dependency review
