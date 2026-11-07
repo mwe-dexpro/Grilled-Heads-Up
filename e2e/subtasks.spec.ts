@@ -542,10 +542,10 @@ test("a drag ends where the row was dropped: when the saved order arrives no row
 
   // Nothing moves from the frame the order shows, other than the dropped row finishing its way into place (less than a row).
   const final = shown[shown.length - 1];
-  const rowHeight = final.Jacket - final.Swimwear;
+  const rowHeight = final["Jacket"] - final["Swimwear"];
   for (const frame of shown) {
     for (const title of ["Boots", "Jacket", "Chargers"]) expect(frame[title], title).toBe(final[title]);
-    expect(Math.abs(frame.Swimwear - final.Swimwear)).toBeLessThan(rowHeight / 2);
+    expect(Math.abs(frame["Swimwear"] - final["Swimwear"])).toBeLessThan(rowHeight / 2);
   }
   await expect(titlesOf(page)).toHaveText(["Swimwear", "Boots", "Jacket", "Chargers"]);
 });

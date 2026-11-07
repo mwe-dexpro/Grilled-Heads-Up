@@ -269,7 +269,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       res.status(401).json({ error: "Sign in first." });
       return;
     }
-    res.locals.userId = userId;
+    res.locals["userId"] = userId;
     next();
   };
 

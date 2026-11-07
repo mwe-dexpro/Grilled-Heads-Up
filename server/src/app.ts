@@ -33,7 +33,7 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
   app.get("/api/passkeys", (_req, res) => {
     const passkeys = db
       .prepare("SELECT created_at AS createdAt, last_used_at AS lastUsedAt FROM passkeys WHERE user_id = ? ORDER BY created_at")
-      .all(res.locals.userId as string);
+      .all(res.locals["userId"] as string);
     res.json(passkeys);
   });
 

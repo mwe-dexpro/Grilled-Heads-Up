@@ -38,7 +38,7 @@ function isChange(value: unknown): value is Change {
     typeof hlc === "string" &&
     hlcPattern.test(hlc) &&
     "value" in value &&
-    (value as Record<string, unknown>).value !== undefined
+    (value as Record<string, unknown>)["value"] !== undefined
   );
 }
 
@@ -80,7 +80,7 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
       res.status(400).json({ error: `Change ${index} is malformed.`, index });
       return;
     }
-    const ownerId = res.locals.userId as string;
+    const ownerId = res.locals["userId"] as string;
     transaction(db, () => {
       let seq = (lastSeq.get(ownerId) as { seq: number }).seq;
       for (const { type, id, field, value, hlc } of changes) {
@@ -92,13 +92,13 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
   });
 
   routes.get("/pull", (req, res) => {
-    const after = wholeNumber(req.query.after, 0);
-    const limit = wholeNumber(req.query.limit, maxChangesPerRequest);
+    const after = wholeNumber(req.query["after"], 0);
+    const limit = wholeNumber(req.query["limit"], maxChangesPerRequest);
     if (after === null || limit === null || limit < 1 || limit > maxChangesPerRequest) {
       res.status(400).json({ error: "after must be a whole number and limit between 1 and 500." });
       return;
     }
-    const rows = feed.all(res.locals.userId as string, after, limit + 1) as unknown as Array<Change & { value: string; seq: number }>;
+    const rows = feed.all(res.locals["userId"] as string, after, limit + 1) as unknown as Array<Change & { value: string; seq: number }>;
     const page = rows.slice(0, limit);
     res.json({
       changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: JSON.parse(value), hlc })),

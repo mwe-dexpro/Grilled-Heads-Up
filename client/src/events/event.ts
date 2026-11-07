@@ -59,7 +59,7 @@ function zoneOffsetMinutes(moment: Date, timeZone: string): number {
       .formatToParts(moment)
       .map((part) => [part.type, Number(part.value)]),
   );
-  const wallClockAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const wallClockAsUtc = Date.UTC(parts["year"], parts["month"] - 1, parts["day"], parts["hour"], parts["minute"], parts["second"]);
   return Math.round((wallClockAsUtc - moment.getTime()) / 60_000);
 }
 

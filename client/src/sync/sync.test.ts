@@ -1059,8 +1059,8 @@ describe("Sync between two devices", () => {
       const after = server.record("event", id);
       const clocks = ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"].map((field) => after[field].hlc);
       expect(new Set(clocks).size).toBe(1);
-      expect(clocks[0] > before.startTime.hlc).toBe(true);
-      expect(after.title.hlc).toBe(after.startTime.hlc);
+      expect(clocks[0] > before["startTime"].hlc).toBe(true);
+      expect(after["title"].hlc).toBe(after["startTime"].hlc);
     });
 
     it("writes none of it for an edit of something else", async () => {
@@ -1073,7 +1073,7 @@ describe("Sync between two devices", () => {
 
       const after = server.record("event", id);
       for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"]) expect(after[field].hlc).toBe(before[field].hlc);
-      expect(after.title.hlc > before.title.hlc).toBe(true);
+      expect(after["title"].hlc > before["title"].hlc).toBe(true);
     });
   });
 
