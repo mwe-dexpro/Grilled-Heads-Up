@@ -12,7 +12,7 @@ import type { TaskActions } from "../tasks/TaskSwipeRow";
 import { hrefOf } from "../app/routes";
 import { SignInSettings } from "../auth/SignInSettings";
 import { ProgressRing } from "../ui/ProgressRing";
-import { arrangeHome, isOverdueEmphasised, type Bucket } from "./buckets";
+import { arrangeHome, isOverdueEmphasised, type Bucket, type Progress } from "./buckets";
 import { dayOf } from "./days";
 import { formatLongDay, formatShortDay, formatWeekday } from "./format";
 import { TaskRow } from "./TaskRow";
@@ -26,9 +26,11 @@ interface HomeScreenProps {
   sync: SyncState;
   onSyncNow(): void;
   actions: TaskActions;
+  /** Each Task's Subtask count (only Tasks that have Subtasks). */
+  counts: Map<string, Progress>;
 }
 
-export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, actions }: HomeScreenProps) {
+export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, actions, counts }: HomeScreenProps) {
   const { language, setLanguage, t } = useI18n();
   const buckets = arrangeHome(tasks, now, events);
   const [overdue, today, ...rest] = buckets;
@@ -46,6 +48,7 @@ export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, 
         list={liveList(task, lists)}
         eventIds={eventsById}
         actions={actions}
+        subtasks={counts.get(task.id)}
       />
     ));
 

@@ -1,5 +1,5 @@
 import { Calendar, Check, ChevronRight, Trash2, X } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { hrefOf } from "../app/routes";
 import { maxTagLength } from "../data/limits";
 import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
@@ -9,6 +9,9 @@ import { formatShortDay, formatTime } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
 import { liveList, liveTags } from "../lists/lists";
+import type { Subtask } from "../subtasks/subtaskStore";
+import { subtasksOf } from "../subtasks/subtasks";
+import { SubtasksSection } from "../subtasks/SubtasksSection";
 import type { Tag } from "../tags/tagStore";
 import { NavBar } from "../ui/NavBar";
 import { availableActions } from "./availableActions";
@@ -23,6 +26,8 @@ interface TaskScreenProps {
   /** The live Lists and Tags on this device. */
   lists: List[];
   tags: Tag[];
+  /** Every live Subtask on this device; the screen shows the Task's own. */
+  subtasks: Subtask[];
   now: Date;
   onComplete(id: string): void;
   onReschedule(id: string, day: Day): void;
@@ -35,15 +40,23 @@ interface TaskScreenProps {
   /** Adds the Tag of that name, making it if there is none. */
   onAddTag(id: string, name: string): void;
   onRemoveTag(id: string, tagId: string): void;
+  onAddSubtask(taskId: string, title: string): void;
+  onRenameSubtask(id: string, title: string): void;
+  onSetSubtaskDone(id: string, done: boolean): Promise<void> | void;
+  onMoveSubtask(id: string, toIndex: number): Promise<void> | void;
+  onMoveSubtaskBy(id: string, by: number): Promise<void> | void;
+  /** Deletes the Subtask and offers to undo it; the screen stays. */
+  onDeleteSubtask(subtask: Subtask): void;
 }
 
-/** Task detail: when it's due, its List and Tags, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
+/** Task detail: when it's due, its Subtasks, List and Tags, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
 export function TaskScreen({
   task: rawTask,
   tasks,
   events,
   lists,
   tags,
+  subtasks,
   now,
   onComplete,
   onReschedule,
@@ -53,13 +66,23 @@ export function TaskScreen({
   onSetList,
   onAddTag,
   onRemoveTag,
+  onAddSubtask,
+  onRenameSubtask,
+  onSetSubtaskDone,
+  onMoveSubtask,
+  onMoveSubtaskBy,
+  onDeleteSubtask,
 }: TaskScreenProps) {
   const { language, t } = useI18n();
   const [chosenEventId, setChosenEventId] = useState("");
   const [picking, setPicking] = useState(false);
   const [newTag, setNewTag] = useState("");
+  // This Task's Subtasks; the same array until a reload brings new ones (the Subtasks section tells a reload by it).
+  const ownSubtasks = useMemo(() => subtasksOf(rawTask?.id ?? "", subtasks), [rawTask?.id, subtasks]);
   // Delete goes back, and a second tap before the screen has gone would go back once more (and delete again).
   const leaving = useRef(false);
+  // Completing the Task from the Subtasks' offer takes the offer away, and the sticky button with it: the heading gets the focus.
+  const heading = useRef<HTMLHeadingElement>(null);
 
   if (!rawTask) {
     return (
@@ -109,7 +132,9 @@ export function TaskScreen({
           aria-label={t("task.completeNamed", { title: task.title })}
         />
         <div>
-          <h1 className={completed ? "large-title completed" : "large-title"}>{task.title}</h1>
+          <h1 ref={heading} tabIndex={-1} className={completed ? "large-title completed" : "large-title"}>
+            {task.title}
+          </h1>
           <p className="eyebrow">{due}</p>
         </div>
       </header>
@@ -167,6 +192,21 @@ export function TaskScreen({
           )}
         </section>
       )}
+
+      <SubtasksSection
+        task={task}
+        subtasks={ownSubtasks}
+        onAdd={onAddSubtask}
+        onRename={onRenameSubtask}
+        onSetDone={onSetSubtaskDone}
+        onMove={onMoveSubtask}
+        onMoveBy={onMoveSubtaskBy}
+        onDelete={onDeleteSubtask}
+        onCompleteTask={(id) => {
+          heading.current?.focus();
+          onComplete(id);
+        }}
+      />
 
       <section className="bucket" aria-labelledby="task-list-heading">
         <div className="section-header">

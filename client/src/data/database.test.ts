@@ -10,7 +10,7 @@ describe("App database", () => {
   it("has a store for every kind of record, and for sync", async () => {
     const db = await openAppDb(freshName());
 
-    expect([...db.objectStoreNames].sort()).toEqual(["events", "fieldClocks", "lists", "outbox", "syncInfo", "tags", "tasks"]);
+    expect([...db.objectStoreNames].sort()).toEqual(["events", "fieldClocks", "lists", "outbox", "subtasks", "syncInfo", "tags", "tasks"]);
     db.close();
   });
 
@@ -57,7 +57,54 @@ describe("App database", () => {
     db.close();
   });
 
-  it("keeps the cursor of a database that is already at version 4", async () => {
+  /** A database as version 4 of the app left it: Lists and Tags, no Subtasks. */
+  async function versionFour(name: string) {
+    return openDB(name, 4, {
+      upgrade(db) {
+        db.createObjectStore("tasks", { keyPath: "id" });
+        db.createObjectStore("events", { keyPath: "id" });
+        createSyncStores(db);
+        db.createObjectStore("lists", { keyPath: "id" });
+        db.createObjectStore("tags", { keyPath: "id" });
+      },
+    });
+  }
+
+  it("upgrades a database from version 4 and keeps its Tasks, Events, Lists and Tags", async () => {
+    const name = freshName();
+    const old = await versionFour(name);
+    await old.put("tasks", { id: "t1", title: "Kept" });
+    await old.put("events", { id: "e1", title: "Party" });
+    await old.put("lists", { id: "l1", name: "Basement" });
+    await old.put("tags", { id: "g1", name: "Errand" });
+    old.close();
+
+    const db = await openAppDb(name);
+
+    expect(await db.get("tasks", "t1")).toEqual({ id: "t1", title: "Kept" });
+    expect(await db.get("events", "e1")).toEqual({ id: "e1", title: "Party" });
+    expect(await db.get("lists", "l1")).toEqual({ id: "l1", name: "Basement" });
+    expect(await db.get("tags", "g1")).toEqual({ id: "g1", name: "Errand" });
+    expect(await db.getAll("subtasks")).toEqual([]);
+    db.close();
+  });
+
+  it("makes a device that synced on version 4 read the server's feed again from the start", async () => {
+    const name = freshName();
+    const old = await versionFour(name);
+    await old.put("syncInfo", 42, "cursor");
+    await old.put("syncInfo", "device-a", "deviceId");
+    old.close();
+
+    const db = await openAppDb(name);
+
+    // Version 4 skipped the Subtasks it did not know, and moved its cursor past them: they are pulled again.
+    expect(await db.get("syncInfo", "cursor")).toBeUndefined();
+    expect(await db.get("syncInfo", "deviceId")).toBe("device-a");
+    db.close();
+  });
+
+  it("keeps the cursor of a database that is already at version 5", async () => {
     const name = freshName();
     const first = await openAppDb(name);
     await first.put("syncInfo", 42, "cursor");
@@ -76,7 +123,7 @@ describe("App database", () => {
     const stop = onDatabaseOutdated(() => told++);
 
     // Would wait forever if the app's connection stayed open.
-    const upgraded = await openDB(name, 5, { upgrade: (db) => void db.createObjectStore("later") });
+    const upgraded = await openDB(name, 6, { upgrade: (db) => void db.createObjectStore("later") });
 
     expect(told).toBe(1);
     expect(upgraded.objectStoreNames).toContain("later");
@@ -91,7 +138,7 @@ describe("App database", () => {
     let told = 0;
     onDatabaseOutdated(() => told++)();
 
-    (await openDB(name, 5)).close();
+    (await openDB(name, 6)).close();
 
     expect(told).toBe(0);
   });

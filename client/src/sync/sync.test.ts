@@ -13,6 +13,7 @@ import { translate } from "../i18n/i18n";
 import { maxNotesLength } from "../data/limits";
 import { openListStore, type ListStore } from "../lists/listStore";
 import { liveList } from "../lists/lists";
+import { openSubtaskStore, subtaskRecordType, type SubtaskStore } from "../subtasks/subtaskStore";
 import { openTagStore, type TagStore } from "../tags/tagStore";
 import { openTaskStore, taskRecordType, type TaskStore } from "../tasks/taskStore";
 import { createSyncEngine, type SyncEngine } from "./engine";
@@ -45,6 +46,7 @@ interface Device {
   events: EventStore;
   lists: ListStore;
   tags: TagStore;
+  subtasks: SubtaskStore;
   engine: SyncEngine;
   sync(): Promise<void>;
   /** Closes everything, like closing the app; the data stays. */
@@ -64,6 +66,7 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
   const events = await openEventStore(name, { now });
   const lists = await openListStore(name, { now });
   const tags = await openTagStore(name, { now });
+  const subtasks = await openSubtaskStore(name, { now });
   const db = await openAppDb(name);
   const engine = await createSyncEngine({ db, types: recordTypes, transport, now });
   return {
@@ -74,6 +77,7 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
     events,
     lists,
     tags,
+    subtasks,
     engine,
     sync: () => engine.syncNow(),
     close() {
@@ -81,6 +85,7 @@ async function openDevice(world: World, server: MemoryServer, { name = freshDbNa
       events.close();
       lists.close();
       tags.close();
+      subtasks.close();
       db.close();
     },
   };
@@ -541,6 +546,187 @@ describe("Sync between two devices", () => {
 
       expect(await a.lists.listLists()).toMatchObject([{ name: "Cellar", isProject: true }]);
       expect(await b.lists.listLists()).toMatchObject([{ name: "Cellar", isProject: true }]);
+    });
+  });
+
+  describe("Subtasks", () => {
+    const subtaskTitles = async (device: Device) => (await device.subtasks.listSubtasks()).map((subtask) => subtask.title);
+
+    it("shows a Subtask added on A on B, with its Task, in order", async () => {
+      const { a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack for the weekend");
+      const boots = await a.subtasks.addSubtask(task.id, "Boots");
+      await a.subtasks.addSubtask(task.id, "Rain jacket");
+
+      await a.sync();
+      await b.sync();
+
+      expect(await titles(b)).toEqual(["Pack for the weekend"]);
+      expect(await b.subtasks.listSubtasks()).toEqual(await a.subtasks.listSubtasks());
+      expect(await b.subtasks.listSubtasks()).toMatchObject([{ id: boots.id, taskId: task.id, title: "Boots", position: 0 }, { title: "Rain jacket", position: 1 }]);
+    });
+
+    it("keeps a rename on A and a tick on B, which are fields of their own", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      const present = await a.subtasks.addSubtask(task.id, "Present");
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.subtasks.renameSubtask(present.id, "Voucher");
+      await b.subtasks.setSubtaskDone(present.id, true);
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      for (const device of [a, b]) expect(await device.subtasks.listSubtasks()).toMatchObject([{ id: present.id, title: "Voucher", completedAt: expect.any(String) }]);
+    });
+
+    it("lets the later untick beat the earlier tick on the other device", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      const boots = await a.subtasks.addSubtask(task.id, "Boots");
+      await a.subtasks.setSubtaskDone(boots.id, true);
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await b.subtasks.setSubtaskDone(boots.id, false);
+      await b.sync();
+      await a.sync();
+
+      expect(await a.subtasks.listSubtasks()).toMatchObject([{ completedAt: null }]);
+    });
+
+    it("brings a move on A to B", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      await a.subtasks.addSubtask(task.id, "Boots");
+      await a.subtasks.addSubtask(task.id, "Jacket");
+      const chargers = await a.subtasks.addSubtask(task.id, "Chargers");
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.subtasks.moveSubtask(chargers.id, 0);
+      await a.sync();
+      await b.sync();
+
+      expect(await subtaskTitles(b)).toEqual(["Chargers", "Boots", "Jacket"]);
+      expect(await subtaskTitles(a)).toEqual(["Chargers", "Boots", "Jacket"]);
+    });
+
+    it("brings the renumbering of a Task's Subtasks to B", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      const table = await openTable(a.db, subtaskRecordType, a.now);
+      for (const id of ["x", "y", "z"]) await table.put({ id, taskId: task.id, title: id, position: 1, completedAt: null, createdAt: `2026-10-01T09:00:0${id.charCodeAt(0) - 119}.000Z`, deletedAt: null });
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.subtasks.moveSubtask("z", 1);
+      await a.sync();
+      await b.sync();
+
+      expect(await subtaskTitles(b)).toEqual(["x", "z", "y"]);
+      expect((await b.subtasks.listSubtasks()).map((subtask) => subtask.position)).toEqual([0, 1, 2]);
+    });
+
+    it("shows the same order on both devices when both added a Subtask at the same position while apart", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      await a.sync();
+      await b.sync();
+      world.advance();
+
+      await a.subtasks.addSubtask(task.id, "From the phone");
+      world.advance();
+      await b.subtasks.addSubtask(task.id, "From the desktop");
+      await a.sync();
+      await b.sync();
+      await a.sync();
+
+      expect(await subtaskTitles(a)).toEqual(["From the phone", "From the desktop"]);
+      expect(await subtaskTitles(b)).toEqual(await subtaskTitles(a));
+    });
+
+    it("keeps a Subtask deleted on A deleted on B, and brings it back on B when A restores it (the undo)", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      const boots = await a.subtasks.addSubtask(task.id, "Boots");
+      await a.subtasks.setSubtaskDone(boots.id, true);
+      await a.sync();
+      await b.sync();
+      const before = await b.subtasks.listSubtasks();
+      world.advance();
+
+      await a.subtasks.deleteSubtask(boots.id);
+      await a.sync();
+      await b.sync();
+      expect(await b.subtasks.listSubtasks()).toEqual([]);
+      world.advance();
+      await a.subtasks.restoreSubtask(boots.id);
+      await a.sync();
+      await b.sync();
+
+      expect(await b.subtasks.listSubtasks()).toEqual(before);
+      expect(await a.subtasks.listSubtasks()).toEqual(before);
+    });
+
+    it("leaves Subtasks of a Task deleted on A stored on B, and shows them again with the Task once A restores it", async () => {
+      const { world, a, b } = await twoDevices();
+      const task = await a.tasks.addTask("Pack");
+      await a.subtasks.addSubtask(task.id, "Boots");
+      await a.sync();
+      await b.sync();
+      const before = await b.subtasks.listSubtasks();
+      world.advance();
+
+      await a.tasks.deleteTask(task.id);
+      await a.sync();
+      await b.sync();
+      expect(await b.subtasks.listSubtasks()).toEqual(before);
+      world.advance();
+      await a.tasks.restoreTask(task.id);
+      await a.sync();
+      await b.sync();
+
+      expect(await titles(b)).toEqual(["Pack"]);
+      expect(await b.subtasks.listSubtasks()).toEqual(before);
+    });
+
+    it("gives a device that synced on the version without Subtasks the ones it skipped, once it has updated", async () => {
+      const world = new World();
+      const server = new MemoryServer({ time: () => world.ms });
+      const a = await openDevice(world, server);
+      const task = await a.tasks.addTask("Pack for the weekend");
+      const boots = await a.subtasks.addSubtask(task.id, "Boots");
+      await a.sync();
+      // Device B is still on database version 4: its engine knows Tasks, Events, Lists and Tags only, so it skips the
+      // Subtask and moves its cursor past it.
+      const name = freshDbName();
+      const old = await openDB(name, 4, {
+        upgrade(db) {
+          db.createObjectStore("tasks", { keyPath: "id" });
+          db.createObjectStore("events", { keyPath: "id" });
+          createSyncStores(db);
+          db.createObjectStore("lists", { keyPath: "id" });
+          db.createObjectStore("tags", { keyPath: "id" });
+        },
+      });
+      const known = recordTypes.filter(({ type }) => type !== "subtask");
+      const oldEngine = await createSyncEngine({ db: old, types: known, transport: server.transport(), now: world.clock() });
+      await oldEngine.syncNow();
+      old.close();
+
+      // B updates (opening the database at version 5) and syncs: nothing new on the server, yet the Subtask arrives.
+      const b = await openDevice(world, server, { name });
+      await b.sync();
+
+      expect(await titles(b)).toEqual(["Pack for the weekend"]);
+      expect(await b.subtasks.listSubtasks()).toEqual([boots]);
     });
   });
 
