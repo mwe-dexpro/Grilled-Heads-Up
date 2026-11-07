@@ -97,7 +97,7 @@ export function bucketOfEvent(event: Event, today: Day): BucketKind | null {
  * Groups Tasks and Events into the home screen's Buckets, in display order, as seen at `now`.
  * Linked tasks get their dates from their Events first.
  */
-export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): Bucket[] {
+export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): [Bucket, Bucket, ...Bucket[]] {
   const tasks = withEventDates(rawTasks, events);
   const today = dayOf(now);
   const tomorrow = addDays(today, 1);
@@ -112,7 +112,7 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
 
   const shown = tasks.filter((task) => isShown(task, today)).sort(compareTasks);
 
-  return (Object.keys(ranges) as BucketKind[]).map((kind) => {
+  const bucketOfKind = (kind: BucketKind): Bucket => {
     const inBucket = shown.filter((task) => bucketOf(task, today) === kind);
     const done = inBucket.filter((task) => task.completedAt !== null).length;
     const bucketEvents = events
@@ -127,5 +127,15 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
       progress: { done, total: inBucket.length },
       open: inBucket.length - done,
     };
-  });
+  };
+
+  // The order the home screen shows them in: Overdue and Today have a place of their own, the rest follow.
+  return [
+    bucketOfKind("overdue"),
+    bucketOfKind("today"),
+    bucketOfKind("tomorrow"),
+    bucketOfKind("nextDays"),
+    bucketOfKind("later"),
+    bucketOfKind("inbox"),
+  ];
 }

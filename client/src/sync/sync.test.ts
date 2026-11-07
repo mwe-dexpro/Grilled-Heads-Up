@@ -23,6 +23,7 @@ import { openTable, type RecordType, type Synced } from "./replica";
 import { createSyncStores, type OutboxEntry, type SyncDb } from "./syncDb";
 import { MemoryServer } from "./testing/memoryServer";
 import { createHttpTransport, TransportError, type Transport } from "./transport";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 const freshDbName = () => `sync-test-${dbCounter++}`;
@@ -133,8 +134,8 @@ describe("Sync between two devices", () => {
     await b.sync();
 
     expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
-    expect((await b.tasks.listTasks())[0]).toMatchObject({ title: "Buy gift", date: "2026-10-04", time: "13:00" });
-    expect((await b.tasks.listTasks())[0].completedAt).not.toBeNull();
+    expect(defined((await b.tasks.listTasks())[0])).toMatchObject({ title: "Buy gift", date: "2026-10-04", time: "13:00" });
+    expect(defined((await b.tasks.listTasks())[0]).completedAt).not.toBeNull();
   });
 
   it("syncs what was done offline once the connection is back", async () => {
@@ -179,13 +180,13 @@ describe("Sync between two devices", () => {
     await b.tasks.linkTask(task.id, event.id, -1);
     await b.sync();
     await a.sync();
-    expect((await a.tasks.listTasks())[0]).toMatchObject({ eventId: event.id, offsetDays: -1, date: null });
+    expect(defined((await a.tasks.listTasks())[0])).toMatchObject({ eventId: event.id, offsetDays: -1, date: null });
     world.advance();
     await a.tasks.unlinkTask(task.id, "2026-10-11");
     await a.sync();
     await b.sync();
 
-    expect((await b.tasks.listTasks())[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
+    expect(defined((await b.tasks.listTasks())[0])).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
   });
 
   it("keeps an edit of the title on one device and an edit of the date on the other", async () => {
@@ -203,7 +204,7 @@ describe("Sync between two devices", () => {
     await a.sync();
 
     for (const device of [a, b]) {
-      expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday party", startDate: "2026-10-14", endDate: "2026-10-14" });
+      expect(defined((await device.events.listEvents())[0])).toMatchObject({ title: "Birthday party", startDate: "2026-10-14", endDate: "2026-10-14" });
     }
   });
 
@@ -224,7 +225,7 @@ describe("Sync between two devices", () => {
     await a.sync();
 
     for (const device of [a, b]) {
-      const [synced] = await device.tasks.listTasks();
+      const synced = defined((await device.tasks.listTasks())[0]);
       expect(synced).toMatchObject({ date: "2026-10-11", eventId: null, offsetDays: null });
       expect(synced.completedAt).not.toBeNull();
     }
@@ -245,8 +246,8 @@ describe("Sync between two devices", () => {
     await b.events.updateEvent(event.id, { ...party, title: "Edited on B, later" });
     for (const who of order) await (who === "a" ? a : b).sync();
 
-    expect((await a.events.listEvents())[0].title).toBe("Edited on B, later");
-    expect((await b.events.listEvents())[0].title).toBe("Edited on B, later");
+    expect(defined((await a.events.listEvents())[0]).title).toBe("Edited on B, later");
+    expect(defined((await b.events.listEvents())[0]).title).toBe("Edited on B, later");
   });
 
   it("settles competing links as a unit: the later link's Event and Offset both win", async () => {
@@ -266,7 +267,7 @@ describe("Sync between two devices", () => {
     await b.sync();
 
     for (const device of [a, b]) {
-      expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: second.id, offsetDays: -3, date: null });
+      expect(defined((await device.tasks.listTasks())[0])).toMatchObject({ eventId: second.id, offsetDays: -3, date: null });
     }
   });
 
@@ -369,7 +370,7 @@ describe("Sync between two devices", () => {
       await b.sync();
 
       expect(await b.tags.listTags()).toEqual([errand]);
-      expect((await b.tasks.listTasks())[0].tagIds).toEqual([errand.id]);
+      expect(defined((await b.tasks.listTasks())[0]).tagIds).toEqual([errand.id]);
     });
 
     it("brings a Task's List to B, and takes it out again there", async () => {
@@ -379,14 +380,14 @@ describe("Sync between two devices", () => {
       await a.tasks.setTaskList(task.id, basement.id);
       await a.sync();
       await b.sync();
-      expect((await b.tasks.listTasks())[0].listId).toBe(basement.id);
+      expect(defined((await b.tasks.listTasks())[0]).listId).toBe(basement.id);
       world.advance();
 
       await a.tasks.setTaskList(task.id, null);
       await a.sync();
       await b.sync();
 
-      expect((await b.tasks.listTasks())[0].listId).toBeNull();
+      expect(defined((await b.tasks.listTasks())[0]).listId).toBeNull();
     });
 
     it("lets a Task added into a List on A arrive on B in that List", async () => {
@@ -435,7 +436,7 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       for (const device of [a, b]) {
-        const [stored] = await device.tasks.listTasks();
+        const stored = defined((await device.tasks.listTasks())[0]);
         expect(stored.listId).toBe(basement.id);
         expect(liveList(stored, await device.lists.listLists())).toBeUndefined();
       }
@@ -493,8 +494,8 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       // The later write wins on both devices: the Task has no List, and B's move is lost.
-      expect((await a.tasks.listTasks())[0].listId).toBeNull();
-      expect((await b.tasks.listTasks())[0].listId).toBeNull();
+      expect(defined((await a.tasks.listTasks())[0]).listId).toBeNull();
+      expect(defined((await b.tasks.listTasks())[0]).listId).toBeNull();
     });
 
     it("keeps only the later device's Tags when two devices changed a Task's Tags apart (one field, last write wins)", async () => {
@@ -512,8 +513,8 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       // `tagIds` is one last-write-wins field: the earlier device's Tag is lost, on both devices alike.
-      expect((await a.tasks.listTasks())[0].tagIds).toEqual(["from-b"]);
-      expect((await b.tasks.listTasks())[0].tagIds).toEqual(["from-b"]);
+      expect(defined((await a.tasks.listTasks())[0]).tagIds).toEqual(["from-b"]);
+      expect(defined((await b.tasks.listTasks())[0]).tagIds).toEqual(["from-b"]);
     });
 
     it("shows two Tags of the same name made on two devices while apart, both (a known limitation)", async () => {
@@ -845,7 +846,7 @@ describe("Sync between two devices", () => {
       await b.sync();
 
       expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
-      expect((await b.tasks.listTasks())[0]).toMatchObject({ date: "2026-10-09", time: "09:00", rescheduleCount: 1 });
+      expect(defined((await b.tasks.listTasks())[0])).toMatchObject({ date: "2026-10-09", time: "09:00", rescheduleCount: 1 });
     });
 
     it("changes a Linked task's Offset on the other device too, its own date still empty, so it keeps following its Event", async () => {
@@ -860,8 +861,8 @@ describe("Sync between two devices", () => {
       await a.sync();
       await b.sync();
 
-      expect((await b.tasks.listTasks())[0]).toMatchObject({ eventId: event.id, offsetDays: -4, date: null, rescheduleCount: 1 });
-      const [onB] = withEventDates(await b.tasks.listTasks(), await b.events.listEvents());
+      expect(defined((await b.tasks.listTasks())[0])).toMatchObject({ eventId: event.id, offsetDays: -4, date: null, rescheduleCount: 1 });
+      const onB = defined(withEventDates(await b.tasks.listTasks(), await b.events.listEvents())[0]);
       expect(onB.date).toBe("2026-10-08");
     });
 
@@ -879,7 +880,7 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       expect(await b.tasks.listTasks()).toEqual(await a.tasks.listTasks());
-      const [both] = await a.tasks.listTasks();
+      const both = defined((await a.tasks.listTasks())[0]);
       expect(both).toMatchObject({ date: "2026-10-09", rescheduleCount: 1 });
       expect(both.completedAt).not.toBeNull();
     });
@@ -899,7 +900,7 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       expect(await a.tasks.listTasks()).toEqual(await b.tasks.listTasks());
-      expect((await a.tasks.listTasks())[0]).toMatchObject({ date: "2026-10-08", rescheduleCount: 1 });
+      expect(defined((await a.tasks.listTasks())[0])).toMatchObject({ date: "2026-10-08", rescheduleCount: 1 });
     });
   });
 
@@ -945,7 +946,7 @@ describe("Sync between two devices", () => {
         const tasks = await device.tasks.listTasks();
         expect(tasks.map((task) => task.title)).toEqual(["Unlinked elsewhere"]);
         expect(tasks[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
-        expect(tasks[0].completedAt).not.toBeNull();
+        expect(defined(tasks[0]).completedAt).not.toBeNull();
       }
     });
   });
@@ -956,7 +957,7 @@ describe("Sync between two devices", () => {
     await a.sync();
     await b.sync();
     world.advance();
-    const { id, createdAt, externalSource, externalId, deletedAt, ...opened } = (await a.events.listEvents())[0];
+    const { id, createdAt, externalSource, externalId, deletedAt, ...opened } = defined((await a.events.listEvents())[0]);
 
     await b.events.updateEvent(event.id, { ...party, location: "Garden" });
     await b.sync();
@@ -968,7 +969,7 @@ describe("Sync between two devices", () => {
     await a.sync();
 
     for (const device of [a, b]) {
-      expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday party", location: "Garden" });
+      expect(defined((await device.events.listEvents())[0])).toMatchObject({ title: "Birthday party", location: "Garden" });
     }
   });
 
@@ -999,7 +1000,7 @@ describe("Sync between two devices", () => {
       await settle(a, b);
 
       for (const device of [a, b]) {
-        const [event] = await device.events.listEvents();
+        const event = defined((await device.events.listEvents())[0]);
         expect(event).toMatchObject({ allDay: false, startTime: "09:30", endTime: "10:00", timeZone: "Europe/Berlin" });
         expect(validateEvent(event)).toBeNull();
       }
@@ -1014,7 +1015,7 @@ describe("Sync between two devices", () => {
       await settle(a, b);
 
       for (const device of [a, b]) {
-        const [event] = await device.events.listEvents();
+        const event = defined((await device.events.listEvents())[0]);
         expect(event).toMatchObject({ allDay: true, startTime: null, endTime: null, timeZone: null });
         expect(validateEvent(event)).toBeNull();
       }
@@ -1029,7 +1030,7 @@ describe("Sync between two devices", () => {
       await settle(a, b);
 
       for (const device of [a, b]) {
-        const [event] = await device.events.listEvents();
+        const event = defined((await device.events.listEvents())[0]);
         expect(event).toMatchObject({ startDate: "2026-10-12", endDate: "2026-10-13" });
         expect(validateEvent(event)).toBeNull();
       }
@@ -1044,7 +1045,7 @@ describe("Sync between two devices", () => {
       await settle(a, b);
 
       for (const device of [a, b]) {
-        expect((await device.events.listEvents())[0]).toMatchObject({ title: "Birthday", location: "Garden", notes: "Cake", endTime: "11:00" });
+        expect(defined((await device.events.listEvents())[0])).toMatchObject({ title: "Birthday", location: "Garden", notes: "Cake", endTime: "11:00" });
       }
     });
 
@@ -1057,10 +1058,10 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       const after = server.record("event", id);
-      const clocks = ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"].map((field) => after[field].hlc);
+      const clocks = ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"].map((field) => defined(after[field]).hlc);
       expect(new Set(clocks).size).toBe(1);
-      expect(clocks[0] > before["startTime"].hlc).toBe(true);
-      expect(after["title"].hlc).toBe(after["startTime"].hlc);
+      expect(defined(clocks[0]) > defined(before["startTime"]).hlc).toBe(true);
+      expect(defined(after["title"]).hlc).toBe(defined(after["startTime"]).hlc);
     });
 
     it("writes none of it for an edit of something else", async () => {
@@ -1072,8 +1073,8 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       const after = server.record("event", id);
-      for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"]) expect(after[field].hlc).toBe(before[field].hlc);
-      expect(after["title"].hlc > before["title"].hlc).toBe(true);
+      for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"]) expect(defined(after[field]).hlc).toBe(defined(before[field]).hlc);
+      expect(defined(after["title"]).hlc > defined(before["title"]).hlc).toBe(true);
     });
   });
 
@@ -1094,7 +1095,7 @@ describe("Sync between two devices", () => {
     await a.sync();
 
     for (const device of [a, b]) {
-      expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: second.id, offsetDays: -3, date: null });
+      expect(defined((await device.tasks.listTasks())[0])).toMatchObject({ eventId: second.id, offsetDays: -3, date: null });
     }
   });
 
@@ -1115,7 +1116,7 @@ describe("Sync between two devices", () => {
     await b.sync();
 
     for (const device of [a, b]) {
-      expect((await device.tasks.listTasks())[0]).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
+      expect(defined((await device.tasks.listTasks())[0])).toMatchObject({ eventId: null, offsetDays: null, date: "2026-10-11" });
     }
   });
 
@@ -1246,14 +1247,14 @@ describe("Sync between two devices", () => {
 
       const { events, tasks } = await useEveryScreen(a);
       expect(events.map((event) => [event.title, event.startDate, event.endDate])).toEqual([["Wedding", "2026-10-19", "2026-10-20"]]);
-      expect(withEventDates(tasks, events)[0].date).toBe("2026-10-12");
+      expect(defined(withEventDates(tasks, events)[0]).date).toBe("2026-10-12");
     });
 
     it("lets the rest of the Event arrive later, and then shows it as it is", async () => {
       const { server, a } = await twoDevices();
       server.inject(arrived("event", "e1", { title: "Party", allDay: false, startDate: "2026-10-12", endDate: "2026-10-12" }));
       await a.sync();
-      expect((await a.events.listEvents())[0].allDay).toBe(true);
+      expect(defined((await a.events.listEvents())[0]).allDay).toBe(true);
 
       server.inject(arrived("event", "e1", { startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }).map((c) => ({ ...c, hlc: "000000000000002-00000-other-device" })));
       await a.sync();
@@ -1279,7 +1280,7 @@ describe("Sync between two devices", () => {
       await b.sync();
       await a.sync();
 
-      expect((await a.events.listEvents())[0].title).toBe("From B, after seeing A");
+      expect(defined((await a.events.listEvents())[0]).title).toBe("From B, after seeing A");
     });
 
     it("pulls a slow clock up to the server's time at each sync", async () => {
@@ -1309,7 +1310,7 @@ describe("Sync between two devices", () => {
     await a.sync();
     await b.sync();
 
-    expect((await b.events.listEvents())[0].title).toBe("Edited during the push");
+    expect(defined((await b.events.listEvents())[0]).title).toBe("Edited during the push");
     expect(server.stored("event", event.id, "title")?.value).toBe("Edited during the push");
   });
 
@@ -1351,7 +1352,7 @@ describe("Sync between two devices", () => {
     const pushedBefore = server.pushRequests;
     await a.sync();
 
-    expect((await a.events.listEvents())[0]).toMatchObject({ title: "From the device with the fast clock", notes: "A note" });
+    expect(defined((await a.events.listEvents())[0])).toMatchObject({ title: "From the device with the fast clock", notes: "A note" });
     expect(server.pushRequests).toBe(pushedBefore);
   });
 
@@ -1639,8 +1640,8 @@ describe("Sync between two devices", () => {
       expect(a.engine.state().status).toBe("rejected");
       expect(await titles(b)).toEqual(["Fine", "From B"]);
       expect(await titles(a)).toEqual(["Fine", "From B"]);
-      expect((await b.events.listEvents())[0]).toMatchObject({ id: event.id, title: "Party", notes: "" });
-      expect((await a.events.listEvents())[0].notes).toHaveLength(1_200_000);
+      expect(defined((await b.events.listEvents())[0])).toMatchObject({ id: event.id, title: "Party", notes: "" });
+      expect(defined((await a.events.listEvents())[0]).notes).toHaveLength(1_200_000);
     });
 
     describe("a refusal as too big", () => {
@@ -1666,7 +1667,7 @@ describe("Sync between two devices", () => {
         expect(server.refusedPushes).toBe(1);
         expect(a.engine.state().status).toBe("rejected");
         expect(((await a.db.getAll("outbox")) as OutboxEntry[]).filter((entry) => entry.rejectedAt !== undefined)).toHaveLength(1);
-        expect((await b.events.listEvents())[0]).toMatchObject({ title: "Party", notes: "" });
+        expect(defined((await b.events.listEvents())[0])).toMatchObject({ title: "Party", notes: "" });
       });
 
       it("takes a single value under 100 KB as the server's trouble: failed, nothing set aside, sent once the server is well", async () => {
@@ -1684,7 +1685,7 @@ describe("Sync between two devices", () => {
         await b.sync();
 
         expect(a.engine.state().status).toBe("idle");
-        expect((await b.events.listEvents())[0].notes).toHaveLength(99_000);
+        expect(defined((await b.events.listEvents())[0]).notes).toHaveLength(99_000);
       });
 
       it("does so also when the first of several changes is over 100 KB: only a lone value is judged by its size", async () => {
@@ -1698,7 +1699,7 @@ describe("Sync between two devices", () => {
         expect(a.engine.state().status).toBe("failed");
         expect(((await a.db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined)).toBe(false);
         await b.sync();
-        expect((await b.events.listEvents())[0].title).toBe("Party");
+        expect(defined((await b.events.listEvents())[0]).title).toBe("Party");
       });
 
       it("takes a refusal of a request with several changes as the server's trouble, however big, and sets nothing aside", async () => {
@@ -1711,8 +1712,8 @@ describe("Sync between two devices", () => {
           events.push(await a.events.addEvent({ ...party, title }));
           world.advance();
         }
-        await writeNotesUnchecked(a, events[0].id, note(150_000));
-        await writeNotesUnchecked(a, events[1].id, note(150_000));
+        await writeNotesUnchecked(a, defined(events[0]).id, note(150_000));
+        await writeNotesUnchecked(a, defined(events[1]).id, note(150_000));
 
         await a.sync();
 
@@ -1742,7 +1743,7 @@ describe("Sync between two devices", () => {
       await b.sync();
 
       expect(a.engine.state().status).toBe("idle");
-      expect((await b.events.listEvents())[0].notes).toBe("Short");
+      expect(defined((await b.events.listEvents())[0]).notes).toBe("Short");
     });
 
     it("sets aside only the change the server names as malformed, and sends the rest in one more request", async () => {
@@ -1818,7 +1819,7 @@ describe("Sync between two devices", () => {
       await a.sync();
       await b.sync();
 
-      expect((await b.events.listEvents())[0].title).toBe("Better title");
+      expect(defined((await b.events.listEvents())[0]).title).toBe("Better title");
     });
 
     it("keeps a change set aside across a restart, and tries it again once the hour is over, when the server has been fixed", async () => {

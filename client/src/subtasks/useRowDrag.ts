@@ -83,8 +83,12 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
 
   /** How far the row at `from` has to go to sit in the place of the row at `target`, as the layout has it (rows can be of different heights). */
   function waySlot(from: number, target: number): number {
-    const here = rows.current.get(subtasks[from].id);
-    const there = rows.current.get(subtasks[target].id);
+    const rowAt = (index: number) => {
+      const subtask = subtasks[index];
+      return subtask === undefined ? undefined : rows.current.get(subtask.id);
+    };
+    const here = rowAt(from);
+    const there = rowAt(target);
     if (!here || !there) return 0;
     // Down: the bottom edges meet. Up: the top edges do.
     return target > from ? there.offsetTop + there.offsetHeight - (here.offsetTop + here.offsetHeight) : there.offsetTop - here.offsetTop;

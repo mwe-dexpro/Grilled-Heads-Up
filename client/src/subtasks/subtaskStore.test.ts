@@ -4,6 +4,7 @@ import { maxTitleLength } from "../data/limits";
 import { openTable } from "../sync/replica";
 import { NoTaskError, openTaskStore } from "../tasks/taskStore";
 import { NoSubtaskError, openSubtaskStore, subtaskRecordType, type Subtask } from "./subtaskStore";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 const freshDbName = () => `subtasks-test-${dbCounter++}`;
@@ -109,7 +110,7 @@ describe("Subtask store", () => {
 
     expect(Date.parse(boots.createdAt)).toBeGreaterThanOrEqual(before - 1000);
     expect(Date.parse(boots.createdAt)).toBeLessThanOrEqual(Date.now());
-    expect(Date.parse((await subtasks.listSubtasks())[0].completedAt!)).toBeLessThanOrEqual(Date.now());
+    expect(Date.parse(defined((await subtasks.listSubtasks())[0]).completedAt!)).toBeLessThanOrEqual(Date.now());
   });
 
   it("refuses an empty, a blank and a too long title, and takes one of exactly the limit", async () => {
@@ -194,10 +195,10 @@ describe("Subtask store", () => {
     const boots = await subtasks.addSubtask(task.id, "Boots");
 
     await subtasks.setSubtaskDone(boots.id, true);
-    expect((await subtasks.listSubtasks())[0].completedAt).toBe("2026-10-04T11:05:00.000Z");
+    expect(defined((await subtasks.listSubtasks())[0]).completedAt).toBe("2026-10-04T11:05:00.000Z");
     await subtasks.setSubtaskDone(boots.id, false);
 
-    expect((await subtasks.listSubtasks())[0].completedAt).toBeNull();
+    expect(defined((await subtasks.listSubtasks())[0]).completedAt).toBeNull();
   });
 
   it("writes nothing for a tick of a ticked Subtask or an untick of an open one", async () => {
@@ -238,9 +239,10 @@ describe("Subtask store", () => {
   describe("moving", () => {
     async function four() {
       const env = await open();
-      const made: Subtask[] = [];
-      for (const title of ["A", "B", "C", "D"]) made.push(await env.subtasks.addSubtask(env.task.id, title));
-      const [a, b, c, d] = made;
+      const a = await env.subtasks.addSubtask(env.task.id, "A");
+      const b = await env.subtasks.addSubtask(env.task.id, "B");
+      const c = await env.subtasks.addSubtask(env.task.id, "C");
+      const d = await env.subtasks.addSubtask(env.task.id, "D");
       return { ...env, a, b, c, d };
     }
 
@@ -254,7 +256,7 @@ describe("Subtask store", () => {
       await subtasks.moveSubtask(a.id, 2);
       expect(await titles(subtasks, task.id)).toEqual(["B", "C", "A", "D"]);
 
-      expect((await queued(dbName, a.id, "position"))[0].value).toBe(2.5);
+      expect(defined((await queued(dbName, a.id, "position"))[0]).value).toBe(2.5);
       expect(await queued(dbName, b.id, "position")).toHaveLength(1);
       expect(await queued(dbName, b.id, "title")).toHaveLength(1);
     });

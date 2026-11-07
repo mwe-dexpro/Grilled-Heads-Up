@@ -1,6 +1,6 @@
 import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import type { Progress } from "../home/buckets";
-import { addDays, dayOf, type Day, type TimeOfDay } from "../home/days";
+import { addDays, dayOf, dayParts, timeParts, type Day, type TimeOfDay } from "../home/days";
 import type { Task } from "../tasks/taskStore";
 
 /**
@@ -45,7 +45,7 @@ export function deviceTimeZone(): string {
 
 /** How many minutes `timeZone` is ahead of UTC at that moment. */
 function zoneOffsetMinutes(moment: Date, timeZone: string): number {
-  const parts = Object.fromEntries(
+  const parts = new Map(
     new Intl.DateTimeFormat("en-US", {
       timeZone,
       hourCycle: "h23",
@@ -59,14 +59,15 @@ function zoneOffsetMinutes(moment: Date, timeZone: string): number {
       .formatToParts(moment)
       .map((part) => [part.type, Number(part.value)]),
   );
-  const wallClockAsUtc = Date.UTC(parts["year"], parts["month"] - 1, parts["day"], parts["hour"], parts["minute"], parts["second"]);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.get(type) ?? NaN;
+  const wallClockAsUtc = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
   return Math.round((wallClockAsUtc - moment.getTime()) / 60_000);
 }
 
 /** The moment a wall-clock time in a time zone stands for. */
 export function zonedInstant(day: Day, time: TimeOfDay, timeZone: string): Date {
-  const [year, month, date] = day.split("-").map(Number);
-  const [hours, minutes] = time.split(":").map(Number);
+  const [year, month, date] = dayParts(day);
+  const [hours, minutes] = timeParts(time);
   const asUtc = Date.UTC(year, month - 1, date, hours, minutes);
   // The offset at the guess can differ from the one at the real moment near a clock change, so check once more.
   const firstGuess = asUtc - zoneOffsetMinutes(new Date(asUtc), timeZone) * 60_000;
@@ -74,7 +75,7 @@ export function zonedInstant(day: Day, time: TimeOfDay, timeZone: string): Date 
 }
 
 function localMidnight(day: Day): Date {
-  const [year, month, date] = day.split("-").map(Number);
+  const [year, month, date] = dayParts(day);
   return new Date(year, month - 1, date);
 }
 
@@ -116,11 +117,13 @@ export function linkedTaskDate(event: Pick<Event, "startDate">, offsetDays: numb
 /** Gives every Linked task the date its Event and Offset make; a Task whose Event is missing has no date. */
 export function withEventDates(tasks: Task[], events: Event[]): Task[] {
   const byId = new Map(events.map((event) => [event.id, event]));
-  return tasks.map((task) => {
-    if (task.eventId === null) return task;
-    const event = byId.get(task.eventId);
-    return { ...task, date: event ? linkedTaskDate(event, task.offsetDays ?? 0) : null };
-  });
+  return tasks.map((task) => withEventDate(task, task.eventId === null ? undefined : byId.get(task.eventId)));
+}
+
+/** One Task with the date its Event (`undefined` if it has none, or the Event is missing) and Offset make. */
+export function withEventDate(task: Task, event: Event | undefined): Task {
+  if (task.eventId === null) return task;
+  return { ...task, date: event ? linkedTaskDate(event, task.offsetDays ?? 0) : null };
 }
 
 /** Completed ÷ all Linked tasks of the Event. */

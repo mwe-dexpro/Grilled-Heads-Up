@@ -16,7 +16,7 @@ export function translate(
   params: Record<string, string> = {},
 ): string {
   return translations[language][key].replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-    name in params ? params[name] : placeholder,
+    params[name] ?? placeholder,
   );
 }
 

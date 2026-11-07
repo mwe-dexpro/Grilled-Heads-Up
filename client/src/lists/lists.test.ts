@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Event } from "../events/event";
-import { withEventDates } from "../events/event";
+import { withEventDate, withEventDates } from "../events/event";
 import type { Tag } from "../tags/tagStore";
 import type { Task } from "../tasks/taskStore";
 import type { List } from "./listStore";
@@ -189,7 +189,8 @@ describe("nextTask", () => {
   });
 
   it("uses the date of a Linked task's Event", () => {
-    const [linked, plain] = withEventDates([task({ eventId: "party", offsetDays: -3 }), task({ date: "2026-10-01" })], [party]);
+    const linked = withEventDate(task({ eventId: "party", offsetDays: -3 }), party);
+    const plain = task({ date: "2026-10-01" });
 
     expect(nextTask([plain, linked], "L")).toBe(linked);
   });

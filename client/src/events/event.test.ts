@@ -184,7 +184,7 @@ describe("Linked task dates come from the Event's start day plus the Offset", ()
   });
 
   it("leaves a Task undated when its Event is missing", () => {
-    expect(withEventDates([task({ eventId: "gone", offsetDays: -1 })], [event()])[0].date).toBeNull();
+    expect(withEventDates([task({ eventId: "gone", offsetDays: -1 })], [event()])[0]?.date).toBeNull();
   });
 });
 

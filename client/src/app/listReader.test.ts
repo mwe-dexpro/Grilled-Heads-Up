@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createListReader } from "./listReader";
+import { defined } from "../testing/defined";
 
 /** A read that finishes when the test says so. */
 function slowRead<T>() {
   const pending: Array<(value: T | null) => void> = [];
   return {
     read: () => new Promise<T | null>((resolve) => pending.push(resolve)),
-    finish: (index: number, value: T | null) => pending[index](value),
+    finish: (index: number, value: T | null) => defined(pending[index])(value),
   };
 }
 
@@ -78,8 +79,8 @@ describe("List reader", () => {
     const first = reload();
     const second = reload();
     const secondResult = expect(second).rejects.toThrow("newest failed");
-    pending[0].resolve("older");
-    pending[1].reject(new Error("newest failed"));
+    defined(pending[0]).resolve("older");
+    defined(pending[1]).reject(new Error("newest failed"));
 
     await expect(first).resolves.toBeUndefined();
     await secondResult;

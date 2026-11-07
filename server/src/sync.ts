@@ -102,7 +102,7 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
     const page = rows.slice(0, limit);
     res.json({
       changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: JSON.parse(value), hlc })),
-      cursor: page.length > 0 ? page[page.length - 1].seq : after,
+      cursor: page.at(-1)?.seq ?? after,
       more: rows.length > limit,
       serverTime: Date.now(),
     });

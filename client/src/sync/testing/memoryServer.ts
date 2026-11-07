@@ -96,7 +96,7 @@ export class MemoryServer {
         this.pulledChanges += page.length;
         return {
           changes: page.map((row) => row.change),
-          cursor: page.length > 0 ? page[page.length - 1].seq : after,
+          cursor: page.at(-1)?.seq ?? after,
           more: feed.length > size,
           serverTime: this.time(),
         };

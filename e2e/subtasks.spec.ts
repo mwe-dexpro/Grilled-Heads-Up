@@ -541,11 +541,17 @@ test("a drag ends where the row was dropped: when the saved order arrives no row
   const shown = await frames;
 
   // Nothing moves from the frame the order shows, other than the dropped row finishing its way into place (less than a row).
-  const final = shown[shown.length - 1];
-  const rowHeight = final["Jacket"] - final["Swimwear"];
+  const final = shown.at(-1);
+  if (final === undefined) throw new Error("no frame was captured");
+  const topOf = (frame: Record<string, number>, title: string) => {
+    const top = frame[title];
+    if (top === undefined) throw new Error(`no row "${title}" in the frame`);
+    return top;
+  };
+  const rowHeight = topOf(final, "Jacket") - topOf(final, "Swimwear");
   for (const frame of shown) {
-    for (const title of ["Boots", "Jacket", "Chargers"]) expect(frame[title], title).toBe(final[title]);
-    expect(Math.abs(frame["Swimwear"] - final["Swimwear"])).toBeLessThan(rowHeight / 2);
+    for (const title of ["Boots", "Jacket", "Chargers"]) expect(topOf(frame, title), title).toBe(topOf(final, title));
+    expect(Math.abs(topOf(frame, "Swimwear") - topOf(final, "Swimwear"))).toBeLessThan(rowHeight / 2);
   }
   await expect(titlesOf(page)).toHaveText(["Swimwear", "Boots", "Jacket", "Chargers"]);
 });

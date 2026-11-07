@@ -24,10 +24,10 @@ export function formatRiskExplanation(event: Event, risk: EventRisk, now: Date, 
   const today = dayOf(now);
 
   let what: string;
-  if (risk.overdue.length > 1) {
+  const [task, ...otherOverdue] = risk.overdue;
+  if (otherOverdue.length > 0) {
     what = t("risk.overdueTasks", { count: String(risk.overdue.length) });
-  } else if (risk.overdue.length === 1) {
-    const [task] = risk.overdue;
+  } else if (task !== undefined) {
     const days = daysBetween(task.date!, today);
     what = days === 1 ? t("risk.overdueOne", { title: task.title }) : t("risk.overdueMany", { title: task.title, count: String(days) });
   } else {

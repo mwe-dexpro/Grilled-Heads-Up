@@ -202,7 +202,7 @@ describe("sync routes", () => {
 
     const stored = await pull(phone);
     expect(stored.changes).toHaveLength(1);
-    expect(stored.changes[0].value).toHaveLength(400_000);
+    expect(stored.changes[0]?.value).toHaveLength(400_000);
   });
 
   test("refuse a bad after or limit", async () => {

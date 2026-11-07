@@ -130,8 +130,9 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         return;
       }
       // `batchesOf` keeps a batch far below the server's limit, so only one value alone can be too big for it.
-      if (batch.length !== 1 || sizeOf(batch[0]) <= tooBigForAnyServer) throw new TransportError("failed");
-      await setAside(batch[0]);
+      const only = batch.length === 1 ? batch[0] : undefined;
+      if (only === undefined || sizeOf(only) <= tooBigForAnyServer) throw new TransportError("failed");
+      await setAside(only);
     }
   }
 

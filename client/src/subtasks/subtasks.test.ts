@@ -15,6 +15,7 @@ import {
   withPendingTicks,
 } from "./subtasks";
 import type { Subtask } from "./subtaskStore";
+import { defined } from "../testing/defined";
 
 let counter = 0;
 /** A Subtask of Task "t1", open, at `position`; made in the order the tests call this unless `createdAt` says otherwise. */
@@ -126,7 +127,7 @@ describe("appendPosition", () => {
 });
 
 describe("positionAt and movedOrder", () => {
-  const abcd = () => [
+  const abcd = (): [Subtask, Subtask, Subtask, Subtask] => [
     subtask({ id: "a", position: 0 }),
     subtask({ id: "b", position: 1 }),
     subtask({ id: "c", position: 2 }),
@@ -329,7 +330,7 @@ describe("dropIndex", () => {
 });
 
 describe("withPendingTicks", () => {
-  const list = () => [subtask({ id: "a", completedAt: done }), subtask({ id: "b" }), subtask({ id: "c" })];
+  const list = (): [Subtask, Subtask, Subtask] => [subtask({ id: "a", completedAt: done }), subtask({ id: "b" }), subtask({ id: "c" })];
 
   it("shows a Subtask as ticked or open as it was asked to be, and the others as they are", () => {
     const shown = withPendingTicks(list(), new Map([["b", true], ["a", false]]));
@@ -344,7 +345,7 @@ describe("withPendingTicks", () => {
 
     expect(shown[0]).toBe(a);
     expect(shown[1]).toBe(b);
-    expect(shown[0].completedAt).toBe(done);
+    expect(defined(shown[0]).completedAt).toBe(done);
   });
 
   it("changes nothing without pending ticks, and does not change the Subtasks it was given", () => {
@@ -352,7 +353,7 @@ describe("withPendingTicks", () => {
 
     expect(withPendingTicks(given, new Map())).toEqual(given);
     withPendingTicks(given, new Map([["b", true]]));
-    expect(given[1].completedAt).toBeNull();
+    expect(defined(given[1]).completedAt).toBeNull();
   });
 
   it("makes the decisions of a second tick that comes before the first is shown: the last open one then offers the Task", () => {

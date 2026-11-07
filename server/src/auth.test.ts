@@ -31,6 +31,12 @@ async function becomeOwner(phone = browser(), passkey = new TestPasskey()) {
   return { phone, passkey, recoveryCode };
 }
 
+describe("configuration", () => {
+  test("the server will not start without an address to bind passkeys to", () => {
+    expect(() => createApp({ db: openDatabase(":memory:"), origins: [] })).toThrow("origin");
+  });
+});
+
 describe("registration", () => {
   test("on first launch, the first passkey creates the owner, signs in and gives a recovery code", async () => {
     const phone = browser();

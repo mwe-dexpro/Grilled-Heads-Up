@@ -53,8 +53,11 @@ interface PasskeyRow {
  * an HttpOnly cookie, and only a hash of the session token and of the recovery code is stored.
  */
 export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
-  const rpID = new URL(origins[0]).hostname;
-  const secure = origins[0].startsWith("https:");
+  // The first origin is the one the app is served from: passkeys are bound to its host, and it decides on secure cookies.
+  const [origin] = origins;
+  if (origin === undefined) throw new Error("At least one origin is needed to bind passkeys to.");
+  const rpID = new URL(origin).hostname;
+  const secure = origin.startsWith("https:");
   const ceremonies = new Map<string, Ceremony>();
 
   function now() {

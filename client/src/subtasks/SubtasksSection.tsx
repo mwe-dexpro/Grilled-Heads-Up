@@ -55,7 +55,8 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     if (moved !== null) {
       rows.current.get(moved.id)?.querySelector<HTMLElement>(moved.control)?.focus();
       const to = subtasks.findIndex((s) => s.id === moved.id);
-      if (to !== -1 && to !== moved.from) announce(t("subtask.moved", { title: subtasks[to].title, position: String(to + 1), total: String(subtasks.length) }));
+      const landed = subtasks[to];
+      if (landed !== undefined && to !== moved.from) announce(t("subtask.moved", { title: landed.title, position: String(to + 1), total: String(subtasks.length) }));
     }
     refocus.current = null;
   }, [subtasks]);

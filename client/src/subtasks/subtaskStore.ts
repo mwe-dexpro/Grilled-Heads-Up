@@ -135,7 +135,7 @@ export async function openSubtaskStore(
     const siblings = subtasksOf(moving.taskId, all);
     const toIndex = target(siblings.findIndex((subtask) => subtask.id === id));
     const order = movedOrder(siblings, id, toIndex);
-    if (order.every((subtask, index) => subtask.id === siblings[index].id)) return;
+    if (order.every((subtask, index) => subtask.id === siblings[index]?.id)) return;
 
     const position = positionAt(siblings, id, toIndex);
     if (position !== null) {

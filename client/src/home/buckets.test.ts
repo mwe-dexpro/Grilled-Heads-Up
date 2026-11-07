@@ -3,6 +3,7 @@ import type { Event } from "../events/event";
 import type { Task } from "../tasks/taskStore";
 import { arrangeHome, bucketOf, isLate, isOverdueEmphasised, taskMeta, type BucketKind } from "./buckets";
 import { addDays, daysBetween, dayOf } from "./days";
+import { defined } from "../testing/defined";
 
 /** Sunday 4 October 2026, 13:05 local time. */
 const now = new Date(2026, 9, 4, 13, 5);
@@ -206,7 +207,7 @@ describe("Overdue badge emphasis", () => {
 
   it("does not count Overdue Tasks Completed today", () => {
     const tasks = overdueTasks(5);
-    tasks[0] = { ...tasks[0], completedAt: now.toISOString() };
+    tasks[0] = { ...defined(tasks[0]), completedAt: now.toISOString() };
 
     expect(isOverdueEmphasised(bucket("overdue", tasks))).toBe(false);
   });
@@ -316,7 +317,7 @@ describe("Events on the home screen", () => {
     const home = arrangeHome([orphan], now, [other]);
 
     expect(home.find((b) => b.kind === "inbox")!.tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
-    expect(taskMeta(home.find((b) => b.kind === "inbox")!.tasks[0], "inbox", now)).toBeNull();
+    expect(taskMeta(defined(defined(home.find((b) => b.kind === "inbox")).tasks[0]), "inbox", now)).toBeNull();
   });
 });
 

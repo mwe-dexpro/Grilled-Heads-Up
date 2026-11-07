@@ -3,7 +3,8 @@ import { openDB } from "idb";
 import { openAppDb } from "../data/database";
 import { createSyncStores } from "../sync/syncDb";
 import { maxTitleLength } from "../data/limits";
-import { NoTaskError, openTaskStore, taskRecordType } from "./taskStore";
+import { NoTaskError, openTaskStore, taskRecordType, type Task } from "./taskStore";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 const freshDbName = () => `tasks-test-${dbCounter++}`;
@@ -22,8 +23,8 @@ describe("Task store", () => {
 
     const tasks = await store.listTasks();
     expect(tasks).toHaveLength(1);
-    expect(tasks[0].title).toBe("Buy birthday present");
-    expect(tasks[0].completedAt).toBeNull();
+    expect(tasks[0]?.title).toBe("Buy birthday present");
+    expect(tasks[0]?.completedAt).toBeNull();
   });
 
   it("marks a Task as Completed at the current time", async () => {
@@ -33,7 +34,7 @@ describe("Task store", () => {
 
     await store.completeTask(task.id);
 
-    const [completed] = await store.listTasks();
+    const completed = defined((await store.listTasks())[0]);
     expect(completed.completedAt).toBe("2026-09-28T10:30:00.000Z");
   });
 
@@ -308,7 +309,7 @@ describe("Rescheduling a Task", () => {
 
     await store.rescheduleTask(task.id, "2026-10-09", noEvents);
 
-    expect((await store.listTasks())[0]).toMatchObject({ offsetDays: -7, rescheduleCount: 0 });
+    expect(defined((await store.listTasks())[0])).toMatchObject({ offsetDays: -7, rescheduleCount: 0 });
   });
 
   it("refuses to take an Overdue Task to today, or any Task to a day in the past, and changes nothing", async () => {
@@ -324,7 +325,7 @@ describe("Rescheduling a Task", () => {
       ["2026-10-09", 0],
     ]);
     await store.rescheduleTask(overdue.id, "2026-10-05", noEvents);
-    expect((await store.listTasks())[0].date).toBe("2026-10-05");
+    expect(defined((await store.listTasks())[0]).date).toBe("2026-10-05");
   });
 
   it("judges Overdue by the device's day when the Task is rescheduled", async () => {
@@ -338,7 +339,7 @@ describe("Rescheduling a Task", () => {
     // At 00:01 the Task is Overdue: tomorrow (Oct 6) is the earliest day, today (Oct 5) is not allowed.
     await expect(store.rescheduleTask(task.id, "2026-10-05", noEvents)).rejects.toThrow();
     await store.rescheduleTask(task.id, "2026-10-06", noEvents);
-    expect((await store.listTasks())[0]).toMatchObject({ date: "2026-10-06", rescheduleCount: 1 });
+    expect(defined((await store.listTasks())[0])).toMatchObject({ date: "2026-10-06", rescheduleCount: 1 });
   });
 
   it("judges a Task whose Event has arrived but not its Offset as the lists show it: a Task due on its date", async () => {
@@ -354,7 +355,7 @@ describe("Rescheduling a Task", () => {
     await store.rescheduleTask(task.id, "2026-10-04", eventStart);
     await store.rescheduleTask(task.id, "2026-10-10", eventStart);
 
-    expect((await store.listTasks())[0]).toMatchObject({ date: "2026-10-10", eventId: null, offsetDays: null, rescheduleCount: 2 });
+    expect(defined((await store.listTasks())[0])).toMatchObject({ date: "2026-10-10", eventId: null, offsetDays: null, rescheduleCount: 2 });
   });
 
   describe("several at once", () => {
@@ -416,7 +417,7 @@ describe("Rescheduling a Task", () => {
     await expect(store.rescheduleTask(task.id, "2026-10-09", noEvents)).resolves.toBeUndefined();
 
     expect(await store.listTasks()).toEqual([]);
-    expect((await store.listTrash())[0]).toMatchObject({ date: "2026-10-06", rescheduleCount: 0 });
+    expect(defined((await store.listTrash())[0])).toMatchObject({ date: "2026-10-06", rescheduleCount: 0 });
   });
 });
 
@@ -454,7 +455,7 @@ describe("The Trash", () => {
   it("lists the Trash newest deletion first, whatever order the ids are stored in", async () => {
     const { state, now } = clock();
     const store = await openTaskStore(freshDbName(), { now });
-    const added = await addWithIds(["k1", "k2", "k3", "k4"], async () => [
+    const added = await addWithIds(["k1", "k2", "k3", "k4"], async (): Promise<[Task, Task, Task, Task]> => [
       await store.addTask("one"),
       await store.addTask("two"),
       await store.addTask("three"),
@@ -479,7 +480,7 @@ describe("The Trash", () => {
     await store.rescheduleTask(task.id, "2026-10-09", () => undefined);
     state.ms += 1000;
     await store.completeTask(task.id);
-    const before = (await store.listTasks())[0];
+    const before = defined((await store.listTasks())[0]);
 
     state.ms += 1000;
     await store.deleteTask(task.id);
@@ -494,7 +495,7 @@ describe("The Trash", () => {
   it("restores a Linked task with its Event and Offset", async () => {
     const store = await openTaskStore(freshDbName(), { now: tickingClock() });
     const task = await store.addTask("Buy gift", { eventId: "e1", offsetDays: -7 });
-    const before = (await store.listTasks())[0];
+    const before = defined((await store.listTasks())[0]);
 
     await store.deleteTask(task.id);
     await store.restoreTask(task.id);
@@ -538,7 +539,7 @@ describe("The Trash", () => {
     const { state, now } = clock();
     const store = await openTaskStore(freshDbName(), { now });
     // k1 is stored before k2 in both pairs; in the first pair the expired Task is the second one, in the other the first.
-    const [oldLate, freshEarly, oldEarly, freshLate] = await addWithIds(["k2", "k1", "k3", "k4"], async () => [
+    const [oldLate, freshEarly, oldEarly, freshLate] = await addWithIds(["k2", "k1", "k3", "k4"], async (): Promise<[Task, Task, Task, Task]> => [
       await store.addTask("old, key k2"),
       await store.addTask("fresh, key k1"),
       await store.addTask("old, key k3"),
@@ -603,7 +604,7 @@ describe("The Trash", () => {
     await db.put("tasks", { ...(await db.get("tasks", task.id))!, eventId: "e1", offsetDays: null });
     db.close();
 
-    expect((await store.listTrash())[0]).toMatchObject({ eventId: null, offsetDays: null });
+    expect(defined((await store.listTrash())[0])).toMatchObject({ eventId: null, offsetDays: null });
   });
 });
 
@@ -640,10 +641,10 @@ describe("Lists and Tags of a Task", () => {
     await store.setTaskList(task.id, "l1");
     store.close();
     const reopened = await openTaskStore(dbName);
-    expect((await reopened.listTasks())[0].listId).toBe("l1");
+    expect(defined((await reopened.listTasks())[0]).listId).toBe("l1");
     await reopened.setTaskList(task.id, null);
 
-    expect((await reopened.listTasks())[0].listId).toBeNull();
+    expect(defined((await reopened.listTasks())[0]).listId).toBeNull();
   });
 
   it("refuses to put a Task that is missing or deleted in a List", async () => {
@@ -664,7 +665,7 @@ describe("Lists and Tags of a Task", () => {
     await store.addTaskTag(task.id, "g1");
     await store.addTaskTag(task.id, "g2");
 
-    expect((await store.listTasks())[0].tagIds).toEqual(["g2", "g1"]);
+    expect(defined((await store.listTasks())[0]).tagIds).toEqual(["g2", "g1"]);
   });
 
   it("removes a Tag and leaves the others; one that is not there changes nothing", async () => {
@@ -675,7 +676,7 @@ describe("Lists and Tags of a Task", () => {
     await store.removeTaskTag(task.id, "g2");
     await store.removeTaskTag(task.id, "g9");
 
-    expect((await store.listTasks())[0].tagIds).toEqual(["g1", "g3"]);
+    expect(defined((await store.listTasks())[0]).tagIds).toEqual(["g1", "g3"]);
   });
 
   it("writes nothing for a Tag that is there already or one that is not there to remove", async () => {
@@ -701,7 +702,7 @@ describe("Lists and Tags of a Task", () => {
 
     const entries = await queued(dbName, task.id, "tagIds");
     expect(entries).toHaveLength(1);
-    expect(entries[0].value).toEqual(["g1", "g2"]);
+    expect(defined(entries[0]).value).toEqual(["g1", "g2"]);
   });
 
   it("refuses Tag changes on a Task that is missing or deleted", async () => {
@@ -726,7 +727,7 @@ describe("Lists and Tags of a Task", () => {
 
     await store.addTaskTag(task.id, "g1");
 
-    expect((await store.listTasks())[0].tagIds).toEqual(["g-from-sync", "g1"]);
+    expect(defined((await store.listTasks())[0]).tagIds).toEqual(["g-from-sync", "g1"]);
   });
 
   it("clears the List of every live Task in it, and of no other", async () => {
@@ -749,7 +750,7 @@ describe("Lists and Tags of a Task", () => {
       ["Nowhere", null],
     ]);
     // A Task in the Trash keeps its List: restoring it puts it back where it was (the List may be gone by then).
-    expect((await store.listTrash())[0].listId).toBe("l1");
+    expect(defined((await store.listTrash())[0]).listId).toBe("l1");
     expect(await queued(dbName, inList.id, "listId")).toHaveLength(1);
   });
 

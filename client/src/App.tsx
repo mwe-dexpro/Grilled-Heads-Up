@@ -144,7 +144,7 @@ export function App() {
       />
       <RescheduleSheet
         open={reschedulingTasks.length > 0}
-        title={reschedulingTasks.length === 1 ? reschedulingTasks[0].title : t("reschedule.tasks", { count: String(reschedulingTasks.length) })}
+        title={reschedulingTasks.length === 1 ? (reschedulingTasks[0]?.title ?? "") : t("reschedule.tasks", { count: String(reschedulingTasks.length) })}
         today={today}
         earliest={earliest}
         onChoose={(day) => {

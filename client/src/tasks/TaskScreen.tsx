@@ -2,7 +2,7 @@ import { Calendar, Check, ChevronRight, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { hrefOf } from "../app/routes";
 import { maxTagLength } from "../data/limits";
-import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
+import { eventDays, eventProgress, withEventDate, type Event } from "../events/event";
 import { formatEventWhen, formatOffset } from "../events/formatEvent";
 import { dayOf, daysBetween, type Day } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
@@ -93,8 +93,8 @@ export function TaskScreen({
     );
   }
 
-  const [task] = withEventDates([rawTask], events);
-  const event = task.eventId === null ? undefined : events.find((e) => e.id === task.eventId);
+  const event = rawTask.eventId === null ? undefined : events.find((e) => e.id === rawTask.eventId);
+  const task = withEventDate(rawTask, event);
   const taskTags = liveTags(task, tags);
   const completed = task.completedAt !== null;
   const today = dayOf(now);

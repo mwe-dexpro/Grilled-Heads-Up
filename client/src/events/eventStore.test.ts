@@ -3,6 +3,7 @@ import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limit
 import { openTaskStore } from "../tasks/taskStore";
 import type { EventFields } from "./event";
 import { eventRecordType, openEventStore } from "./eventStore";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 const freshDbName = () => `events-test-${dbCounter++}`;
@@ -115,7 +116,7 @@ describe("Event store", () => {
 
     await expect(store.updateEvent(created.id, { ...birthday, endDate: "2026-10-11" })).rejects.toThrow("Invalid Event: end");
     await expect(store.updateEvent("missing", birthday)).rejects.toThrow("No Event with id missing");
-    expect((await store.listEvents())[0].endDate).toBe("2026-10-12");
+    expect(defined((await store.listEvents())[0]).endDate).toBe("2026-10-12");
   });
 
   it("shares one database with the Task store", async () => {

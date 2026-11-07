@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import { maxTitleLength } from "../data/limits";
 import { NoListError, listRecordType, openListStore } from "./listStore";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 const freshDbName = () => `lists-test-${dbCounter++}`;
@@ -77,9 +78,9 @@ describe("List store", () => {
     const list = await store.addList("Basement");
 
     await store.setProject(list.id, true);
-    expect((await store.listLists())[0].isProject).toBe(true);
+    expect(defined((await store.listLists())[0]).isProject).toBe(true);
     await store.setProject(list.id, false);
-    expect((await store.listLists())[0].isProject).toBe(false);
+    expect(defined((await store.listLists())[0]).isProject).toBe(false);
     await expect(store.setProject("missing", true)).rejects.toThrow("No List with id missing");
   });
 

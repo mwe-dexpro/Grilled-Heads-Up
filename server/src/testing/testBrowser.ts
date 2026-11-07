@@ -24,8 +24,8 @@ export class TestBrowser {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     for (const cookie of response.headers.getSetCookie()) {
-      const [pair, ...attributes] = cookie.split(";");
-      const [name, value] = pair.split("=");
+      const [pair = "", ...attributes] = cookie.split(";");
+      const [name = "", value = ""] = pair.split("=");
       const cleared = value === "" || attributes.some((a) => /expires=Thu, 01 Jan 1970/i.test(a));
       if (cleared) this.cookies.delete(name);
       else this.cookies.set(name, value);
