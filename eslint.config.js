@@ -10,6 +10,13 @@ import security from "eslint-plugin-security";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+const leftOutMessage = "A test that is left out needs an issue: disable this rule on the line with a reason that names it (#123). See docs/agents/testing.md.";
+const leftOutVitest = {
+  selector: "MemberExpression[object.name=/^(it|test|describe|suite)$/][property.name=/^(skipIf|runIf|todo)$/]",
+  message: leftOutMessage,
+};
+const leftOutPlaywright = { selector: "MemberExpression[property.name='fixme']", message: leftOutMessage };
+
 /**
  * One flat config for the whole repo (client, server, tools, e2e). Rules the presets enable stay on; each rule that is
  * turned off or relaxed below has a one-line reason next to it. Run with `--max-warnings 0` (`npm run lint:eslint`).
@@ -127,6 +134,8 @@ export default tseslint.config(
       "vitest/expect-expect": "error",
       "vitest/no-focused-tests": "error",
       "vitest/no-disabled-tests": "error",
+      // `skipIf`, `runIf` and `todo` (a test that is not there) leave a test out without `.skip`: they need the same disable with an issue as `it.skip` (see lint:skips).
+      "no-restricted-syntax": ["error", leftOutVitest],
       // Vitest's expect takes a message as its second argument (`expect(value, "what it is")`), which the default of 1 refuses.
       "vitest/valid-expect": ["error", { maxArgs: 2 }],
     },
@@ -141,6 +150,8 @@ export default tseslint.config(
       "playwright/expect-expect": ["error", { assertFunctionNames: ["registerOwner"] }],
       "playwright/no-focused-test": "error",
       "playwright/no-skipped-test": "error",
+      // `test.fixme` and `test.describe.fixme` leave a test out like `test.skip`: same disable, same issue (see lint:skips).
+      "no-restricted-syntax": ["error", leftOutPlaywright],
       "playwright/missing-playwright-await": "error",
       "playwright/no-wait-for-timeout": "error",
     },

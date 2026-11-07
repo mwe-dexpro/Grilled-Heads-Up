@@ -93,4 +93,47 @@ describe("skipsWithoutIssue", () => {
   it("reads lines ended by Windows line breaks too", () => {
     expect(check("one\r\n// eslint-disable-next-line vitest/no-disabled-tests\r\nthree")).toHaveLength(1);
   });
+
+  it("finds a disable whose rule name stands on a later line of a block comment than its opener", () => {
+    const found = check("const before = 1;", "/* eslint-disable-next-line", "   vitest/no-disabled-tests -- flaky on CI */", "it.skip('x', () => {});");
+
+    expect(found).toEqual([{ path: "a.test.ts", line: 2, text: "/* eslint-disable-next-line" }]);
+  });
+
+  it("accepts a block comment that names its issue on a later line than the rule", () => {
+    expect(check("/* eslint-disable-next-line vitest/no-disabled-tests", "   -- waits for #42 */", "it.skip('x', () => {});")).toEqual([]);
+  });
+
+  it("finds a disable after a regular expression that looks like the start of a comment, and a block comment of several lines", () => {
+    expect(check("const pattern = /\\/*/;", "/*", " eslint-disable", " vitest/no-disabled-tests", " */")).toHaveLength(1);
+    expect(check("const pattern = /a\\/b/; // eslint-disable-line vitest/no-disabled-tests")).toHaveLength(1);
+    expect(check("const pattern = /\\/*/; /* eslint-disable vitest/no-disabled-tests */")).toHaveLength(1);
+  });
+
+  it("finds the other ways of leaving a test out: skipIf, runIf, todo and fixme are all disabled through no-restricted-syntax", () => {
+    expect(check("// eslint-disable-next-line no-restricted-syntax -- later")).toHaveLength(1);
+    expect(check("// eslint-disable-next-line no-restricted-syntax -- later, see #17")).toEqual([]);
+  });
+
+  it("counts only a comment that begins with the directive, as ESLint does: a mention in a doc comment is no disable", () => {
+    expect(check("/**", " * An `eslint-disable` of `vitest/no-disabled-tests` needs an issue.", " */")).toEqual([]);
+    expect(check("// see eslint-disable-line vitest/no-disabled-tests")).toEqual([]);
+    expect(check("/** eslint-disable vitest/no-disabled-tests */")).toHaveLength(1);
+    expect(check("/*", " * eslint-disable vitest/no-disabled-tests", " */")).toHaveLength(1);
+  });
+
+  it("reads a component file (TSX) as well", () => {
+    const source = { path: "Probe.tsx", text: "const a = <div>{/* eslint-disable-next-line vitest/no-disabled-tests */}</div>;" };
+
+    expect(skipsWithoutIssue([source])).toHaveLength(1);
+  });
+
+  it("takes only a number or the address of an issue as an issue, not a # that is part of a longer word", () => {
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- #3abc")).toHaveLength(1);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- colour#3")).toHaveLength(1);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- &#39;")).toHaveLength(1);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- waits for (#42), then goes")).toEqual([]);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- #42")).toEqual([]);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- see #42, #43")).toEqual([]);
+  });
 });

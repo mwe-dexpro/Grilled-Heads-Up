@@ -8,7 +8,7 @@ Work as a reviewer of your own change. A test that passes proves nothing until y
 
 - [ ] **Every new or changed behaviour has tests for the happy path, the error paths and the likely edge cases** (the prompt list below).
 - [ ] **Each new test has been seen to fail.** Break the code by hand (the most likely bug), or check that Stryker's mutants on the new code are killed. No surviving mutant on new code unless its reason is written down (README, "Mutation testing").
-- [ ] **Tests assert results and states that can be seen**, not only calls on mocks. No snapshot-only tests, no tautologies (the expected value worked out by the code's own logic), no `.only`, no `.skip` without an issue.
+- [ ] **Tests assert results and states that can be seen**, not only calls on mocks. No snapshot-only tests, no tautologies (the expected value worked out by the code's own logic), no `.only`, no `.skip`, `skipIf`, `runIf`, `todo` or `fixme` without an issue.
 - [ ] **New source files are covered automatically** by the mutation and coverage globs: no config edit was needed. No threshold was lowered.
 - [ ] **`npm run typecheck` and `npm run lint` pass with zero warnings.** Violations were fixed in the code. No new `any`, `as` cast, `!` assertion, `eslint-disable` or baseline entry; if one is truly the last resort it names its rule, says why, and has a follow-up issue.
 - [ ] **No dependency with a high or critical advisory, or a copyleft licence, was added**, and every new dependency is justified in the pull request.
@@ -34,7 +34,7 @@ Weak patterns to fix when you meet them: asserting on mocks or calls only, tauto
 | Command | What it checks | CI job |
 | --- | --- | --- |
 | `npm run typecheck` | `tsc` in client, server, tools and for `e2e/` and the config files, with `strict` and the stricter flags (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, …) | `typecheck` |
-| `npm run lint` | ESLint (typed `strictTypeChecked` and `stylisticTypeChecked`, React hooks, Vitest, Playwright, security, Node rules; `--max-warnings 0`), knip (dead files, exports and dependencies), the Prettier check, and `lint:skips` (a skipped test names its issue) | `lint` |
+| `npm run lint` | ESLint (typed `strictTypeChecked` and `stylisticTypeChecked`, React hooks, Vitest, Playwright, security, Node rules; `--max-warnings 0`), knip (dead files, exports and dependencies), the Prettier check, and `lint:skips` (a test that is left out names its issue: `.skip`, `skipIf`, `runIf`, `todo`, `fixme`; the disable may be a block comment over several lines) | `lint` |
 | `npm run format` | Prettier, to fix what `lint:format` reports | |
 | `npm run test:unit` | Vitest in client, server and tools **with coverage**; below a workspace's thresholds it fails; a `.only` fails | `unit` |
 | `npm run test:e2e` | builds and runs Playwright against three servers with in-memory databases | `e2e` |

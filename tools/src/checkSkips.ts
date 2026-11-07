@@ -1,3 +1,5 @@
+import ts from "typescript";
+
 export interface SourceFile {
   path: string;
   text: string;
@@ -10,35 +12,61 @@ export interface Skip {
   text: string;
 }
 
-const skipRules = /no-disabled-tests|no-skipped-test/;
-/** `#42`, or an address of an issue: `…/issues/42`. */
-const issue = /#\d|https?:\/\/\S+\/issues\/\d/;
+/**
+ * The rules whose disabling leaves a test out: the skip rules of Vitest and Playwright, and `no-restricted-syntax`, which
+ * forbids `skipIf`, `runIf`, `todo` and `fixme` (see eslint.config.js).
+ */
+const skipRules = /no-disabled-tests|no-skipped-test|no-restricted-syntax/;
+/** `#42` (not inside a longer word, as in `colour#3` or `&#39;`), or an address of an issue: `…/issues/42`. */
+const issue = /(?<![\w&])#\d+(?!\w)|https?:\/\/\S+\/issues\/\d/;
 
-/** The comment at the end of a line of code, or the line itself if it is one; a `//` or `/*` inside a string is no comment. */
-function commentOf(line: string): string | undefined {
-  let quote = "";
-  let escaped = false;
-  for (const [at, char] of line.split("").entries()) {
-    if (escaped) escaped = false;
-    else if (quote !== "") {
-      if (char === "\\") escaped = true;
-      else if (char === quote) quote = "";
-    } else if (char === '"' || char === "'" || char === "`") quote = char;
-    else if (char === "/" && ["/", "*"].includes(line.charAt(at + 1))) return line.slice(at);
-  }
-  return undefined;
+interface Comment {
+  /** What stands between the comment's delimiters. */
+  body: string;
+  /** Offset of the comment's first character. */
+  start: number;
 }
 
 /**
- * The places where a skipped test is allowed (an `eslint-disable` of `vitest/no-disabled-tests` or
- * `playwright/no-skipped-test`) without naming the issue that will bring it back, on the line of the disable itself.
+ * Every comment of a file, as the TypeScript parser sees them: a `//` or `/*` inside a string, a template or a regular
+ * expression is no comment, and a block comment is one piece whatever number of lines it has.
+ */
+function commentsOf({ path, text }: SourceFile): Comment[] {
+  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false, path.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const found = new Map<number, Comment>();
+  const add = (ranges: ts.CommentRange[] | undefined) => {
+    for (const { pos, end, kind } of ranges ?? []) {
+      const block = kind === ts.SyntaxKind.MultiLineCommentTrivia;
+      found.set(pos, { start: pos, body: text.slice(pos + 2, block ? end - 2 : end) });
+    }
+  };
+  // Every comment is trivia of a token: before it (on its own line) or after it (on the same line).
+  const visit = (node: ts.Node) => {
+    if (ts.isJSDoc(node)) return;
+    add(ts.getLeadingCommentRanges(text, node.getFullStart()));
+    add(ts.getTrailingCommentRanges(text, node.getEnd()));
+    for (const child of node.getChildren(file)) visit(child);
+  };
+  visit(file);
+  return [...found.values()];
+}
+
+/**
+ * The places where a skipped test is allowed (an `eslint-disable` of `vitest/no-disabled-tests`,
+ * `playwright/no-skipped-test` or `no-restricted-syntax`) without naming the issue that will bring it back anywhere in the
+ * comment of the disable. Only a comment that begins with `eslint-disable` is a directive, as for ESLint.
  */
 export function skipsWithoutIssue(files: SourceFile[]): Skip[] {
-  return files.flatMap(({ path, text }) =>
-    text
-      .split(/\r?\n/)
-      .map((line, index) => ({ path, line: index + 1, text: line, comment: commentOf(line) }))
-      .filter(({ comment }) => comment?.includes("eslint-disable") === true && skipRules.test(comment) && !issue.test(comment))
-      .map(({ path: file, line, text: source }) => ({ path: file, line, text: source })),
-  );
+  return files.flatMap((file) => {
+    const lines = file.text.split(/\r?\n/);
+    const lineStarts = [0];
+    for (const match of file.text.matchAll(/\n/g)) lineStarts.push(match.index + 1);
+    return commentsOf(file)
+      .filter(({ body }) => /^[\s*]*eslint-disable/.test(body) && skipRules.test(body) && !issue.test(body))
+      .map(({ start }) => {
+        const line = lineStarts.findLastIndex((offset) => offset <= start);
+        return { path: file.path, line: line + 1, text: lines[line] ?? "" };
+      })
+      .sort((a, b) => a.line - b.line);
+  });
 }
