@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY client/package.json client/
 COPY server/package.json server/
+COPY tools/package.json tools/
 RUN npm ci
 COPY client client
 COPY server server
@@ -13,12 +14,15 @@ RUN npm run build
 RUN rm -rf node_modules client/node_modules server/node_modules \
  && npm ci --omit=dev --workspace server --offline
 
-FROM node:22-alpine
+FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202
 ENV NODE_ENV=production \
     PORT=3000 \
     CLIENT_DIR=/app/client/dist \
     DATABASE_FILE=/data/grilled-heads-up.sqlite
 WORKDIR /app
+# The server runs with `node` alone. The package managers that come with the image (npm, npx, corepack, yarn) are not
+# needed to run it, and the packages they bundle carry advisories of their own, which the image scan would report.
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v*
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/server/package.json server/
