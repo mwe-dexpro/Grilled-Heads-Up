@@ -36,3 +36,9 @@ export function siteUrl(baseURL: string | undefined): string {
   if (baseURL === undefined) throw new Error("The Playwright project has no baseURL.");
   return baseURL;
 }
+
+/** The value, failing the test, saying what was missing, when there is none. */
+export function present<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`Expected ${what}, but there was none.`);
+  return value;
+}

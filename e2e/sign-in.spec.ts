@@ -5,7 +5,7 @@ import { addAuthenticator, passkeysOf, syncPasskeys, type Authenticator, type Pa
 // One story on one server, from the first launch on: each test builds on the ones before.
 test.describe.configure({ mode: "serial" });
 
-const recoveryCodeShape = /^[0-9A-Z]{4}(-[0-9A-Z]{4}){4}$/;
+const recoveryCodeShape = /^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/;
 const today = (page: Page) => page.getByRole("heading", { name: "Today", level: 1 });
 const signInHeading = (page: Page) => page.getByRole("heading", { name: "Sign in", level: 1 });
 

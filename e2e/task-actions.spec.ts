@@ -150,7 +150,8 @@ test("a finger swipe opens the row, and a short one that snaps back doesn't swal
   // presses on the focused check circle a moment later is a click of its own, and Completes the Task.
   await touchSwipe(page, "Pay dentist invoice", 330, -40);
   await expect(content).toHaveCSS("transform", "none");
-  await page.waitForTimeout(300);
+  // Past the moment the app stops expecting the click of the swipe (the page's clock is faked, so this takes no real time).
+  await page.clock.fastForward(300);
   const check = page.getByRole("checkbox", { name: "Complete Pay dentist invoice" });
   await check.focus();
   await page.keyboard.press("Space");

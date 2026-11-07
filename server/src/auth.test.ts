@@ -7,7 +7,7 @@ import { openDatabase } from "./database.js";
 import { TestBrowser } from "./testing/testBrowser.js";
 import { TestPasskey } from "./testing/testPasskey.js";
 
-const recoveryCodeShape = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){4}$/;
+const recoveryCodeShape = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
 
 let server: Server;
 let baseUrl: string;

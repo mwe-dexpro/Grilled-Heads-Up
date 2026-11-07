@@ -35,7 +35,7 @@ test("add a Task and Complete it; both survive a reload", async ({ page }) => {
   await completeTask(page, "Buy birthday present");
   await page.reload();
 
-  await expect(page.getByRole("listitem")).toHaveText(["Buy birthday present", "Book restaurant"].map((t) => new RegExp(t)));
+  await expect(page.getByRole("listitem")).toHaveText([/Buy birthday present/, /Book restaurant/]);
   await expect(page.getByRole("checkbox", { name: "Complete Buy birthday present" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Complete Book restaurant" })).not.toBeChecked();
 });

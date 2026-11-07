@@ -92,6 +92,21 @@ export default tseslint.config(
     files: ["server/src/**/*.ts", "tools/src/**/*.ts"],
     extends: [n.configs["flat/recommended-module"]],
     languageOptions: { globals: globals.node },
+    rules: {
+      // Relaxed for node:sqlite only: it is experimental in Node 22 on purpose (ADR-0005; the server starts with
+      // --disable-warning=ExperimentalWarning). Any other experimental or too-new built-in is still refused.
+      "n/no-unsupported-features/node-builtins": ["error", { ignores: ["sqlite", "sqlite.DatabaseSync"] }],
+    },
+  },
+  {
+    // Off for the bootstrap file only: the shutdown handler ends the process on purpose, once the server and the database are closed.
+    files: ["server/src/server.ts"],
+    rules: { "n/no-process-exit": "off" },
+  },
+  {
+    // Off here only: the path is the operator's DATABASE_FILE setting, not input from a request.
+    files: ["server/src/database.ts"],
+    rules: { "security/detect-non-literal-fs-filename": "off" },
   },
 
   // Unit tests.
@@ -102,7 +117,8 @@ export default tseslint.config(
       "vitest/expect-expect": "error",
       "vitest/no-focused-tests": "error",
       "vitest/no-disabled-tests": "error",
-      "vitest/valid-expect": "error",
+      // Vitest's expect takes a message as its second argument (`expect(value, "what it is")`), which the default of 1 refuses.
+      "vitest/valid-expect": ["error", { maxArgs: 2 }],
     },
   },
 
@@ -111,7 +127,8 @@ export default tseslint.config(
     files: ["e2e/**/*.ts"],
     extends: [playwright.configs["flat/recommended"]],
     rules: {
-      "playwright/expect-expect": "error",
+      // `registerOwner` (e2e/passkeys.ts) holds the assertion of the two setup steps.
+      "playwright/expect-expect": ["error", { assertFunctionNames: ["registerOwner"] }],
       "playwright/no-focused-test": "error",
       "playwright/no-skipped-test": "error",
       "playwright/missing-playwright-await": "error",
@@ -124,18 +141,6 @@ export default tseslint.config(
   {
     rules: {
       "security/detect-object-injection": "off", // 25
-      "n/no-unsupported-features/node-builtins": "off", // 10
-      "playwright/no-conditional-in-test": "off", // 4
-      "vitest/valid-expect": "off", // 2
-      "@eslint-community/eslint-comments/require-description": "off", // 2
-      "playwright/expect-expect": "off", // 2
-      "security/detect-unsafe-regex": "off", // 2
-      "playwright/no-wait-for-timeout": "off", // 2
-      "playwright/no-conditional-expect": "off", // 1
-      "security/detect-non-literal-regexp": "off", // 1
-      "security/detect-non-literal-fs-filename": "off", // 1
-      "n/no-process-exit": "off", // 1
-      "n/no-unsupported-features/es-syntax": "off", // 1
     },
   },
 

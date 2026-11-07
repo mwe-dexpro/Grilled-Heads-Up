@@ -1,4 +1,4 @@
-import { boxOf, expect, test, textOf, type TouchType } from "./fixtures";
+import { boxOf, expect, present, test, textOf, type TouchType } from "./fixtures";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: today is Oct 7. */
@@ -492,8 +492,10 @@ test("a key held down moves a Subtask one place for every press, none is lost an
 
   /** A key held down: the first press, then one more every 20 ms (a repeat rate of 50 per second). */
   async function hold(key: string, presses: number) {
-    for (let press = 0; press < presses; press++) {
-      if (press > 0) await page.waitForTimeout(20);
+    await page.keyboard.down(key);
+    for (let press = 1; press < presses; press++) {
+      // The page's clock moves on by the gap between two presses, so the pace does not depend on how busy this machine is.
+      await page.clock.runFor(20);
       await page.keyboard.down(key);
     }
     await page.keyboard.up(key);
@@ -502,12 +504,12 @@ test("a key held down moves a Subtask one place for every press, none is lost an
   for (let round = 0; round < 3; round++) {
     await handleOf(page, "A").focus();
     await hold("ArrowDown", 5);
-    if (round === 0) expect(await page.evaluate(() => (window as { delayedPosts?: number }).delayedPosts ?? 0), "the screen was really slowed").toBeGreaterThan(0);
     await expect(titlesOf(page)).toHaveText(["B", "C", "D", "E", "F", "A"]);
     await expect(handleOf(page, "A")).toBeFocused();
     await hold("ArrowUp", 5);
     await expect(titlesOf(page)).toHaveText(["A", "B", "C", "D", "E", "F"]);
   }
+  expect(await page.evaluate(() => (window as { delayedPosts?: number }).delayedPosts ?? 0), "the screen was really slowed").toBeGreaterThan(0);
   // Presses with no wait at all, and past the end: it stops there.
   for (let press = 0; press < 9; press++) await page.keyboard.down("ArrowDown");
   await page.keyboard.up("ArrowDown");
@@ -553,13 +555,8 @@ test("a drag ends where the row was dropped: when the saved order arrives no row
   const shown = await frames;
 
   // Nothing moves from the frame the order shows, other than the dropped row finishing its way into place (less than a row).
-  const final = shown.at(-1);
-  if (final === undefined) throw new Error("no frame was captured");
-  const topOf = (frame: Record<string, number>, title: string) => {
-    const top = frame[title];
-    if (top === undefined) throw new Error(`no row "${title}" in the frame`);
-    return top;
-  };
+  const final = present(shown.at(-1), "a captured frame");
+  const topOf = (frame: Record<string, number>, title: string) => present(frame[title], `the row "${title}" in the frame`);
   const rowHeight = topOf(final, "Jacket") - topOf(final, "Swimwear");
   for (const frame of shown) {
     for (const title of ["Boots", "Jacket", "Chargers"]) expect(topOf(frame, title), title).toBe(topOf(final, title));

@@ -78,12 +78,12 @@ describe("List reader", () => {
 
     const first = reload();
     const second = reload();
-    const secondResult = expect(second).rejects.toThrow("newest failed");
+    const secondRejection = second.catch((error: unknown) => error);
     defined(pending[0]).resolve("older");
     defined(pending[1]).reject(new Error("newest failed"));
 
     await expect(first).resolves.toBeUndefined();
-    await secondResult;
+    expect(await secondRejection).toMatchObject({ message: "newest failed" });
     expect(delivered).toEqual([]);
   });
 
