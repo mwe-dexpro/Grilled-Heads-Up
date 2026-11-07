@@ -29,7 +29,12 @@ function server(answers: Record<string, Answer>) {
   return received;
 }
 
-const creationOptions = { challenge: "c1", rp: { name: "Grilled Heads-Up" }, user: { id: "u", name: "n", displayName: "n" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }] };
+const creationOptions = {
+  challenge: "c1",
+  rp: { name: "Grilled Heads-Up" },
+  user: { id: "u", name: "n", displayName: "n" },
+  pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+};
 const requestOptions = { challenge: "c2" };
 
 /** What failing with `error` leaves in the AuthError the sign-in screens show. */
@@ -82,7 +87,10 @@ describe("registering a passkey", () => {
     expect(await registerPasskey()).toEqual({ recoveryCode: "AAAA-BBBB" });
 
     expect(prompt.register).toHaveBeenCalledWith({ optionsJSON: creationOptions });
-    expect(received.map((r) => [r.method, r.path])).toEqual([["POST", "register/options"], ["POST", "register/verify"]]);
+    expect(received.map((r) => [r.method, r.path])).toEqual([
+      ["POST", "register/options"],
+      ["POST", "register/verify"],
+    ]);
     expect(received[1]?.body).toEqual({ id: "credential-1" });
   });
 
@@ -95,7 +103,12 @@ describe("registering a passkey", () => {
 
   it("says a cancelled or timed-out prompt was cancelled, and a device that has the passkey already so", async () => {
     server({ "register/options": { body: creationOptions } });
-    for (const [name, problem] of [["NotAllowedError", "cancelled"], ["AbortError", "cancelled"], ["InvalidStateError", "exists"], ["SecurityError", "refused"]]) {
+    for (const [name, problem] of [
+      ["NotAllowedError", "cancelled"],
+      ["AbortError", "cancelled"],
+      ["InvalidStateError", "exists"],
+      ["SecurityError", "refused"],
+    ]) {
       prompt.register.mockRejectedValue(namedError(name ?? ""));
       expect(await problemOf(registerPasskey), name).toBe(problem);
     }
@@ -116,7 +129,15 @@ describe("registering a passkey", () => {
     server({ "register/options": { status: 403 } });
     expect(await problemOf(registerPasskey)).toBe("refused");
 
-    for (const options of [null, "text", {}, { ...creationOptions, challenge: 5 }, { ...creationOptions, rp: "x" }, { ...creationOptions, user: null }, { ...creationOptions, pubKeyCredParams: {} }]) {
+    for (const options of [
+      null,
+      "text",
+      {},
+      { ...creationOptions, challenge: 5 },
+      { ...creationOptions, rp: "x" },
+      { ...creationOptions, user: null },
+      { ...creationOptions, pubKeyCredParams: {} },
+    ]) {
       server({ "register/options": { body: options } });
       expect(await problemOf(registerPasskey), JSON.stringify(options)).toBe("refused");
     }
@@ -144,7 +165,10 @@ describe("signing in with a passkey", () => {
     await signInWithPasskey();
 
     expect(prompt.signIn).toHaveBeenCalledWith({ optionsJSON: requestOptions });
-    expect(received.map((r) => [r.method, r.path])).toEqual([["POST", "sign-in/options"], ["POST", "sign-in/verify"]]);
+    expect(received.map((r) => [r.method, r.path])).toEqual([
+      ["POST", "sign-in/options"],
+      ["POST", "sign-in/verify"],
+    ]);
     expect(received[1]?.body).toEqual({ id: "credential-4" });
   });
 

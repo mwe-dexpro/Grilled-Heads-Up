@@ -92,11 +92,7 @@ describe("subtaskProgress", () => {
 
 describe("subtaskCounts", () => {
   it("has an entry for each Task that has Subtasks, and only for those", () => {
-    const list = [
-      subtask({ taskId: "t1", completedAt: done }),
-      subtask({ taskId: "t1" }),
-      subtask({ taskId: "t2", completedAt: done }),
-    ];
+    const list = [subtask({ taskId: "t1", completedAt: done }), subtask({ taskId: "t1" }), subtask({ taskId: "t2", completedAt: done })];
 
     const counts = subtaskCounts(list);
 
@@ -205,7 +201,13 @@ describe("positionAt and movedOrder", () => {
   });
 
   it("gives a position that really sorts the Subtask where it was sent", () => {
-    for (const [id, to] of [["d", 0], ["a", 3], ["b", 2], ["c", 1], ["d", 2]] as const) {
+    for (const [id, to] of [
+      ["d", 0],
+      ["a", 3],
+      ["b", 2],
+      ["c", 1],
+      ["d", 2],
+    ] as const) {
       const list = abcd();
       const position = defined(positionAt(list, id, to), "position");
       const moved = list.map((s) => (s.id === id ? { ...s, position } : s));
@@ -333,7 +335,13 @@ describe("withPendingTicks", () => {
   const list = (): [Subtask, Subtask, Subtask] => [subtask({ id: "a", completedAt: done }), subtask({ id: "b" }), subtask({ id: "c" })];
 
   it("shows a Subtask as ticked or open as it was asked to be, and the others as they are", () => {
-    const shown = withPendingTicks(list(), new Map([["b", true], ["a", false]]));
+    const shown = withPendingTicks(
+      list(),
+      new Map([
+        ["b", true],
+        ["a", false],
+      ]),
+    );
 
     expect(shown.map((s) => s.completedAt !== null)).toEqual([false, true, false]);
   });
@@ -341,7 +349,13 @@ describe("withPendingTicks", () => {
   it("returns a Subtask that already is as asked unchanged, with its real time", () => {
     const [a, b] = list();
 
-    const shown = withPendingTicks([a, b], new Map([["a", true], ["b", false]]));
+    const shown = withPendingTicks(
+      [a, b],
+      new Map([
+        ["a", true],
+        ["b", false],
+      ]),
+    );
 
     expect(shown[0]).toBe(a);
     expect(shown[1]).toBe(b);
@@ -358,8 +372,18 @@ describe("withPendingTicks", () => {
 
   it("makes the decisions of a second tick that comes before the first is shown: the last open one then offers the Task", () => {
     const task: Task = {
-      id: "t1", title: "Pack", date: null, time: null, eventId: null, offsetDays: null, listId: null, tagIds: [],
-      createdAt: "2026-10-01T09:00:00.000Z", completedAt: null, rescheduleCount: 0, deletedAt: null,
+      id: "t1",
+      title: "Pack",
+      date: null,
+      time: null,
+      eventId: null,
+      offsetDays: null,
+      listId: null,
+      tagIds: [],
+      createdAt: "2026-10-01T09:00:00.000Z",
+      completedAt: null,
+      rescheduleCount: 0,
+      deletedAt: null,
     };
     const shown = [subtask({ id: "x" }), subtask({ id: "y" })];
 
@@ -373,15 +397,31 @@ describe("stillPending", () => {
   it("keeps the ticks that are not shown yet", () => {
     const shown = [subtask({ id: "a" }), subtask({ id: "b", completedAt: done })];
 
-    const left = stillPending(shown, new Map([["a", true], ["b", false]]));
+    const left = stillPending(
+      shown,
+      new Map([
+        ["a", true],
+        ["b", false],
+      ]),
+    );
 
-    expect([...left]).toEqual([["a", true], ["b", false]]);
+    expect([...left]).toEqual([
+      ["a", true],
+      ["b", false],
+    ]);
   });
 
   it("drops a tick that is shown, and one whose Subtask is gone", () => {
     const shown = [subtask({ id: "a", completedAt: done }), subtask({ id: "b" })];
 
-    const left = stillPending(shown, new Map([["a", true], ["b", false], ["gone", true]]));
+    const left = stillPending(
+      shown,
+      new Map([
+        ["a", true],
+        ["b", false],
+        ["gone", true],
+      ]),
+    );
 
     expect(left.size).toBe(0);
   });

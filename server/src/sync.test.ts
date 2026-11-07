@@ -29,7 +29,12 @@ async function signedInOwner() {
   return phone;
 }
 
-interface Pulled { changes: ReturnType<typeof change>[]; cursor: number; more: boolean; serverTime: number }
+interface Pulled {
+  changes: ReturnType<typeof change>[];
+  cursor: number;
+  more: boolean;
+  serverTime: number;
+}
 const pull = async (phone: TestBrowser, query = ""): Promise<Pulled> => (await (await phone.get(`/api/sync/pull${query}`)).json()) as Pulled;
 const push = (phone: TestBrowser, changes: unknown) => phone.post("/api/sync/push", { changes });
 const fieldsOf = (page: Pulled) => page.changes.map((c) => [c.field, c.value]);
@@ -121,7 +126,10 @@ describe("sync routes", () => {
 
   test("page through the feed with after, limit, more and cursor", async () => {
     const phone = await signedInOwner();
-    await push(phone, ["a", "b", "c", "d", "e"].map((field) => change(field, field, hlc(1))));
+    await push(
+      phone,
+      ["a", "b", "c", "d", "e"].map((field) => change(field, field, hlc(1))),
+    );
 
     const first = await pull(phone, "?limit=2");
     const second = await pull(phone, `?after=${first.cursor}&limit=2`);
@@ -169,7 +177,14 @@ describe("sync routes", () => {
     expect(await indexOf(await push(phone, [good, good, bad, bad]))).toBe(2);
     expect(await indexOf(await push(phone, [bad]))).toBe(0);
     expect(await indexOf(await push(phone, "nope"))).toBeUndefined();
-    expect(await indexOf(await push(phone, Array.from({ length: 501 }, () => good)))).toBeUndefined();
+    expect(
+      await indexOf(
+        await push(
+          phone,
+          Array.from({ length: 501 }, () => good),
+        ),
+      ),
+    ).toBeUndefined();
   });
 
   test("accept a null value and the longest allowed names", async () => {

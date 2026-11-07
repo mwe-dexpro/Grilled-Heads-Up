@@ -71,9 +71,8 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   function signedInUser(req: Request): string | null {
     const presented = readCookie(req, sessionCookie);
     if (presented === undefined) return null;
-    const row = db
-      .prepare("SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?")
-      .get(hash(presented), now()) as { user_id: string } | undefined;
+    const row = db.prepare("SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?").get(hash(presented), now()) as
+      { user_id: string } | undefined;
     return row?.user_id ?? null;
   }
 
@@ -137,9 +136,8 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       return;
     }
     const handle = userId ?? randomBytes(16).toString("base64url");
-    const existing = userId !== null
-      ? (db.prepare("SELECT id, transports FROM passkeys WHERE user_id = ?").all(userId) as { id: string; transports: string }[])
-      : [];
+    const existing =
+      userId !== null ? (db.prepare("SELECT id, transports FROM passkeys WHERE user_id = ?").all(userId) as { id: string; transports: string }[]) : [];
     const options = await generateRegistrationOptions({
       rpName,
       rpID,
@@ -185,9 +183,14 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       if (recoveryCode !== null) {
         db.prepare("INSERT INTO users (id, recovery_code_hash, created_at) VALUES (?, ?, ?)").run(userId, recoveryCodeHash(recoveryCode), now());
       }
-      db.prepare(
-        "INSERT INTO passkeys (id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-      ).run(credential.id, userId, credential.publicKey, credential.counter, JSON.stringify(credential.transports ?? []), now());
+      db.prepare("INSERT INTO passkeys (id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
+        credential.id,
+        userId,
+        credential.publicKey,
+        credential.counter,
+        JSON.stringify(credential.transports ?? []),
+        now(),
+      );
     });
     if (newOwner) startSession(res, userId);
     res.json({ recoveryCode });
@@ -205,9 +208,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const response = req.body as AuthenticationResponseJSON;
     const presentedId = (req.body as { id?: unknown } | undefined)?.id;
     const passkey =
-      typeof presentedId === "string"
-        ? (db.prepare("SELECT * FROM passkeys WHERE id = ?").get(presentedId) as PasskeyRow | undefined)
-        : undefined;
+      typeof presentedId === "string" ? (db.prepare("SELECT * FROM passkeys WHERE id = ?").get(presentedId) as PasskeyRow | undefined) : undefined;
     if (!ceremony || !passkey) {
       res.status(401).json({ error: "Sign-in didn't work." });
       return;
@@ -229,11 +230,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       res.status(401).json({ error: "Sign-in didn't work." });
       return;
     }
-    db.prepare("UPDATE passkeys SET counter = ?, last_used_at = ? WHERE id = ?").run(
-      verification.authenticationInfo.newCounter,
-      now(),
-      passkey.id,
-    );
+    db.prepare("UPDATE passkeys SET counter = ?, last_used_at = ? WHERE id = ?").run(verification.authenticationInfo.newCounter, now(), passkey.id);
     startSession(res, passkey.user_id);
     res.status(204).end();
   });
@@ -242,9 +239,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const code = (req.body as { code?: unknown } | undefined)?.code;
     const user =
       typeof code === "string"
-        ? (db.prepare("SELECT id FROM users WHERE recovery_code_hash = ?").get(recoveryCodeHash(code)) as
-            | { id: string }
-            | undefined)
+        ? (db.prepare("SELECT id FROM users WHERE recovery_code_hash = ?").get(recoveryCodeHash(code)) as { id: string } | undefined)
         : undefined;
     if (!user) {
       res.status(401).json({ error: "That recovery code doesn't match." });
@@ -296,11 +291,7 @@ export function generateRecoveryCode(): string {
 
 /** Ignores case, spaces and dashes, and reads the letters people mistake for digits as those digits. */
 export function normalizeRecoveryCode(code: string): string {
-  return code
-    .toUpperCase()
-    .replace(/[\s-]/g, "")
-    .replace(/O/g, "0")
-    .replace(/[IL]/g, "1");
+  return code.toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
 }
 
 function recoveryCodeHash(code: string): string {

@@ -54,7 +54,9 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     setAnnouncement((current) => ({ text, n: current.n + 1 }));
   }, []);
   // (An Effect Event: the words are made with the language as it is when a move has landed, not a reason to run the effect again.)
-  const announceMove = useEffectEvent((title: string, to: number) => announce(t("subtask.moved", { title, position: String(to + 1), total: String(subtasks.length) })));
+  const announceMove = useEffectEvent((title: string, to: number) =>
+    announce(t("subtask.moved", { title, position: String(to + 1), total: String(subtasks.length) })),
+  );
 
   useLayoutEffect(() => {
     const moved = refocus.current;

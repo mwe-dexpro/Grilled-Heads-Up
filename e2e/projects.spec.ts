@@ -320,7 +320,10 @@ test("Tasks are Completed, Rescheduled and deleted from the Project view like on
   await expect(row(page, "Pay invoice")).toContainText("2 days overdue");
   await row(page, "Pay invoice").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Reschedule" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Tomorrow/ })
+    .click();
   await expect(row(page, "Pay invoice")).not.toContainText("overdue");
   await expect(page.getByRole("heading", { name: "Progress: 0 of 2 done" })).toBeVisible();
   await row(page, "Sweep").dispatchEvent("contextmenu");
@@ -524,10 +527,13 @@ test("Back pressed while a List is being deleted stays where Back went: the entr
   await page.getByRole("button", { name: "Delete list" }).click();
 
   // Delete and Back in the same task: Back arrives while the delete is still being written.
-  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).evaluate((button) => {
-    (button as HTMLButtonElement).click();
-    window.history.back();
-  });
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      window.history.back();
+    });
 
   // Once the delete is through (the Task has lost its List), the app must still be where Back went.
   await expect(row(page, "Sort boxes")).toBeVisible();

@@ -39,7 +39,9 @@ export function CountdownLine({ countdown, eventDay }: { countdown: Countdown; e
           className={["countdown-mark", mark.state, mark.position < atStart && "start"].filter(Boolean).join(" ")}
           style={at(mark.position)}
         >
-          <span className="countdown-label">{labelled.has(mark.position) && (mark.tasks.length === 1 ? mark.tasks[0]?.title : t("risk.tasksOnDay", { count: String(mark.tasks.length) }))}</span>
+          <span className="countdown-label">
+            {labelled.has(mark.position) && (mark.tasks.length === 1 ? mark.tasks[0]?.title : t("risk.tasksOnDay", { count: String(mark.tasks.length) }))}
+          </span>
           <span className="countdown-dot" />
         </span>
       ))}

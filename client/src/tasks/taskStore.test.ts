@@ -222,9 +222,7 @@ describe("Linked tasks", () => {
 
     await expect(store.addTask("A", { offsetDays: -1 })).rejects.toThrow("A Linked task needs both an Event and an Offset");
     await expect(store.addTask("B", { eventId: "e1" })).rejects.toThrow("A Linked task needs both an Event and an Offset");
-    await expect(store.addTask("C", { eventId: "e1", offsetDays: 0, date: "2026-10-12" })).rejects.toThrow(
-      "A Linked task gets its date from its Event",
-    );
+    await expect(store.addTask("C", { eventId: "e1", offsetDays: 0, date: "2026-10-12" })).rejects.toThrow("A Linked task gets its date from its Event");
     expect(await store.listTasks()).toHaveLength(0);
   });
 
@@ -364,7 +362,11 @@ describe("Rescheduling a Task", () => {
 
     it("takes every Task to the earliest day it may have when the chosen day has become too early, and none stops the others", async () => {
       const store = await openTaskStore(freshDbName(), { now: afterMidnight });
-      const [a, b, c] = [await store.addTask("A", { date: "2026-10-01" }), await store.addTask("B", { date: "2026-10-02" }), await store.addTask("C", { date: "2026-10-09" })];
+      const [a, b, c] = [
+        await store.addTask("A", { date: "2026-10-01" }),
+        await store.addTask("B", { date: "2026-10-02" }),
+        await store.addTask("C", { date: "2026-10-09" }),
+      ];
 
       await store.rescheduleTasks([a.id, b.id, c.id], "2026-10-04", noEvents);
 

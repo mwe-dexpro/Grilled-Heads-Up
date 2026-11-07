@@ -76,12 +76,7 @@ export function atEarliest(
  * The count goes up by one for a Task that had a date (dated, or Linked). An Inbox Task getting its first date is
  * being scheduled, not rescheduled, so its count stays.
  */
-export function reschedulePatch(
-  task: Task,
-  day: Day,
-  eventStart: (eventId: string) => Day | undefined,
-  today: Day,
-): Patch<Task> | null {
+export function reschedulePatch(task: Task, day: Day, eventStart: (eventId: string) => Day | undefined, today: Day): Patch<Task> | null {
   if (day < today) throw new Error(`Cannot reschedule to ${day}: it is in the past`);
 
   const link = linkOf(task);

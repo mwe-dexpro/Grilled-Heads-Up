@@ -78,7 +78,13 @@ describe("listTasks", () => {
 
 describe("listProgress", () => {
   it("is Completed over all Tasks of the List, however long ago they were Completed", () => {
-    const tasks = [task(done), task({ completedAt: "2025-01-01T08:00:00.000Z" }), task(), task(), task({ listId: "M", completedAt: "2026-10-01T08:00:00.000Z" })];
+    const tasks = [
+      task(done),
+      task({ completedAt: "2025-01-01T08:00:00.000Z" }),
+      task(),
+      task(),
+      task({ listId: "M", completedAt: "2026-10-01T08:00:00.000Z" }),
+    ];
 
     expect(listProgress(tasks, "L")).toEqual({ done: 2, total: 4 });
   });

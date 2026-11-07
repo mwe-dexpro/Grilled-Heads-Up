@@ -39,7 +39,12 @@ export function TrashScreen({ tasks, now, onRestore }: TrashScreenProps) {
                   <span className="task-title">{task.title}</span>
                   <span className="task-meta">{meta}</span>
                 </div>
-                <button type="button" className="button-ghost small" aria-label={t("trash.restoreNamed", { title: task.title })} onClick={() => onRestore(task.id)}>
+                <button
+                  type="button"
+                  className="button-ghost small"
+                  aria-label={t("trash.restoreNamed", { title: task.title })}
+                  onClick={() => onRestore(task.id)}
+                >
                   {t("trash.restore")}
                 </button>
               </li>

@@ -100,14 +100,7 @@ describe("isLate", () => {
 
 describe("arrangeHome", () => {
   it("returns every Bucket in home-screen order", () => {
-    expect(arrangeHome([], now).map((b) => b.kind)).toEqual([
-      "overdue",
-      "today",
-      "tomorrow",
-      "nextDays",
-      "later",
-      "inbox",
-    ]);
+    expect(arrangeHome([], now).map((b) => b.kind)).toEqual(["overdue", "today", "tomorrow", "nextDays", "later", "inbox"]);
   });
 
   it("gives each Bucket its first and last day", () => {
@@ -138,7 +131,10 @@ describe("arrangeHome", () => {
   it("keeps a Task Completed today crossed out until 23:59 and drops it from its Bucket at midnight", () => {
     const completed = task({ date: today, completedAt: new Date(2026, 9, 4, 8, 0).toISOString() });
     const openOne = task({ date: today });
-    const shownAt = (moment: Date) => arrangeHome([completed, openOne], moment).flatMap((b) => b.tasks).map((t) => [t.id, t.completedAt !== null]);
+    const shownAt = (moment: Date) =>
+      arrangeHome([completed, openOne], moment)
+        .flatMap((b) => b.tasks)
+        .map((t) => [t.id, t.completedAt !== null]);
 
     expect(shownAt(new Date(2026, 9, 4, 23, 59, 59))).toEqual([
       [completed.id, true],
@@ -169,13 +165,7 @@ describe("arrangeHome", () => {
     const older = task({ date: "2026-09-20", time: "23:00" });
     const untimedFirst = task({ date: "2026-10-03", createdAt: new Date(2026, 0, 1).toISOString() });
 
-    expect(bucket("overdue", [later, early, untimedSecond, older, untimedFirst]).tasks).toEqual([
-      older,
-      untimedFirst,
-      untimedSecond,
-      early,
-      later,
-    ]);
+    expect(bucket("overdue", [later, early, untimedSecond, older, untimedFirst]).tasks).toEqual([older, untimedFirst, untimedSecond, early, later]);
   });
 
   it("puts an untimed Task before a timed one on the same day, whichever was created first", () => {
@@ -261,8 +251,7 @@ function event(fields: Partial<Event> = {}): Event {
 }
 
 describe("Events on the home screen", () => {
-  const eventsIn = (kind: BucketKind, events: Event[]) =>
-    defined(arrangeHome([], now, events).find((b) => b.kind === kind)).events.map((e) => e.title);
+  const eventsIn = (kind: BucketKind, events: Event[]) => defined(arrangeHome([], now, events).find((b) => b.kind === kind)).events.map((e) => e.title);
 
   it("puts an Event into the Bucket of the day it starts", () => {
     const events = [
@@ -286,7 +275,11 @@ describe("Events on the home screen", () => {
     ];
 
     expect(eventsIn("today", events)).toEqual(["Ongoing", "Ends today"]);
-    expect(arrangeHome([], now, events).flatMap((b) => b.events).map((e) => e.title)).not.toContain("Passed");
+    expect(
+      arrangeHome([], now, events)
+        .flatMap((b) => b.events)
+        .map((e) => e.title),
+    ).not.toContain("Passed");
   });
 
   it("orders a Bucket's Events by when they start", () => {

@@ -87,10 +87,7 @@ function checked(fields: EventFields): EventFields {
   return clean;
 }
 
-export async function openEventStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: EventStoreOptions = {},
-): Promise<EventStore> {
+export async function openEventStore(dbName = defaultDatabaseName, { now = () => new Date() }: EventStoreOptions = {}): Promise<EventStore> {
   const db = await openAppDb(dbName);
   const events = await openTable(db, eventRecordType, now);
 
@@ -122,7 +119,10 @@ export async function openEventStore(
     },
 
     async listEvents() {
-      return (await events.list()).filter(arrived).map(wholeShape).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await events.list())
+        .filter(arrived)
+        .map(wholeShape)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {

@@ -47,10 +47,7 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
         setHeaders(res, path) {
           // Hashed build assets never change; everything else (index.html, sw.js, manifest) must revalidate
           // so a new deploy reaches installed apps.
-          res.setHeader(
-            "Cache-Control",
-            path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
-          );
+          res.setHeader("Cache-Control", path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache");
         },
       }),
     );

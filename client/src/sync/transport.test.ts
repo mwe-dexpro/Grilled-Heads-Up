@@ -3,7 +3,10 @@ import { httpTransport, TransportError } from "./transport";
 import { defined } from "../testing/defined";
 
 function answer(status: number, body: unknown = {}) {
-  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+  );
 }
 
 const kindOf = async (call: () => Promise<unknown>) => {
@@ -75,16 +78,25 @@ describe("HTTP transport", () => {
     ["an index that is not a position", JSON.stringify({ index: "3" })],
     ["a negative index", JSON.stringify({ index: -1 })],
   ])("tells a 400 with %s as a failure, which says nothing about the changes in the request", async (_name, body) => {
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(body, { status: 400 }))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(body, { status: 400 }))),
+    );
 
     expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "failed", refusal: undefined });
   });
 
   it("tells a missing connection as offline, and an answer that isn't JSON as failed", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))),
+    );
     expect(await kindOf(() => httpTransport.pull(0, 500))).toBe("offline");
 
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("<html>", { status: 200 }))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("<html>", { status: 200 }))),
+    );
     expect(await kindOf(() => httpTransport.pull(0, 500))).toBe("failed");
   });
 });

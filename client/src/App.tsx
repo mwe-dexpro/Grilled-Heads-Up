@@ -128,13 +128,7 @@ export function App() {
       <button type="button" className="fab" aria-label={t("newTask.open")} disabled={!data.ready} onClick={() => setAdding(true)}>
         <Plus size={26} strokeWidth={1.5} aria-hidden="true" />
       </button>
-      <NewTaskSheet
-        open={adding}
-        list={currentList}
-        onAdd={addToCurrent}
-        onNewEvent={() => navigate({ name: "newEvent" })}
-        onClose={() => setAdding(false)}
-      />
+      <NewTaskSheet open={adding} list={currentList} onAdd={addToCurrent} onNewEvent={() => navigate({ name: "newEvent" })} onClose={() => setAdding(false)} />
       <TaskActionsSheet
         open={menuTask !== undefined}
         title={menuTask?.title ?? ""}
@@ -281,7 +275,19 @@ function Screen({
       );
     case "editEvent": {
       const event = data.events.find((e) => e.id === route.id);
-      if (!event) return <EventScreen event={undefined} tasks={[]} now={now} actions={actions} counts={counts} onAddTask={() => { /* an Event that is not there takes no Tasks */ }} />;
+      if (!event)
+        return (
+          <EventScreen
+            event={undefined}
+            tasks={[]}
+            now={now}
+            actions={actions}
+            counts={counts}
+            onAddTask={() => {
+              /* an Event that is not there takes no Tasks */
+            }}
+          />
+        );
       return (
         <EventForm
           key={event.id}

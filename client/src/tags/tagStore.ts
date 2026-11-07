@@ -39,10 +39,7 @@ export const tagRecordType: RecordType<Tag> = {
   }),
 };
 
-export async function openTagStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: TagStoreOptions = {},
-): Promise<TagStore> {
+export async function openTagStore(dbName = defaultDatabaseName, { now = () => new Date() }: TagStoreOptions = {}): Promise<TagStore> {
   const db = await openAppDb(dbName);
   const tags = await openTable(db, tagRecordType, now);
 

@@ -65,8 +65,7 @@ export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, 
   const restMeta = (bucket: Bucket): string => {
     // Progress once something is Completed, otherwise just how many Tasks the Bucket holds.
     const { done, total } = bucket.progress;
-    const count =
-      done > 0 ? t("home.progress", { done: String(done), total: String(total) }) : String(total + bucket.events.length);
+    const count = done > 0 ? t("home.progress", { done: String(done), total: String(total) }) : String(total + bucket.events.length);
     const { firstDay, lastDay } = bucket;
     if (bucket.kind === "tomorrow" && firstDay !== null) return `${formatShortDay(firstDay, language)} · ${count}`;
     if (bucket.kind === "nextDays" && firstDay !== null && lastDay !== null)

@@ -108,9 +108,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       return null;
     case "setup":
       return (
-        <SetupScreen
-          onRegistered={(recoveryCode) => enter(recoveryCode !== null ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })}
-        />
+        <SetupScreen onRegistered={(recoveryCode) => enter(recoveryCode !== null ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })} />
       );
     case "signIn":
       return (
@@ -173,15 +171,7 @@ function SetupScreen({ onRegistered }: { onRegistered: (recoveryCode: string | n
   );
 }
 
-function SignInScreen({
-  unreachable,
-  onSignedIn,
-  onRecovered,
-}: {
-  unreachable: boolean;
-  onSignedIn: () => void;
-  onRecovered: (recoveryCode: string) => void;
-}) {
+function SignInScreen({ unreachable, onSignedIn, onRecovered }: { unreachable: boolean; onSignedIn: () => void; onRecovered: (recoveryCode: string) => void }) {
   const { t } = useI18n();
   const passkey = useStep();
   const recovery = useStep();
@@ -202,10 +192,13 @@ function SignInScreen({
           className="button-primary"
           disabled={passkey.busy}
           onClick={() =>
-            void passkey.run(async () => {
-              await signInWithPasskey();
-              onSignedIn();
-            }, { refused: "auth.problem.signIn" })
+            void passkey.run(
+              async () => {
+                await signInWithPasskey();
+                onSignedIn();
+              },
+              { refused: "auth.problem.signIn" },
+            )
           }
         >
           {t("auth.signInWithPasskey")}
@@ -253,10 +246,13 @@ function NewPasskeyScreen({ onDone }: { onDone: () => void }) {
           className="button-primary"
           disabled={busy}
           onClick={() =>
-            void run(async () => {
-              await registerPasskey();
-              onDone();
-            }, { refused: "auth.problem.createPasskey" })
+            void run(
+              async () => {
+                await registerPasskey();
+                onDone();
+              },
+              { refused: "auth.problem.createPasskey" },
+            )
           }
         >
           {t("auth.createPasskey")}

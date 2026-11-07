@@ -157,7 +157,11 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       const key = `${change.type}/${change.id}`;
       let clocks = clocksOf.get(key);
       if (!clocks) {
-        clocks = ((await tx.objectStore("fieldClocks").get([change.type, change.id])) as FieldClocks | undefined) ?? { type: change.type, id: change.id, clocks: {} };
+        clocks = ((await tx.objectStore("fieldClocks").get([change.type, change.id])) as FieldClocks | undefined) ?? {
+          type: change.type,
+          id: change.id,
+          clocks: {},
+        };
         clocksOf.set(key, clocks);
       }
       // Equal means our own change coming back; older means we already know better. A clock text is never empty.
@@ -187,7 +191,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   /** Reads the feed page by page from the saved cursor; `onApplied` hears of each page that changed a record. */
   async function pull(onApplied: () => void) {
     let cursor = ((await db.get("syncInfo", "cursor")) as number | undefined) ?? 0;
-    for (let more = true; more; ) {
+    for (let more = true; more;) {
       const page = await transport.pull(cursor, batchSize);
       if (await apply(page.changes, page.cursor, page.serverTime)) onApplied();
       cursor = page.cursor;

@@ -63,16 +63,18 @@ export function useAppData() {
   useEffect(() => {
     let opened: Stores | null = null;
     let cancelled = false;
-    void Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
-      opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
-      if (cancelled) {
-        close(opened);
-        return;
-      }
-      stores.current = opened;
-      await reload();
-      setReady(true);
-    });
+    void Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(
+      async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
+        opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
+        if (cancelled) {
+          close(opened);
+          return;
+        }
+        stores.current = opened;
+        await reload();
+        setReady(true);
+      },
+    );
     return () => {
       cancelled = true;
       stores.current = null;
@@ -99,15 +101,9 @@ export function useAppData() {
   );
   const changeTasks = useCallback((change: (store: TaskStore) => Promise<unknown>) => changeStores((s) => change(s.tasks)), [changeStores]);
 
-  const addTask = useCallback(
-    (title: string, when?: TaskWhen, listId?: string | null) => changeTasks((s) => s.addTask(title, when, listId)),
-    [changeTasks],
-  );
+  const addTask = useCallback((title: string, when?: TaskWhen, listId?: string | null) => changeTasks((s) => s.addTask(title, when, listId)), [changeTasks]);
   const completeTask = useCallback((id: string) => changeTasks((s) => s.completeTask(id)), [changeTasks]);
-  const linkTask = useCallback(
-    (id: string, eventId: string, offsetDays: number) => changeTasks((s) => s.linkTask(id, eventId, offsetDays)),
-    [changeTasks],
-  );
+  const linkTask = useCallback((id: string, eventId: string, offsetDays: number) => changeTasks((s) => s.linkTask(id, eventId, offsetDays)), [changeTasks]);
   const unlinkTask = useCallback((id: string, date: Day | null) => changeTasks((s) => s.unlinkTask(id, date)), [changeTasks]);
   const deleteTask = useCallback((id: string) => changeTasks((s) => s.deleteTask(id)), [changeTasks]);
   const restoreTask = useCallback((id: string) => changeTasks((s) => s.restoreTask(id)), [changeTasks]);

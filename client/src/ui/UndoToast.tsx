@@ -52,12 +52,7 @@ function Toast({ message, onUndo, onExpire }: { message: TranslationKey; onUndo:
   }, [held, onExpire]);
 
   return (
-    <div
-      className="undo-toast"
-      data-held={held ? "" : undefined}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-    >
+    <div className="undo-toast" data-held={held ? "" : undefined} onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}>
       <span>{t(message)}</span>
       <button type="button" className="undo-button" onClick={onUndo} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
         {t("toast.undo")}

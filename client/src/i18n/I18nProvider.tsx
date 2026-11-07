@@ -1,12 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import {
-  defaultLanguage,
-  loadLanguage,
-  saveLanguage,
-  translate,
-  type Language,
-  type TranslationKey,
-} from "./i18n";
+import { defaultLanguage, loadLanguage, saveLanguage, translate, type Language, type TranslationKey } from "./i18n";
 
 interface I18n {
   language: Language;

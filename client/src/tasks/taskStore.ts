@@ -135,10 +135,7 @@ function wholeLink<T extends Task>(task: T): T {
   return task;
 }
 
-export async function openTaskStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: TaskStoreOptions = {},
-): Promise<TaskStore> {
+export async function openTaskStore(dbName = defaultDatabaseName, { now = () => new Date() }: TaskStoreOptions = {}): Promise<TaskStore> {
   const db = await openAppDb(dbName);
   const tasks = await openTable(db, taskRecordType, now);
 

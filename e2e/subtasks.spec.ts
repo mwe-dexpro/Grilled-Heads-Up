@@ -467,7 +467,9 @@ async function packWith(page: Page, ...titles: string[]) {
 
 const handleOf = (page: Page, title: string) => page.getByRole("button", { name: `Reorder ${title}` });
 
-test("a key held down moves a Subtask one place for every press, none is lost and none goes back, also when the screen is slow to show the order", async ({ page }) => {
+test("a key held down moves a Subtask one place for every press, none is lost and none goes back, also when the screen is slow to show the order", async ({
+  page,
+}) => {
   // The screen shows what a save left a moment after the save is done: React renders it in a later task. Here that
   // task is held back by 40 ms (React's scheduler posts a message to itself), so a key that repeats while the screen
   // is behind is certain to meet it, not only now and then.
@@ -477,14 +479,17 @@ test("a key held down moves a Subtask one place for every press, none is lost an
     const around = <T extends object, K extends keyof T>(proto: T, name: K, make: (original: T[K]) => T[K]) => {
       proto[name] = make(proto[name]);
     };
-    around(MessagePort.prototype, "postMessage", (post) =>
-      function (this: MessagePort, ...args: [unknown]) {
-        const slow = window as { slowScreen?: boolean; delayedPosts?: number };
-        if (slow.slowScreen === true) {
-          slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
-          setTimeout(() => post.apply(this, args), 40);
-        } else post.apply(this, args);
-      },
+    around(
+      MessagePort.prototype,
+      "postMessage",
+      (post) =>
+        function (this: MessagePort, ...args: [unknown]) {
+          const slow = window as { slowScreen?: boolean; delayedPosts?: number };
+          if (slow.slowScreen === true) {
+            slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
+            setTimeout(() => post.apply(this, args), 40);
+          } else post.apply(this, args);
+        },
     );
   });
   await packWith(page, "A", "B", "C", "D", "E", "F");
@@ -708,7 +713,11 @@ test("the Subtasks are a list of their own: the 'Add subtask' row is not counted
 
   const list = section(page).getByRole("list");
   await expect(list.getByRole("listitem")).toHaveCount(3);
-  await expect(section(page).getByRole("listitem").filter({ has: page.getByRole("textbox", { name: "Add subtask" }) })).toHaveCount(0);
+  await expect(
+    section(page)
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("textbox", { name: "Add subtask" }) }),
+  ).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Add subtask" })).toBeVisible();
 });
 
@@ -728,7 +737,9 @@ test("Subtasks speak German when moved: the hint and the announcement", async ({
   }
 
   const handle = page.getByRole("button", { name: "Schuhe verschieben" });
-  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben oder unten verschieben, oder aktivieren, um Schaltflächen zum Verschieben anzuzeigen");
+  await expect(handle).toHaveAccessibleDescription(
+    "Mit den Pfeiltasten nach oben oder unten verschieben, oder aktivieren, um Schaltflächen zum Verschieben anzuzeigen",
+  );
   await handle.focus();
   await page.keyboard.press("ArrowDown");
   await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe auf Platz 2 von 2 verschoben");
@@ -894,11 +905,14 @@ test("a tick that fails for a real reason is not remembered: the next tap on the
     const around = <T extends object, K extends keyof T>(proto: T, name: K, make: (original: T[K]) => T[K]) => {
       proto[name] = make(proto[name]);
     };
-    around(IDBObjectStore.prototype, "put", (put) =>
-      function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
-        if ((window as { failWrites?: boolean }).failWrites === true) throw new DOMException("The disk is full", "QuotaExceededError");
-        return put.apply(this, args);
-      },
+    around(
+      IDBObjectStore.prototype,
+      "put",
+      (put) =>
+        function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
+          if ((window as { failWrites?: boolean }).failWrites === true) throw new DOMException("The disk is full", "QuotaExceededError");
+          return put.apply(this, args);
+        },
     );
   });
   const errors: string[] = [];
@@ -1164,11 +1178,10 @@ test("a drop that another reload overlaps never shows the old order again before
     await page.evaluate(
       ({ mover, delay }) => {
         (window as { mover?: string }).mover = mover;
-        document.addEventListener(
-          "pointerup",
-          () => setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Boots"]')?.click(), delay),
-          { once: true, capture: true },
-        );
+        document.addEventListener("pointerup", () => setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Boots"]')?.click(), delay), {
+          once: true,
+          capture: true,
+        });
       },
       { mover, delay },
     );
@@ -1254,7 +1267,8 @@ test("a finger drag that the browser cancels ends: no row stays displaced", asyn
   const x = grip.x + grip.width / 2;
   const y = grip.y + grip.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: TouchType, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y: atY, id: 1 }] });
+  const send = (type: TouchType, atY: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y: atY, id: 1 }] });
   await send("touchStart", y);
   for (let step = 1; step <= 5; step++) await send("touchMove", y + step * 12);
   await expect(page.locator("li.subtask.dragging")).toHaveCount(1);

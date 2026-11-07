@@ -68,9 +68,7 @@ export function bucketOf(task: Pick<Task, "date">, today: Day): BucketKind {
 
 /** Due today, its time has passed, and still open. A Late Task stays in Today; it is not Overdue. */
 export function isLate(task: Task, now: Date): boolean {
-  return (
-    task.completedAt === null && task.date === dayOf(now) && task.time !== null && task.time < timeOf(now)
-  );
+  return task.completedAt === null && task.date === dayOf(now) && task.time !== null && task.time < timeOf(now);
 }
 
 function isShown(task: Task, today: Day): boolean {
@@ -79,11 +77,7 @@ function isShown(task: Task, today: Day): boolean {
 
 /** Date, then untimed before timed, then time, then creation. Never completion, so Completing keeps a Task in place. */
 function compareTasks(a: Task, b: Task): number {
-  return (
-    (a.date ?? "").localeCompare(b.date ?? "") ||
-    (a.time ?? "").localeCompare(b.time ?? "") ||
-    a.createdAt.localeCompare(b.createdAt)
-  );
+  return (a.date ?? "").localeCompare(b.date ?? "") || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt);
 }
 
 /** The Bucket an Event shows in: the day it starts, or Today while it is going on; null once it has passed. */
@@ -115,9 +109,7 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
   const bucketOfKind = (kind: BucketKind): Bucket => {
     const inBucket = shown.filter((task) => bucketOf(task, today) === kind);
     const done = inBucket.filter((task) => task.completedAt !== null).length;
-    const bucketEvents = events
-      .filter((event) => bucketOfEvent(event, today) === kind)
-      .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
+    const bucketEvents = events.filter((event) => bucketOfEvent(event, today) === kind).sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
     return {
       kind,
       firstDay: ranges[kind][0],
@@ -130,12 +122,5 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
   };
 
   // The order the home screen shows them in: Overdue and Today have a place of their own, the rest follow.
-  return [
-    bucketOfKind("overdue"),
-    bucketOfKind("today"),
-    bucketOfKind("tomorrow"),
-    bucketOfKind("nextDays"),
-    bucketOfKind("later"),
-    bucketOfKind("inbox"),
-  ];
+  return [bucketOfKind("overdue"), bucketOfKind("today"), bucketOfKind("tomorrow"), bucketOfKind("nextDays"), bucketOfKind("later"), bucketOfKind("inbox")];
 }

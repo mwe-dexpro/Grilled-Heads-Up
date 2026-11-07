@@ -60,10 +60,7 @@ function checkedName(raw: string): string {
   return name;
 }
 
-export async function openListStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: ListStoreOptions = {},
-): Promise<ListStore> {
+export async function openListStore(dbName = defaultDatabaseName, { now = () => new Date() }: ListStoreOptions = {}): Promise<ListStore> {
   const db = await openAppDb(dbName);
   const lists = await openTable(db, listRecordType, now);
 

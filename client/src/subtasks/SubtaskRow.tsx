@@ -31,7 +31,20 @@ interface SubtaskRowProps {
 }
 
 /** One Subtask of the list: tick, title (an input while it is renamed), handle, delete, and the Move buttons when they are shown. */
-export function SubtaskRow({ subtask, rowRef, drag, handleProps, endsDrag, moving, onToggleMoving, onCloseMoving, onTick, onRename, onDelete, onMoveBy }: SubtaskRowProps) {
+export function SubtaskRow({
+  subtask,
+  rowRef,
+  drag,
+  handleProps,
+  endsDrag,
+  moving,
+  onToggleMoving,
+  onCloseMoving,
+  onTick,
+  onRename,
+  onDelete,
+  onMoveBy,
+}: SubtaskRowProps) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   // After a rename ended with a key, the title button gets the focus back (the input that had it is gone).

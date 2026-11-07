@@ -91,10 +91,7 @@ function checkedTitle(raw: string): string {
   return title;
 }
 
-export async function openSubtaskStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: SubtaskStoreOptions = {},
-): Promise<SubtaskStore> {
+export async function openSubtaskStore(dbName = defaultDatabaseName, { now = () => new Date() }: SubtaskStoreOptions = {}): Promise<SubtaskStore> {
   const db = await openAppDb(dbName);
   const subtasks = await openTable(db, subtaskRecordType, now);
   const tasks = await openTable(db, taskRecordType, now);

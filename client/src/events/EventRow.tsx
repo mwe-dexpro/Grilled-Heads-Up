@@ -11,10 +11,7 @@ import { eventRisk } from "./risk";
 export function EventRow({ event, tasks, now }: { event: Event; tasks: Task[]; now: Date }) {
   const { language, t } = useI18n();
   const progress = eventProgress(event.id, tasks);
-  const meta = [
-    formatEventTime(event, language, t),
-    progress.total > 0 && t("home.progress", { done: String(progress.done), total: String(progress.total) }),
-  ]
+  const meta = [formatEventTime(event, language, t), progress.total > 0 && t("home.progress", { done: String(progress.done), total: String(progress.total) })]
     .filter(Boolean)
     .join(" · ");
 

@@ -15,13 +15,7 @@ export function TabBar({ current, onSelect }: { current: Tab | undefined; onSele
   return (
     <nav className="tab-bar" aria-label={t("tabs.label")}>
       {tabs.map(({ tab, icon: Icon }) => (
-        <button
-          key={tab}
-          type="button"
-          className="tab"
-          aria-current={tab === current ? "page" : undefined}
-          onClick={() => onSelect(tab)}
-        >
+        <button key={tab} type="button" className="tab" aria-current={tab === current ? "page" : undefined} onClick={() => onSelect(tab)}>
           <Icon size={22} strokeWidth={1.5} aria-hidden="true" />
           <span>{t(`tabs.${tab}`)}</span>
         </button>

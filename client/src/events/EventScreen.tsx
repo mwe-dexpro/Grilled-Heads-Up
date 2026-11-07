@@ -43,7 +43,9 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
   }
 
   const today = dayOf(now);
-  const linked = linkedTasksOf(event, tasks).sort((a, b) => a.offsetDays - b.offsetDays || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt));
+  const linked = linkedTasksOf(event, tasks).sort(
+    (a, b) => a.offsetDays - b.offsetDays || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt),
+  );
   const progress = eventProgress(event.id, tasks);
   const risk = eventRisk(event, tasks, now);
   const countdownLine = countdown(event, tasks, now);
@@ -101,7 +103,13 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
 
   return (
     <div className="screen">
-      <NavBar right={<a className="nav-action" href={hrefOf({ name: "editEvent", id: event.id })}>{t("nav.edit")}</a>} />
+      <NavBar
+        right={
+          <a className="nav-action" href={hrefOf({ name: "editEvent", id: event.id })}>
+            {t("nav.edit")}
+          </a>
+        }
+      />
       <header className="detail-header">
         <p className="eyebrow">{when}</p>
         <h1 className="large-title">{event.title}</h1>

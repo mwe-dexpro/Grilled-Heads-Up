@@ -35,8 +35,7 @@ async function touchSwipe(page: Page, title: string, fromX: number, byX: number)
   const box = await boxOf(row(page, title));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: TouchType, x: number) =>
-    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  const send = (type: TouchType, x: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
   await send("touchStart", fromX);
   const steps = 8;
   for (let step = 1; step <= steps; step++) await send("touchMove", fromX + (byX * step) / steps);
@@ -76,7 +75,8 @@ test("swiping a row left reveals Reschedule, Complete and Delete; Complete works
 
   await swipeLeft(page, "Pay dentist invoice");
 
-  for (const name of ["Reschedule", "Complete", "Delete"]) await expect(row(page, "Pay dentist invoice").getByRole("button", { name, exact: true })).toBeVisible();
+  for (const name of ["Reschedule", "Complete", "Delete"])
+    await expect(row(page, "Pay dentist invoice").getByRole("button", { name, exact: true })).toBeVisible();
   await row(page, "Pay dentist invoice").getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: "Complete Pay dentist invoice" })).toBeChecked();
   // A Task in Today works the same, and only one row is open at a time.
@@ -206,7 +206,13 @@ test("an Overdue Task can't be rescheduled to today: no Today in the sheet, and 
 
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: "Pay dentist invoice" })).toBeVisible();
-  await expect(sheet.getByRole("button")).toHaveText([/Tomorrow.*Thu, Oct 8/, /Day after tomorrow.*Fri, Oct 9/, /Next week.*Mon, Oct 12/, "Pick a date", "Cancel"]);
+  await expect(sheet.getByRole("button")).toHaveText([
+    /Tomorrow.*Thu, Oct 8/,
+    /Day after tomorrow.*Fri, Oct 9/,
+    /Next week.*Mon, Oct 12/,
+    "Pick a date",
+    "Cancel",
+  ]);
   await expect(sheet.getByRole("button", { name: "Today" })).toHaveCount(0);
   await sheet.getByRole("button", { name: "Pick a date" }).click();
   await expect(sheet.getByLabel("Date")).toHaveAttribute("min", "2026-10-08");
@@ -271,7 +277,10 @@ test("Reschedule all… after midnight, with the sheet's day gone stale, still m
 
   // Midnight passes while the sheet is open; the screen does not know yet (it looks at the clock every 30 seconds).
   await page.clock.setSystemTime(new Date(2026, 9, 8, 0, 0, 5));
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   // The Tasks went to the real tomorrow, the 9th, which the stale screen shows as the day after tomorrow.
   await expect(page.getByText("Nothing overdue.")).toBeVisible();
@@ -290,7 +299,10 @@ test("a Reschedule that fails in the store is not hidden: the page reports it an
 
   await swipeLeft(page, "Pay dentist invoice");
   await row(page, "Pay dentist invoice").getByRole("button", { name: "Reschedule", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   // Like a failed Complete or a failed add, the failure is not swallowed.
   await expect.poll(() => errors).toEqual([expect.stringContaining("disk full")]);
@@ -320,7 +332,10 @@ test("Next week is the next Monday", async ({ page }) => {
 
   await row(page, "Pay dentist invoice").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Reschedule" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Next week/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Next week/ })
+    .click();
 
   await expect(bucket(page, "Later")).toContainText(/Pay dentist invoice.*Mon, Oct 12/);
 });
@@ -646,7 +661,10 @@ test("Rescheduling a Linked task in the Event view changes its Offset, so it kee
 
   await swipeLeft(page, "Buy gift");
   await row(page, "Buy gift").getByRole("button", { name: "Reschedule", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   await expect(row(page, "Buy gift")).toContainText("6 days before · Thu, Oct 8");
   // Moving the Event moves the Task with it: it still has its Offset.
@@ -666,7 +684,13 @@ test("the Reschedule sheet speaks German", async ({ page }) => {
   await page.getByRole("dialog").getByRole("button", { name: "Verschieben" }).click();
 
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByRole("button")).toHaveText([/Morgen.*Do\., 8\. Okt\./, /Übermorgen.*Fr\., 9\. Okt\./, /Nächste Woche.*Mo\., 12\. Okt\./, "Datum wählen", "Abbrechen"]);
+  await expect(sheet.getByRole("button")).toHaveText([
+    /Morgen.*Do\., 8\. Okt\./,
+    /Übermorgen.*Fr\., 9\. Okt\./,
+    /Nächste Woche.*Mo\., 12\. Okt\./,
+    "Datum wählen",
+    "Abbrechen",
+  ]);
   await sheet.getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByRole("button", { name: "Alle verschieben…" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Papierkorb" })).toBeVisible();

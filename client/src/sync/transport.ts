@@ -83,8 +83,7 @@ export function createHttpTransport(request: typeof fetch = (...args) => fetch(.
   }
 
   return {
-    push: (changes) =>
-      call("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) }),
+    push: (changes) => call("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) }),
     pull: (after, limit) => call(`pull?after=${after}&limit=${limit}`),
   };
 }

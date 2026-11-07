@@ -61,7 +61,11 @@ interface DeviceOptions {
   transport?: Transport | undefined;
 }
 
-async function openDevice(world: World, server: MemoryServer, { name = freshDbName(), clockOffsetMs = 0, transport = server.transport() }: DeviceOptions = {}): Promise<Device> {
+async function openDevice(
+  world: World,
+  server: MemoryServer,
+  { name = freshDbName(), clockOffsetMs = 0, transport = server.transport() }: DeviceOptions = {},
+): Promise<Device> {
   const now = world.clock(clockOffsetMs);
   const tasks = await openTaskStore(name, { now });
   const events = await openEventStore(name, { now });
@@ -564,7 +568,10 @@ describe("Sync between two devices", () => {
 
       expect(await titles(b)).toEqual(["Pack for the weekend"]);
       expect(await b.subtasks.listSubtasks()).toEqual(await a.subtasks.listSubtasks());
-      expect(await b.subtasks.listSubtasks()).toMatchObject([{ id: boots.id, taskId: task.id, title: "Boots", position: 0 }, { title: "Rain jacket", position: 1 }]);
+      expect(await b.subtasks.listSubtasks()).toMatchObject([
+        { id: boots.id, taskId: task.id, title: "Boots", position: 0 },
+        { title: "Rain jacket", position: 1 },
+      ]);
     });
 
     it("keeps a rename on A and a tick on B, which are fields of their own", async () => {
@@ -624,7 +631,16 @@ describe("Sync between two devices", () => {
       const { world, a, b } = await twoDevices();
       const task = await a.tasks.addTask("Pack");
       const table = await openTable(a.db, subtaskRecordType, a.now);
-      for (const id of ["x", "y", "z"]) await table.put({ id, taskId: task.id, title: id, position: 1, completedAt: null, createdAt: `2026-10-01T09:00:0${id.charCodeAt(0) - 119}.000Z`, deletedAt: null });
+      for (const id of ["x", "y", "z"])
+        await table.put({
+          id,
+          taskId: task.id,
+          title: id,
+          position: 1,
+          completedAt: null,
+          createdAt: `2026-10-01T09:00:0${id.charCodeAt(0) - 119}.000Z`,
+          deletedAt: null,
+        });
       await a.sync();
       await b.sync();
       world.advance();
@@ -1086,7 +1102,8 @@ describe("Sync between two devices", () => {
       await a.sync();
 
       const after = server.record("event", id);
-      for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"]) expect(defined(after[field]).hlc).toBe(defined(before[field]).hlc);
+      for (const field of ["allDay", "startDate", "startTime", "endDate", "endTime", "timeZone"])
+        expect(defined(after[field]).hlc).toBe(defined(before[field]).hlc);
       expect(defined(after["title"]).hlc > defined(before["title"]).hlc).toBe(true);
     });
   });
@@ -1173,8 +1190,14 @@ describe("Sync between two devices", () => {
 
     it.each([
       ["a timed Event whose times and zone are still to come", { title: "Party", allDay: false, startDate: "2026-10-12", endDate: "2026-10-12" }],
-      ["a timed Event whose zone is still to come", { title: "Party", allDay: false, startDate: "2026-10-12", startTime: "09:00", endDate: "2026-10-12", endTime: "10:00" }],
-      ["an all-day Event that still has the times of its timed past", { title: "Party", allDay: true, startDate: "2026-10-12", endDate: "2026-10-12", startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }],
+      [
+        "a timed Event whose zone is still to come",
+        { title: "Party", allDay: false, startDate: "2026-10-12", startTime: "09:00", endDate: "2026-10-12", endTime: "10:00" },
+      ],
+      [
+        "an all-day Event that still has the times of its timed past",
+        { title: "Party", allDay: true, startDate: "2026-10-12", endDate: "2026-10-12", startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" },
+      ],
     ])("shows %s without breaking a screen", async (_name, fields) => {
       const { server, a } = await twoDevices();
       server.inject(arrived("event", "e1", fields));
@@ -1245,7 +1268,11 @@ describe("Sync between two devices", () => {
       const { events, tasks, home } = await useEveryScreen(a);
       expect(events).toEqual([]);
       expect(tasks.map((task) => task.title)).toEqual(["Buy suit", "Thank them"]);
-      expect(home.filter((bucket) => bucket.tasks.length + bucket.events.length > 0).map((bucket) => [bucket.kind, bucket.tasks.length, bucket.events.length, bucket.open])).toEqual([["inbox", 2, 0, 2]]);
+      expect(
+        home
+          .filter((bucket) => bucket.tasks.length + bucket.events.length > 0)
+          .map((bucket) => [bucket.kind, bucket.tasks.length, bucket.events.length, bucket.open]),
+      ).toEqual([["inbox", 2, 0, 2]]);
     });
 
     it("shows the Event, and its Linked tasks on their days, once the missing field has arrived", async () => {
@@ -1253,9 +1280,11 @@ describe("Sync between two devices", () => {
       server.inject(arrived("event", "e1", { title: "Wedding", endDate: "2026-10-20" }));
       server.inject(arrived("task", "t1", { title: "Buy suit", eventId: "e1", offsetDays: -7 }));
       await a.sync();
-      expect((await a.events.listEvents())).toEqual([]);
+      expect(await a.events.listEvents()).toEqual([]);
 
-      server.inject(arrived("event", "e1", { startDate: "2026-10-19", allDay: true }).map((change) => ({ ...change, hlc: "000000000000002-00000-other-device" })));
+      server.inject(
+        arrived("event", "e1", { startDate: "2026-10-19", allDay: true }).map((change) => ({ ...change, hlc: "000000000000002-00000-other-device" })),
+      );
       await a.sync();
 
       const { events, tasks } = await useEveryScreen(a);
@@ -1269,7 +1298,12 @@ describe("Sync between two devices", () => {
       await a.sync();
       expect(defined((await a.events.listEvents())[0]).allDay).toBe(true);
 
-      server.inject(arrived("event", "e1", { startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }).map((c) => ({ ...c, hlc: "000000000000002-00000-other-device" })));
+      server.inject(
+        arrived("event", "e1", { startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" }).map((c) => ({
+          ...c,
+          hlc: "000000000000002-00000-other-device",
+        })),
+      );
       await a.sync();
 
       expect((await useEveryScreen(a)).events[0]).toMatchObject({ allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "Europe/Berlin" });
