@@ -120,7 +120,7 @@ export default tseslint.config(
   },
   {
     // Off for the command-line tools: they read the files they are told to on the command line, run by a developer or by CI.
-    files: ["tools/src/bin/**/*.ts"],
+    files: ["tools/src/cli.ts", "tools/src/bin/**/*.ts"],
     rules: { "security/detect-non-literal-fs-filename": "off" },
   },
 
