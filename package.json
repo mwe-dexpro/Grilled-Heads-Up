@@ -20,7 +20,9 @@
     "test:mutation": "npm run test:mutation -w client",
     "lint:eslint": "eslint . --max-warnings 0",
     "lint:format": "prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "lint:knip": "knip",
+    "lint": "npm run lint:eslint && npm run lint:knip && npm run lint:format"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",

@@ -18,7 +18,7 @@ const retrySetAsideAfterMs = 60 * 60 * 1000;
 const byteLength = (text: string) => new TextEncoder().encode(text).length;
 
 /** "rejected": the last sync went through, but some changes were set aside as certainly bad; they stay on this device for now. */
-export type SyncStatus = "idle" | "syncing" | FailureKind;
+type SyncStatus = "idle" | "syncing" | FailureKind;
 
 export interface SyncState {
   status: SyncStatus;

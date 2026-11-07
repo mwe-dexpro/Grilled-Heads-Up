@@ -2,7 +2,7 @@ import { addDays, dateAtNoon, daysBetween, type Day } from "../home/days";
 import type { Patch } from "../sync/replica";
 import type { Task } from "./taskStore";
 
-export type RescheduleChoice = "tomorrow" | "dayAfter" | "nextWeek";
+type RescheduleChoice = "tomorrow" | "dayAfter" | "nextWeek";
 
 export interface RescheduleOption {
   choice: RescheduleChoice;

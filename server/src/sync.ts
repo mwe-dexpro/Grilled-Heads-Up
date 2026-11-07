@@ -14,7 +14,7 @@ interface Change {
   hlc: string;
 }
 
-export const maxChangesPerRequest = 500;
+const maxChangesPerRequest = 500;
 
 // The client checks every registered record type against copies of these two patterns
 // (`client/src/sync/recordTypes.test.ts`); change them in both places.

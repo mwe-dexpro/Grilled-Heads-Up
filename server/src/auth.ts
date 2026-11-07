@@ -282,7 +282,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
 }
 
 /** 20 characters of Crockford base32 (100 bits), in groups of four: `7K2M-…`. */
-export function generateRecoveryCode(): string {
+function generateRecoveryCode(): string {
   const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
   const characters = Array.from({ length: 20 }, () => alphabet.charAt(randomInt(alphabet.length)));
   const groups = Array.from({ length: 5 }, (_, group) => characters.slice(group * 4, group * 4 + 4).join(""));

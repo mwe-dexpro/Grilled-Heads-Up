@@ -32,7 +32,7 @@ export interface OutboxEntry {
   rejectedAt?: number;
 }
 
-export const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;
+const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;
 
 /** Adds the stores sync needs; call it from the database upgrade that introduces sync. */
 export function createSyncStores(db: SyncDb): void {

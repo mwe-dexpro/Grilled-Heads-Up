@@ -26,7 +26,7 @@ export interface Bucket {
 const nextDaysCount = 3;
 
 /** The Overdue badge gets stronger emphasis from this many open Tasks. */
-export const overdueEmphasisFrom = 5;
+const overdueEmphasisFrom = 5;
 
 export function isOverdueEmphasised(overdue: Pick<Bucket, "open">): boolean {
   return overdue.open >= overdueEmphasisFrom;
@@ -81,7 +81,7 @@ function compareTasks(a: Task, b: Task): number {
 }
 
 /** The Bucket an Event shows in: the day it starts, or Today while it is going on; null once it has passed. */
-export function bucketOfEvent(event: Event, today: Day): BucketKind | null {
+function bucketOfEvent(event: Event, today: Day): BucketKind | null {
   const { first, last } = eventDays(event);
   if (last < today) return null;
   return first <= today ? "today" : bucketOf({ date: first }, today);

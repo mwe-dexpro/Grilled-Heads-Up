@@ -62,7 +62,7 @@ export interface Table<T extends Synced> {
 }
 
 /** A record that is deleted: it has the time of its deletion. */
-export type Deleted<T extends Synced> = T & { deletedAt: string };
+type Deleted<T extends Synced> = T & { deletedAt: string };
 
 const isDeleted = <T extends Synced>(record: T): record is Deleted<T> => record.deletedAt !== null;
 

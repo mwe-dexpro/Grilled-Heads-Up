@@ -215,8 +215,6 @@ export function useAppData() {
   };
 }
 
-export type AppData = ReturnType<typeof useAppData>;
-
 function close(stores: Stores) {
   stores.tasks.close();
   stores.events.close();

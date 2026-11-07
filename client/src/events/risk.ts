@@ -14,7 +14,7 @@ export type LinkedRole = "preparation" | "followUp";
  * - **passed**: the Event is over with Preparation tasks still open; it has no risk status any more.
  * - **none**: nothing to warn about.
  */
-export type RiskStatus = "critical" | "atRisk" | "passed" | "none";
+type RiskStatus = "critical" | "atRisk" | "passed" | "none";
 
 export interface EventRisk {
   status: RiskStatus;
@@ -70,7 +70,7 @@ export function putsEventAtRisk(task: DatedTask, event: Event, now: Date): boole
   return linkedRole(task, event) === "preparation" && isOverdue(task, today) && !hasPassed(event, today);
 }
 
-export interface CountdownMark {
+interface CountdownMark {
   offsetDays: number;
   /** 0 = left end of the line, 1 = the Event. */
   position: number;
