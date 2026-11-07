@@ -95,7 +95,7 @@ describe("gateSarif", () => {
     expect(result.output.split("\n")[0]).toBe("1 high or critical CodeQL result:");
   });
 
-  it("reads a severity written as a number, and ignores one that is no number", () => {
+  it("reads a severity written as a number; one that is no number on a security rule cannot be classified, and fails", () => {
     const text = sarif(
       [
         { id: "js/number", severity: 7.5 },
@@ -112,9 +112,13 @@ describe("gateSarif", () => {
     const result = gateSarif([file(text)], [], today);
 
     expect(result.exitCode).toBe(1);
-    expect(result.output).toContain("js/number");
-    expect(result.output).not.toContain("js/text");
-    expect(result.output).not.toContain("js/empty");
+    expect(result.output.split("\n")).toEqual([
+      "3 high, critical or unclassified CodeQL results:",
+      "high      js/number  a.ts:1  A problem of js/number",
+      "unclassified  js/empty  c.ts:3  A problem of js/empty",
+      "unclassified  js/text  b.ts:2  A problem of js/text",
+      "",
+    ]);
   });
 
   it("finds the severity of a rule that comes with a query pack (an extension)", () => {
@@ -123,12 +127,107 @@ describe("gateSarif", () => {
     expect(gateSarif([file(text)], [], today).exitCode).toBe(1);
   });
 
-  it("gives a result with no rule entry, or no location, no severity it could not have, and names the place it does not know", () => {
-    const unknownRule = gateSarif([file(sarif([], [{ rule: "js/unlisted", file: "a.ts", line: 1 }]))], [], today);
+  it("names the place it does not know when a result has no location", () => {
     const noLocation = gateSarif([file(sarif([{ id: "js/x", severity: "8.0" }], [{ rule: "js/x" }]))], [], today);
 
-    expect(unknownRule.exitCode).toBe(0);
     expect(noLocation.output).toContain("high      js/x  (no location)  A problem of js/x");
+  });
+
+  it("fails a result whose rule is not in the file: it cannot be told from a high one, so it is not let through", () => {
+    const result = gateSarif([file(sarif([], [{ rule: "js/unlisted", file: "a.ts", line: 1 }]))], [], today);
+
+    expect(result).toEqual({
+      exitCode: 1,
+      output: "1 high, critical or unclassified CodeQL result:\nunclassified  js/unlisted  a.ts:1  A problem of js/unlisted\n",
+    });
+  });
+
+  it("fails a security rule that carries no security severity (a CodeQL release that renamed the property would otherwise pass every high result)", () => {
+    const renamed = JSON.stringify({
+      runs: [
+        {
+          tool: { driver: { rules: [{ id: "js/sql-injection", properties: { tags: ["security", "external/cwe/cwe-089"], "security-score": "9.8" } }] } },
+          results: [
+            {
+              ruleId: "js/sql-injection",
+              message: { text: "m" },
+              locations: [{ physicalLocation: { artifactLocation: { uri: "a.ts" }, region: { startLine: 4 } } }],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(gateSarif([file(renamed)], [], today)).toEqual({
+      exitCode: 1,
+      output: "1 high, critical or unclassified CodeQL result:\nunclassified  js/sql-injection  a.ts:4  m\n",
+    });
+  });
+
+  it("passes a rule that is known and is no security rule: it has no severity to have", () => {
+    const text = sarif([{ id: "js/unused-variable", severity: undefined }], [{ rule: "js/unused-variable", file: "a.ts", line: 1 }]);
+
+    expect(gateSarif([file(text)], [], today).exitCode).toBe(0);
+  });
+
+  it("fails a result that names no rule at all", () => {
+    const text = JSON.stringify({ runs: [{ tool: { driver: { rules: [] } }, results: [{ message: { text: "m" } }] }] });
+
+    expect(gateSarif([file(text)], [], today)).toEqual({
+      exitCode: 1,
+      output: "1 high, critical or unclassified CodeQL result:\nunclassified  (no rule)  (no location)  m\n",
+    });
+  });
+
+  it("finds the rule of a result by its index when it names no id: in the driver, or in the extension that rule.toolComponent points at", () => {
+    const security = (id: string, severity: string) => ({ id, properties: { "security-severity": severity, tags: ["security"] } });
+    const results = [
+      { ruleIndex: 1, message: { text: "by ruleIndex" } },
+      { rule: { index: 0, toolComponent: { index: 0 } }, message: { text: "by extension" } },
+      { rule: { index: 0 }, message: { text: "by rule.index" } },
+    ];
+    const rules = [security("js/driver-first", "7.5"), security("js/driver-second", "8.0")];
+    const text = JSON.stringify({ runs: [{ tool: { driver: { rules }, extensions: [{ rules: [security("js/in-extension", "9.5")] }] }, results }] });
+
+    expect(gateSarif([file(text)], [], today).output.split("\n")).toEqual([
+      "3 high or critical CodeQL results:",
+      "critical  js/in-extension  (no location)  by extension",
+      "high      js/driver-first  (no location)  by rule.index",
+      "high      js/driver-second  (no location)  by ruleIndex",
+      "",
+    ]);
+  });
+
+  it("finds the rule of a result by rule.id when ruleId is missing", () => {
+    const rule = { id: "js/x", properties: { "security-severity": "8.0", tags: ["security"] } };
+    const text = JSON.stringify({ runs: [{ tool: { driver: { rules: [rule] } }, results: [{ rule: { id: "js/x" }, message: { text: "m" } }] }] });
+
+    expect(gateSarif([file(text)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  (no location)  m\n");
+  });
+
+  it("does not take an index that points at nothing for a rule", () => {
+    const text = JSON.stringify({
+      runs: [
+        {
+          tool: { driver: { rules: [] }, extensions: [{ rules: [] }] },
+          results: [
+            { ruleIndex: 3, message: { text: "a" } },
+            { rule: { index: 0, toolComponent: { index: 5 } }, message: { text: "b" } },
+          ],
+        },
+      ],
+    });
+
+    expect(gateSarif([file(text)], [], today).output).toBe(
+      "2 high, critical or unclassified CodeQL results:\nunclassified  (no rule)  (no location)  a\nunclassified  (no rule)  (no location)  b\n",
+    );
+  });
+
+  it("lets the allowlist cover an unclassified result by its rule id, like any other", () => {
+    const text = sarif([], [{ rule: "js/unlisted", file: "a.ts", line: 1 }]);
+
+    expect(gateSarif([file(text)], [allow("js/unlisted")], today).exitCode).toBe(0);
+    expect(gateSarif([file(text)], [allow("js/unlisted", { expires: "2026-11-06" })], today).exitCode).toBe(1);
   });
 
   it("lets a rule on the allowlist pass, says so, and still fails the others", () => {
@@ -275,7 +374,8 @@ describe("gateSarif", () => {
 
     expect(gateSarif([file(text)], [], today)).toEqual({
       exitCode: 1,
-      output: "2 high or critical CodeQL results:\nhigh      js/x  (no location)  \nhigh      js/x  a.ts:3  \n",
+      output:
+        "3 high, critical or unclassified CodeQL results:\nhigh      js/x  (no location)  \nhigh      js/x  a.ts:3  \nunclassified  (no rule)  (no location)  no rule\n",
     });
   });
 
