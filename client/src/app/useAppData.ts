@@ -59,13 +59,13 @@ export function useAppData() {
       ),
     [],
   );
-  const sync = useSync(reload);
+  const sync = useSync(() => void reload());
   const { syncSoon } = sync;
 
   useEffect(() => {
     let opened: Stores | null = null;
     let cancelled = false;
-    Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
+    void Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
       opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
       if (cancelled) {
         close(opened);

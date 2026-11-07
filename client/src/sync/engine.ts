@@ -204,17 +204,17 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     const applied = { remote: false };
     try {
       // A push that fails for another reason than the connection or the session doesn't keep the pull from running.
-      let pushFailure: unknown = null;
+      let pushFailure: { error: unknown } | null = null;
       try {
         // The stores do this when they open; here too, since the first run can come before they are done.
         for (const recordType of types) await queuePreSyncRecords(db, recordType, now);
         await push();
       } catch (error) {
         if (error instanceof TransportError && (error.kind === "offline" || error.kind === "signedOut")) throw error;
-        pushFailure = error;
+        pushFailure = { error };
       }
       await pull(() => (applied.remote = true));
-      if (pushFailure !== null) throw pushFailure;
+      if (pushFailure !== null) throw pushFailure.error;
       const lastSyncedAt = now().getTime();
       await db.put("syncInfo", lastSyncedAt, "lastSyncedAt");
       const refused = ((await db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined);

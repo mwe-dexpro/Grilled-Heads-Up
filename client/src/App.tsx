@@ -70,17 +70,17 @@ export function App() {
     (title: string, when: TaskWhen, listId: string | null) => {
       // A Tag chosen in the Project view would hide the new Task, which has no Tag: show them all again.
       if (listId !== null) setProjectViews((views) => ({ ...views, [listId]: { ...(views[listId] ?? defaultProjectView), tagId: null } }));
-      return addTask(title, when, listId);
+      void addTask(title, when, listId);
     },
     [addTask],
   );
 
   const { deleteTask, restoreTask, completeTask, rescheduleTasks, deleteSubtask, restoreSubtask } = data;
   const actions: TaskActions = {
-    complete: completeTask,
+    complete: (id) => void completeTask(id),
     reschedule: (tasks) => setRescheduleIds(tasks.map((task) => task.id)),
     // A Task that is gone already (a sync deleted it a moment ago) has nothing to delete and nothing to undo.
-    remove: (task) => ignoreGone(deleteTask(task.id).then(() => setDeleted({ kind: "task", id: task.id }))),
+    remove: (task) => void ignoreGone(deleteTask(task.id).then(() => setDeleted({ kind: "task", id: task.id }))),
     openMenu: (task) => setMenuId(task.id),
   };
 
@@ -91,7 +91,7 @@ export function App() {
   function selectFromMenu(action: TaskAction) {
     if (!menuTask) return;
     setMenuId(null);
-    if (action === "complete") completeTask(menuTask.id);
+    if (action === "complete") void completeTask(menuTask.id);
     else if (action === "reschedule") setRescheduleIds([menuTask.id]);
     else actions.remove(menuTask);
   }
@@ -249,7 +249,7 @@ function Screen({
         </div>
       );
     case "projects":
-      return <ProjectsScreen lists={data.lists} tasks={datedTasks} now={now} onAddList={data.addList} />;
+      return <ProjectsScreen lists={data.lists} tasks={datedTasks} now={now} onAddList={(name, isProject) => void data.addList(name, isProject)} />;
     case "list":
       return (
         <ProjectScreen
@@ -302,7 +302,7 @@ function Screen({
           now={now}
           actions={actions}
           counts={counts}
-          onAddTask={(title, offsetDays) => data.addTask(title, { eventId: route.id, offsetDays })}
+          onAddTask={(title, offsetDays) => void data.addTask(title, { eventId: route.id, offsetDays })}
         />
       );
     case "task":
@@ -316,14 +316,14 @@ function Screen({
           tags={data.tags}
           subtasks={data.subtasks}
           now={now}
-          onComplete={data.completeTask}
+          onComplete={(id) => void data.completeTask(id)}
           onReschedule={(id, day) => void data.rescheduleTask(id, day)}
           onDelete={(task) => {
             actions.remove(task);
             goBack();
           }}
-          onLink={data.linkTask}
-          onUnlink={data.unlinkTask}
+          onLink={(id, eventId, offsetDays) => void data.linkTask(id, eventId, offsetDays)}
+          onUnlink={(id, date) => void data.unlinkTask(id, date)}
           onSetList={(id, listId) => void ignoreGone(data.setTaskList(id, listId))}
           onAddTag={(id, name) => void ignoreGone(data.addTaskTag(id, name))}
           onRemoveTag={(id, tagId) => void ignoreGone(data.removeTaskTag(id, tagId))}
@@ -336,6 +336,6 @@ function Screen({
         />
       );
     case "trash":
-      return <TrashScreen tasks={data.trash} now={now} onRestore={data.restoreTask} />;
+      return <TrashScreen tasks={data.trash} now={now} onRestore={(id) => void data.restoreTask(id)} />;
   }
 }

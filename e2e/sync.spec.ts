@@ -119,10 +119,10 @@ test("when the session has expired, the next sync leads to the sign-in screen an
     () =>
       new Promise<string[]>((resolve, reject) => {
         const open = indexedDB.open("grilled-heads-up");
-        open.onerror = () => reject(open.error);
+        open.onerror = () => reject(open.error ?? new Error("indexedDB.open failed"));
         open.onsuccess = () => {
           const request = open.result.transaction("tasks").objectStore("tasks").getAll();
-          request.onerror = () => reject(request.error);
+          request.onerror = () => reject(request.error ?? new Error("the IndexedDB request failed"));
           request.onsuccess = () => {
             open.result.close();
             resolve((request.result as { title: string }[]).map((task) => task.title));
@@ -157,7 +157,7 @@ test("a tab that another tab's database upgrade waits for lets go and asks to be
           resolve();
         };
         request.onblocked = () => reject(new Error("blocked by the other tab"));
-        request.onerror = () => reject(request.error);
+        request.onerror = () => reject(request.error ?? new Error("the IndexedDB request failed"));
       }),
   );
 

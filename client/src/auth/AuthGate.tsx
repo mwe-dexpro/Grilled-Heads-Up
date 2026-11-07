@@ -163,7 +163,7 @@ function SetupScreen({ onRegistered }: { onRegistered: (recoveryCode: string | n
           type="button"
           className="button-primary"
           disabled={busy}
-          onClick={() => run(async () => onRegistered((await registerPasskey()).recoveryCode), { refused: "auth.problem.createPasskey" })}
+          onClick={() => void run(async () => onRegistered((await registerPasskey()).recoveryCode), { refused: "auth.problem.createPasskey" })}
         >
           {t("auth.createPasskey")}
         </button>
@@ -190,7 +190,7 @@ function SignInScreen({
   function handleRecover(event: FormEvent) {
     event.preventDefault();
     if (code.trim() === "") return;
-    recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });
+    void recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });
   }
 
   return (
@@ -202,7 +202,7 @@ function SignInScreen({
           className="button-primary"
           disabled={passkey.busy}
           onClick={() =>
-            passkey.run(async () => {
+            void passkey.run(async () => {
               await signInWithPasskey();
               onSignedIn();
             }, { refused: "auth.problem.signIn" })
@@ -253,7 +253,7 @@ function NewPasskeyScreen({ onDone }: { onDone: () => void }) {
           className="button-primary"
           disabled={busy}
           onClick={() =>
-            run(async () => {
+            void run(async () => {
               await registerPasskey();
               onDone();
             }, { refused: "auth.problem.createPasskey" })

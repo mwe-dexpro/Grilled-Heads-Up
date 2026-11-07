@@ -87,20 +87,22 @@ export class MemoryServer {
         await hook?.();
         return { serverTime: this.time() };
       },
-      pull: async (after, limit): Promise<PullPage> => {
-        this.check();
-        this.pullRequests++;
-        const feed = [...this.fields.values()].filter((row) => row.seq > after).sort((a, b) => a.seq - b.seq);
-        const size = Math.min(limit, this.pageSize);
-        const page = feed.slice(0, size);
-        this.pulledChanges += page.length;
-        return {
-          changes: page.map((row) => row.change),
-          cursor: page.at(-1)?.seq ?? after,
-          more: feed.length > size,
-          serverTime: this.time(),
-        };
-      },
+      // A promise made by hand: a refusal (`check`) throws inside it and so rejects, as in an async function.
+      pull: (after, limit) =>
+        new Promise<PullPage>((resolve) => {
+          this.check();
+          this.pullRequests++;
+          const feed = [...this.fields.values()].filter((row) => row.seq > after).sort((a, b) => a.seq - b.seq);
+          const size = Math.min(limit, this.pageSize);
+          const page = feed.slice(0, size);
+          this.pulledChanges += page.length;
+          resolve({
+            changes: page.map((row) => row.change),
+            cursor: page.at(-1)?.seq ?? after,
+            more: feed.length > size,
+            serverTime: this.time(),
+          });
+        }),
     };
   }
 

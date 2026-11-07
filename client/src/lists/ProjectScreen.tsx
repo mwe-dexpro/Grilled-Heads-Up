@@ -71,6 +71,35 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
   const shown = projectViewTasks(tasks, list.id, { showCompleted, tagId: chosen }, today);
   const eventsById = new Map(events.map((event) => [event.id, event]));
 
+  const listId = list.id;
+
+  async function saveChanges({ name, isProject }: { name?: string; isProject?: boolean }) {
+    try {
+      if (name !== undefined) await onRename(listId, name);
+      if (isProject !== undefined) await onSetProject(listId, isProject);
+    } catch (error) {
+      // Deleted meanwhile (in another tab): the screen reloads and says so. Any other failure is not hidden.
+      if (!(error instanceof NoListError)) throw error;
+    }
+  }
+
+  async function deleteList() {
+    setEditing(false);
+    // Delete first, then leave, replacing the entry (so that Back does not return to a List that is gone). The
+    // screen shows nothing meanwhile: the route would say "not found", and the Projects tab, not yet shown,
+    // must not list a List that is going.
+    setLeaving(true);
+    try {
+      await onDelete(listId);
+    } catch (error) {
+      setLeaving(false);
+      throw error;
+    }
+    // Only while this List is still the route: after Back, the entry that was gone back to stays as it is.
+    const route = parseRoute(window.location.hash);
+    if (route.name === "list" && route.id === listId) navigate({ name: "projects" }, { replace: true });
+  }
+
   return (
     <div className="screen">
       <NavBar
@@ -141,31 +170,8 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
         <EditListSheet
           list={list}
           taskCount={listTasks(tasks, list.id).length}
-          onSave={async ({ name, isProject }) => {
-            try {
-              if (name !== undefined) await onRename(list.id, name);
-              if (isProject !== undefined) await onSetProject(list.id, isProject);
-            } catch (error) {
-              // Deleted meanwhile (in another tab): the screen reloads and says so. Any other failure is not hidden.
-              if (!(error instanceof NoListError)) throw error;
-            }
-          }}
-          onDelete={async () => {
-            setEditing(false);
-            // Delete first, then leave, replacing the entry (so that Back does not return to a List that is gone). The
-            // screen shows nothing meanwhile: the route would say "not found", and the Projects tab, not yet shown,
-            // must not list a List that is going.
-            setLeaving(true);
-            try {
-              await onDelete(list.id);
-            } catch (error) {
-              setLeaving(false);
-              throw error;
-            }
-            // Only while this List is still the route: after Back, the entry that was gone back to stays as it is.
-            const route = parseRoute(window.location.hash);
-            if (route.name === "list" && route.id === list.id) navigate({ name: "projects" }, { replace: true });
-          }}
+          onSave={(changes) => void saveChanges(changes)}
+          onDelete={() => void deleteList()}
           onClose={() => setEditing(false)}
         />
       )}

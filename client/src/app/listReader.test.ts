@@ -14,7 +14,7 @@ function slowRead<T>() {
 describe("List reader", () => {
   it("hands on what a read found", async () => {
     const delivered: string[] = [];
-    const reload = createListReader(async () => "lists", (value) => delivered.push(value));
+    const reload = createListReader(() => Promise.resolve("lists"), (value) => delivered.push(value));
 
     await reload();
 
@@ -38,7 +38,7 @@ describe("List reader", () => {
   it("hands on nothing when there was nothing to read, and reads again later", async () => {
     const delivered: string[] = [];
     let ready = false;
-    const reload = createListReader(async () => (ready ? "lists" : null), (value) => delivered.push(value));
+    const reload = createListReader(() => Promise.resolve(ready ? "lists" : null), (value) => delivered.push(value));
 
     await reload();
     expect(delivered).toEqual([]);

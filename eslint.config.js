@@ -119,21 +119,17 @@ export default tseslint.config(
   {
     rules: {
       "security/detect-object-injection": "off", // 25
-      "@typescript-eslint/no-misused-promises": "off", // 19
       "n/no-unsupported-features/node-builtins": "off", // 10
       "@typescript-eslint/no-deprecated": "off", // 9
       "@typescript-eslint/no-unsafe-assignment": "off", // 8
-      "@typescript-eslint/require-await": "off", // 7
       "@typescript-eslint/no-unused-vars": "off", // 5
       "@typescript-eslint/no-unsafe-argument": "off", // 5
-      "@typescript-eslint/no-floating-promises": "off", // 4
       "react-hooks/exhaustive-deps": "off", // 4
       "playwright/no-conditional-in-test": "off", // 4
       "@typescript-eslint/no-unsafe-member-access": "off", // 4
       "@typescript-eslint/no-empty-function": "off", // 3
       "react-hooks/refs": "off", // 3
       "@typescript-eslint/no-unsafe-return": "off", // 3
-      "@typescript-eslint/prefer-promise-reject-errors": "off", // 3
       "vitest/valid-expect": "off", // 2
       "react-hooks/set-state-in-effect": "off", // 2
       "@eslint-community/eslint-comments/require-description": "off", // 2
@@ -141,10 +137,7 @@ export default tseslint.config(
       "security/detect-unsafe-regex": "off", // 2
       "playwright/no-wait-for-timeout": "off", // 2
       "react-hooks/preserve-manual-memoization": "off", // 1
-      "@typescript-eslint/switch-exhaustiveness-check": "off", // 1
       "react-hooks/immutability": "off", // 1
-      "@typescript-eslint/use-unknown-in-catch-callback-variable": "off", // 1
-      "@typescript-eslint/only-throw-error": "off", // 1
       "playwright/no-conditional-expect": "off", // 1
       "security/detect-non-literal-regexp": "off", // 1
       "@typescript-eslint/no-unsafe-call": "off", // 1

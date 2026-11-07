@@ -62,7 +62,7 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
     pendingTicks.current.set(subtask.id, done);
     // A save that fails for a real reason (the Subtask being gone ends calmly, without a rejection) has not happened: the
     // tick stops being pending, or the next tap on this check would take it for done and do the opposite.
-    Promise.resolve(onSetDone(subtask.id, done)).catch((error) => {
+    Promise.resolve(onSetDone(subtask.id, done)).catch((error: unknown) => {
       if (pendingTicks.current.get(subtask.id) === done) pendingTicks.current.delete(subtask.id);
       setOffered((current) => (current === subtask.id ? null : current));
       throw error;

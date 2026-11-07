@@ -15,7 +15,7 @@ export function SignInSettings() {
         type="button"
         className="button-text"
         disabled={busy}
-        onClick={() => run(async () => { await registerPasskey(); }, { refused: "auth.problem.createPasskey", done: "settings.passkeyAdded" })}
+        onClick={() => void run(async () => { await registerPasskey(); }, { refused: "auth.problem.createPasskey", done: "settings.passkeyAdded" })}
       >
         {t("settings.addPasskey")}
       </button>
@@ -23,11 +23,11 @@ export function SignInSettings() {
         type="button"
         className="button-text"
         disabled={busy}
-        onClick={() => run(signedIn.showNewRecoveryCode, { refused: "settings.problem.recoveryCode" })}
+        onClick={() => void run(signedIn.showNewRecoveryCode, { refused: "settings.problem.recoveryCode" })}
       >
         {t("settings.newRecoveryCode")}
       </button>
-      <button type="button" className="button-text" disabled={busy} onClick={() => run(signedIn.signOut, { refused: "settings.problem.signOut" })}>
+      <button type="button" className="button-text" disabled={busy} onClick={() => void run(signedIn.signOut, { refused: "settings.problem.signOut" })}>
         {t("settings.signOut")}
       </button>
       {message && (

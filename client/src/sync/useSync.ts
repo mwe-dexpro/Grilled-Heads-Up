@@ -22,7 +22,7 @@ export function useSync(onRemoteChanges: () => void) {
   useEffect(() => {
     let cancelled = false;
     let stop = () => {};
-    openAppDb(defaultDatabaseName).then(async (db) => {
+    void openAppDb(defaultDatabaseName).then(async (db) => {
       const opened = await createSyncEngine({ db, types: recordTypes, transport: httpTransport });
       if (cancelled) {
         db.close();

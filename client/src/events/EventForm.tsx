@@ -70,7 +70,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
   }
 
   return (
-    <form className="screen" onSubmit={handleSubmit} noValidate>
+    <form className="screen" onSubmit={(e) => void handleSubmit(e)} noValidate>
       <NavBar
         left={
           <button type="button" className="nav-action" onClick={goBack}>

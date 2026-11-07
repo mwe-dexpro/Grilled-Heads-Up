@@ -1909,9 +1909,7 @@ describe("Sync between two devices", () => {
       const server = new MemoryServer({ time: () => world.ms });
       const confused: Transport = {
         ...server.transport(),
-        push: async () => {
-          throw new TransportError("rejected", { badChange: 99 });
-        },
+        push: () => Promise.reject(new TransportError("rejected", { badChange: 99 })),
       };
       const a = await openDevice(world, server, { transport: confused });
       await a.tasks.addTask("Fine");

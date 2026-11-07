@@ -27,7 +27,8 @@ export function RiskBadge({ risk }: { risk: EventRisk }) {
           {label}
         </span>
       );
-    default:
+    case "passed":
+    case "none":
       return <span className="risk-badge passed">{label}</span>;
   }
 }
