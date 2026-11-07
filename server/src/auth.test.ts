@@ -359,12 +359,10 @@ describe("cookies and what is stored", () => {
 
   test("a session cookie whose value contains = is read whole (a token as another encoder writes it, with base64 padding)", async () => {
     await becomeOwner();
-    const owner = db.prepare("SELECT id FROM users").get() as { id: string };
     const token = "dG9rZW4=.c2lnbg==";
     const expires = new Date(Date.now() + day).toISOString();
-    db.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)").run(
+    db.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, (SELECT id FROM users), ?, ?)").run(
       createHash("sha256").update(token).digest("hex"),
-      owner.id,
       new Date().toISOString(),
       expires,
     );

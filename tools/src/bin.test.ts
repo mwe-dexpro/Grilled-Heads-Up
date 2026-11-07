@@ -72,10 +72,9 @@ describe("security:allowlist (bin/allowlist.js)", () => {
     const root = repository({ [allowlistFile]: allowlist(entry({ expires: "2030-01-01" })) });
 
     expect(start("allowlist", root, ["--today=2030-01-01"]).status).toBe(0);
-    expect(start("allowlist", root, ["--today=2030-01-02"])).toMatchObject({
-      status: 1,
-      stderr: expect.stringContaining("Judging expiry as of 2030-01-02 (--today).") as string,
-    });
+    const later = start("allowlist", root, ["--today=2030-01-02"]);
+    expect(later.status).toBe(1);
+    expect(later.stderr).toContain("Judging expiry as of 2030-01-02 (--today).");
   });
 
   it("is not moved by SECURITY_TODAY in the environment: an expired exception stays expired", () => {
