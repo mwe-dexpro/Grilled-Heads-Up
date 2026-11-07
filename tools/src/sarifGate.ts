@@ -5,7 +5,7 @@ const highFrom = 7;
 const criticalFrom = 9;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const list = (value: unknown): unknown[] => (Array.isArray(value) ? (value as unknown[]) : []);
+const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 interface Finding {
   severity: "high" | "critical";
@@ -56,9 +56,11 @@ export function gateSarif(files: { name: string; text: string }[], allowlist: Al
     } catch {
       return { exitCode: 1, output: `${name} is not valid SARIF JSON.\n` };
     }
-    if (!isRecord(data) || !Array.isArray(data["runs"]) || !(data["runs"] as unknown[]).every(isRecord))
+    const runs = isRecord(data) ? list(data["runs"]) : [];
+    const runRecords = runs.filter(isRecord);
+    if (!isRecord(data) || !Array.isArray(data["runs"]) || runRecords.length !== runs.length)
       return { exitCode: 1, output: `${name} is not valid SARIF JSON.\n` };
-    for (const run of data["runs"] as Record<string, unknown>[]) {
+    for (const run of runRecords) {
       const bySeverity = severities(run);
       for (const result of list(run["results"]).filter(isRecord)) {
         const rule = typeof result["ruleId"] === "string" ? result["ruleId"] : "";

@@ -11,6 +11,7 @@ export interface AuditFinding {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /** Every advisory npm lists in `via` (a package that only passes one on names the other package, as a string). */
@@ -18,7 +19,7 @@ function advisories(audit: Record<string, unknown>): Record<string, unknown>[] {
   const vulnerabilities = audit["vulnerabilities"];
   if (!isRecord(vulnerabilities)) return [];
   return Object.values(vulnerabilities)
-    .flatMap((vulnerability) => (isRecord(vulnerability) && Array.isArray(vulnerability["via"]) ? (vulnerability["via"] as unknown[]) : []))
+    .flatMap((vulnerability) => (isRecord(vulnerability) ? list(vulnerability["via"]) : []))
     .filter(isRecord);
 }
 

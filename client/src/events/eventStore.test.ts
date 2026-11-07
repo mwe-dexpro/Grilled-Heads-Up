@@ -1,3 +1,4 @@
+import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { openTaskStore } from "../tasks/taskStore";
@@ -21,6 +22,19 @@ const birthday: EventFields = {
 };
 
 describe("Events that arrive in part", () => {
+  it("are left out of the list, with the Event that is whole next to them", async () => {
+    const dbName = freshDbName();
+    const store = await openEventStore(dbName, { now: () => new Date(Date.UTC(2026, 9, 4, 9, 0, 0)) });
+    await store.addEvent(birthday);
+    // As a sync that has brought one field of an Event so far leaves it: no title, no dates.
+    const raw = await openDB(dbName);
+    await raw.put("events", { id: "half", location: "Somewhere" });
+    await raw.put("events", { id: "no-dates", title: "Has a title only" });
+    raw.close();
+
+    expect((await store.listEvents()).map((event) => event.title)).toEqual(["Mom's birthday"]);
+  });
+
   it("show as an empty all-day placeholder, with no date made up, until the rest arrives", () => {
     expect(eventRecordType.withDefaults({ id: "e1" })).toEqual({
       id: "e1",
