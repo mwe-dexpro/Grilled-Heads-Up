@@ -20,8 +20,8 @@ export interface PullPage {
 
 /** How the engine talks to the server; the app uses HTTP, tests an in-memory server. */
 export interface Transport {
-  push(changes: Change[]): Promise<{ serverTime: number }>;
-  pull(after: number, limit: number): Promise<PullPage>;
+  push: (changes: Change[]) => Promise<{ serverTime: number }>;
+  pull: (after: number, limit: number) => Promise<PullPage>;
 }
 
 /**

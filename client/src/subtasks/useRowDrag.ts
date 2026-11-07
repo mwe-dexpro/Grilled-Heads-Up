@@ -21,9 +21,9 @@ interface RowDragOptions {
   list: RefObject<HTMLUListElement | null>;
   rows: RefObject<Map<string, HTMLLIElement>>;
   /** Moves the Subtask to that index (a drop); the drag ends when what this returns settles. */
-  onMove(id: string, toIndex: number): Promise<void> | void;
+  onMove: (id: string, toIndex: number) => Promise<void> | void;
   /** The pointer moved a good way from where it went down: this is a drag, no tap. */
-  onDragged(): void;
+  onDragged: () => void;
 }
 
 /** What a row shows of a drag in progress. */
@@ -130,7 +130,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
       onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => endDrag(e, false),
     }),
     /** How a row looks now. The rows slide only while a drag is under way: when it ends they must not slide to where they are. */
-    rowState(subtask: Subtask, index: number): RowDragState {
+    rowState: (subtask: Subtask, index: number): RowDragState => {
       const dragged = dragging?.id === subtask.id;
       return {
         reordering: dragging !== null,
@@ -148,7 +148,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
      * a screen reader (`detail` 0) never is: after a finger drag, which sends no click, the flag is still set, and
      * that click must still do what it says.
      */
-    endsDrag(e: MouseEvent): boolean {
+    endsDrag: (e: MouseEvent): boolean => {
       if (!dragMoved.current || e.detail === 0) return false;
       dragMoved.current = false;
       return true;

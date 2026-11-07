@@ -4,8 +4,8 @@ import { useI18n } from "../i18n/I18nProvider";
 
 interface NewListSheetProps {
   open: boolean;
-  onCreate(name: string, isProject: boolean): void;
-  onClose(): void;
+  onCreate: (name: string, isProject: boolean) => void;
+  onClose: () => void;
 }
 
 /** A name, and whether the List is a Project. The new List shows on the Projects tab. */

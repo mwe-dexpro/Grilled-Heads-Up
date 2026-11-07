@@ -219,9 +219,9 @@ function Screen({
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;
   /** Deletes the Subtask and offers to undo it; Task detail stays open. */
-  onDeleteSubtask(subtask: Subtask): Promise<void>;
+  onDeleteSubtask: (subtask: Subtask) => Promise<void>;
   projectViews: Record<string, ProjectView>;
-  onProjectView(listId: string, view: ProjectView): void;
+  onProjectView: (listId: string, view: ProjectView) => void;
 }) {
   const { t } = useI18n();
   switch (route.name) {

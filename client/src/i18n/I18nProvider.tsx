@@ -10,8 +10,8 @@ import {
 
 interface I18n {
   language: Language;
-  setLanguage(language: Language): void;
-  t(key: TranslationKey, params?: Record<string, string>): string;
+  setLanguage: (language: Language) => void;
+  t: (key: TranslationKey, params?: Record<string, string>) => string;
 }
 
 const I18nContext = createContext<I18n | null>(null);

@@ -3,7 +3,7 @@ import { openTable, type RecordType } from "../sync/replica";
 import { validateEvent, type Event, type EventFields } from "./event";
 
 export interface EventStore {
-  addEvent(fields: EventFields): Promise<Event>;
+  addEvent: (fields: EventFields) => Promise<Event>;
   /**
    * Changes what a person can edit; Linked tasks follow because their dates come from the Event. Only fields that
    * differ from `base` are written (`base` defaults to the stored Event), so a form opened before another
@@ -11,13 +11,13 @@ export interface EventStore {
    * was opened with. The exception is when the Event's time changes (see `whenFields`): then all of those fields are
    * written, so that two devices' competing edits of when the Event is never mixed into one that neither made.
    */
-  updateEvent(id: string, fields: EventFields, base?: EventFields): Promise<Event>;
+  updateEvent: (id: string, fields: EventFields, base?: EventFields) => Promise<Event>;
   /**
    * Events in the order they were created; deleted ones are left out, and so is one that has not fully arrived
    * from another device yet (no title, start date or end date), until it has.
    */
-  listEvents(): Promise<Event[]>;
-  close(): void;
+  listEvents: () => Promise<Event[]>;
+  close: () => void;
 }
 
 export interface EventStoreOptions {

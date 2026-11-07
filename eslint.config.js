@@ -113,7 +113,6 @@ export default tseslint.config(
   {
     rules: {
       "@typescript-eslint/no-confusing-void-expression": "off", // 133
-      "@typescript-eslint/unbound-method": "off", // 121
       "@typescript-eslint/restrict-template-expressions": "off", // 69
       "@typescript-eslint/strict-boolean-expressions": "off", // 41
       "security/detect-object-injection": "off", // 25

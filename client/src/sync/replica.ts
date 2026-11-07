@@ -14,51 +14,51 @@ export interface RecordType<T extends Synced> {
   /** The object store holding the records; it must exist in `openAppDb`. */
   storeName: string;
   /** Fills fields missing from a record saved by an older version, or built from Changes that arrived in part. */
-  withDefaults(record: Partial<T> & { id: string }): T;
+  withDefaults: (record: Partial<T> & { id: string }) => T;
 }
 
 /** The only way a domain store writes records: every change is stamped and queued for the server on the way. */
 export interface Table<T extends Synced> {
   /** A record that exists and is not deleted. */
-  get(id: string): Promise<T | undefined>;
+  get: (id: string) => Promise<T | undefined>;
   /** Live records only, in no particular order. */
-  list(): Promise<T[]>;
+  list: () => Promise<T[]>;
   /**
    * Saves a record that is new: every field is synced, under one shared clock. It throws when the id is taken
    * (also by a deleted record), because replacing a stored record from a copy read earlier would write that
    * copy's stale fields over what a sync brought meanwhile; to change a stored record, use `update`. A new record
    * is always live: only `delete` writes the tombstone.
    */
-  put(record: T): Promise<void>;
+  put: (record: T) => Promise<void>;
   /**
    * Saves `record` unless `pick` chooses one of the live records: it is given them all and returns the one that
    * counts as the same, which is then returned and nothing is written. Looking and saving are one transaction, so two
    * calls at once for the same thing make one record, not two. Throws when the id is taken, like `put`.
    */
-  findOrPut(record: T, pick: (live: T[]) => T | undefined): Promise<T>;
+  findOrPut: (record: T, pick: (live: T[]) => T | undefined) => Promise<T>;
   /**
    * Changes a live record: reads it, applies the change and writes it in one transaction, so a sync that lands
    * meanwhile is never overwritten. Every field the change names is synced under one shared clock, also when its
    * value stays the same, so that fields set together are won or lost together. Returns the record as saved,
    * or undefined when there is none (missing or deleted). `change` can compute the fields from the stored record.
    */
-  update(id: string, change: Patch<T> | ((current: T) => Patch<T>)): Promise<T | undefined>;
+  update: (id: string, change: Patch<T> | ((current: T) => Patch<T>)) => Promise<T | undefined>;
   /**
    * Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. Returns whether this call
    * wrote the tombstone: false when the record is missing or was deleted already (nothing is written then). Looking
    * and writing are one transaction, so of two deletes at once exactly one says true.
    */
-  delete(id: string): Promise<boolean>;
+  delete: (id: string) => Promise<boolean>;
   /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
-  getDeleted(id: string): Promise<Deleted<T> | undefined>;
+  getDeleted: (id: string) => Promise<Deleted<T> | undefined>;
   /** Deleted records (tombstones), in no particular order. */
-  listDeleted(): Promise<Array<Deleted<T>>>;
+  listDeleted: () => Promise<Array<Deleted<T>>>;
   /**
    * Un-deletes a deleted record: writes `deletedAt` = null under a new clock (one field, one outbox entry), in
    * one transaction. That is an ordinary last-write-wins write, so it beats the older deletion on every device.
    * Returns the record as saved, or undefined when it is missing or not deleted.
    */
-  restore(id: string): Promise<T | undefined>;
+  restore: (id: string) => Promise<T | undefined>;
 }
 
 /** A record that is deleted: it has the time of its deletion. */

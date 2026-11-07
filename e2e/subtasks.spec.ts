@@ -473,14 +473,19 @@ test("a key held down moves a Subtask one place for every press, none is lost an
   // is behind is certain to meet it, not only now and then.
   // The posts held back are counted: if React stops scheduling that way the patch slows nothing, and this test must say so.
   await page.addInitScript(() => {
-    const post = MessagePort.prototype.postMessage;
-    MessagePort.prototype.postMessage = function (this: MessagePort, ...args: [unknown]) {
-      const slow = window as { slowScreen?: boolean; delayedPosts?: number };
-      if (slow.slowScreen) {
-        slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
-        setTimeout(() => post.apply(this, args), 40);
-      } else post.apply(this, args);
+    /** Replaces a method of a prototype by what `make` builds from the method it had. */
+    const around = <T extends object, K extends keyof T>(proto: T, name: K, make: (original: T[K]) => T[K]) => {
+      proto[name] = make(proto[name]);
     };
+    around(MessagePort.prototype, "postMessage", (post) =>
+      function (this: MessagePort, ...args: [unknown]) {
+        const slow = window as { slowScreen?: boolean; delayedPosts?: number };
+        if (slow.slowScreen) {
+          slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
+          setTimeout(() => post.apply(this, args), 40);
+        } else post.apply(this, args);
+      },
+    );
   });
   await packWith(page, "A", "B", "C", "D", "E", "F");
   await page.evaluate(() => ((window as { slowScreen?: boolean }).slowScreen = true));
@@ -888,11 +893,16 @@ test("the Move buttons speak German", async ({ page }) => {
 
 test("a tick that fails for a real reason is not remembered: the next tap on the check ticks it", async ({ page }) => {
   await page.addInitScript(() => {
-    const put = IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
-      if ((window as { failWrites?: boolean }).failWrites) throw new DOMException("The disk is full", "QuotaExceededError");
-      return put.apply(this, args);
+    /** Replaces a method of a prototype by what `make` builds from the method it had. */
+    const around = <T extends object, K extends keyof T>(proto: T, name: K, make: (original: T[K]) => T[K]) => {
+      proto[name] = make(proto[name]);
     };
+    around(IDBObjectStore.prototype, "put", (put) =>
+      function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
+        if ((window as { failWrites?: boolean }).failWrites) throw new DOMException("The disk is full", "QuotaExceededError");
+        return put.apply(this, args);
+      },
+    );
   });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

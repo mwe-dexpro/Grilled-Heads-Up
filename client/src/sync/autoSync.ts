@@ -13,8 +13,8 @@ export interface AutoSyncOptions {
 
 export interface AutoSync {
   /** A local change was made: sync shortly, once for a burst of changes. */
-  afterChange(): void;
-  stop(): void;
+  afterChange: () => void;
+  stop: () => void;
 }
 
 /**

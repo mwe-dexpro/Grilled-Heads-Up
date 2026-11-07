@@ -10,9 +10,9 @@ interface EditListSheetProps {
   /** How many Tasks are in the List: the delete question says they stay. */
   taskCount: number;
   /** Only what the person changed in the sheet, so what a sync brought meanwhile is not written over. */
-  onSave(changes: { name?: string; isProject?: boolean }): void;
-  onDelete(): void;
-  onClose(): void;
+  onSave: (changes: { name?: string; isProject?: boolean }) => void;
+  onDelete: () => void;
+  onClose: () => void;
 }
 
 /**

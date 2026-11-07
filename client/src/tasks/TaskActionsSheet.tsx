@@ -8,8 +8,8 @@ interface TaskActionsSheetProps {
   title: string;
   /** What can be done to this Task (see `availableActions`). */
   actions: TaskAction[];
-  onSelect(action: TaskAction): void;
-  onClose(): void;
+  onSelect: (action: TaskAction) => void;
+  onClose: () => void;
 }
 
 const icons: Record<TaskAction, LucideIcon> = { reschedule: Clock, complete: Check, delete: Trash2 };

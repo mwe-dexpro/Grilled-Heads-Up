@@ -7,7 +7,7 @@ interface PickDateProps {
   today: Day;
   /** The earliest day that can be picked (`earliestRescheduleDay`): tomorrow for an Overdue Task. */
   earliest: Day;
-  onPick(day: Day): void;
+  onPick: (day: Day) => void;
 }
 
 /** "Pick a date": a date input that starts on tomorrow and can't go before `earliest`. Leaving it empty means tomorrow. */

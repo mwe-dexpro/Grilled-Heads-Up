@@ -8,13 +8,13 @@ export interface SwipeAction {
   icon: LucideIcon;
   /** Picks the colours (see `.swipe-action` in styles.css). */
   tone: "neutral" | "primary" | "strong";
-  onSelect(): void;
+  onSelect: () => void;
 }
 
 interface SwipeRowProps {
   actions: SwipeAction[];
   /** Long press (`contextmenu`, which Android Chrome fires on long press and desktop on right click). */
-  onMenu(): void;
+  onMenu: () => void;
   /** Classes of the row's content, which slides over the actions. */
   className?: string;
   children: ReactNode;

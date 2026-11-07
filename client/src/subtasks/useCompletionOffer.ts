@@ -8,7 +8,7 @@ interface CompletionOfferOptions {
   /** The Task's live Subtasks, in order. */
   subtasks: Subtask[];
   /** Saves the tick; a promise that fails tells the hook that it did not happen. */
-  onSetDone(id: string, done: boolean): Promise<void> | void;
+  onSetDone: (id: string, done: boolean) => Promise<void> | void;
   /** The row elements and the "Add subtask" input: where the focus goes when the offer's button goes. */
   rows: RefObject<Map<string, HTMLLIElement>>;
   addInput: RefObject<HTMLInputElement | null>;

@@ -33,36 +33,36 @@ export interface SubtaskStore {
    * Adds a Subtask after the Task's last one. Throws `NoTaskError` when the Task is missing or deleted (also when
    * `taskId` is a Subtask's id: Subtasks don't nest), and for an empty or too long title.
    */
-  addSubtask(taskId: string, title: string): Promise<Subtask>;
+  addSubtask: (taskId: string, title: string) => Promise<Subtask>;
   /** Same title checks as `addSubtask`; a Subtask that is missing or deleted throws `NoSubtaskError`. */
-  renameSubtask(id: string, title: string): Promise<void>;
+  renameSubtask: (id: string, title: string) => Promise<void>;
   /**
    * Ticks a Subtask (`completedAt` = now) or unticks it (null). One that is in that state already changes nothing: no
    * write, nothing to sync. Missing or deleted: `NoSubtaskError`.
    */
-  setSubtaskDone(id: string, done: boolean): Promise<void>;
+  setSubtaskDone: (id: string, done: boolean) => Promise<void>;
   /**
    * Moves a Subtask to `toIndex` among its Task's live Subtasks (clamped to them). Only its `position` is written,
    * or, when no position is left between its new neighbours, the Task's Subtasks are renumbered 0 to n-1 in their
    * new order. A move that changes nothing writes nothing. Missing or deleted: `NoSubtaskError`.
    */
-  moveSubtask(id: string, toIndex: number): Promise<void>;
+  moveSubtask: (id: string, toIndex: number) => Promise<void>;
   /**
    * Moves a Subtask `by` places (negative: up) from where it is when the move runs, clamped like `moveSubtask`. A
    * key press means this: it does not depend on the order the screen shows, which a held key outruns. Moves asked
    * for at once run one after the other, so each counts. Missing or deleted: `NoSubtaskError`.
    */
-  moveSubtaskBy(id: string, by: number): Promise<void>;
+  moveSubtaskBy: (id: string, by: number) => Promise<void>;
   /**
    * Deletes a Subtask (it leaves the lists and syncs as deleted) and says it did. One that is missing or deleted
    * already is ignored, and says false: there is nothing to offer an undo of.
    */
-  deleteSubtask(id: string): Promise<boolean>;
+  deleteSubtask: (id: string) => Promise<boolean>;
   /** Takes a Subtask back after a delete (the undo toast), exactly as it was; one that is live or missing is left alone. */
-  restoreSubtask(id: string): Promise<void>;
+  restoreSubtask: (id: string) => Promise<void>;
   /** Live Subtasks that have a Task and a title, in order; the caller groups them by Task. */
-  listSubtasks(): Promise<Subtask[]>;
-  close(): void;
+  listSubtasks: () => Promise<Subtask[]>;
+  close: () => void;
 }
 
 export interface SubtaskStoreOptions {

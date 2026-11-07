@@ -26,7 +26,7 @@ export const defaultProjectView: ProjectView = { showCompleted: false, tagId: nu
 interface ProjectScreenProps {
   list: List | undefined;
   view: ProjectView;
-  onView(view: ProjectView): void;
+  onView: (view: ProjectView) => void;
   /** The live Tasks with their Events' dates (`withEventDates`). */
   tasks: Task[];
   events: Event[];
@@ -35,9 +35,9 @@ interface ProjectScreenProps {
   actions: TaskActions;
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;
-  onRename(id: string, name: string): Promise<void> | void;
-  onSetProject(id: string, isProject: boolean): Promise<void> | void;
-  onDelete(id: string): Promise<void> | void;
+  onRename: (id: string, name: string) => Promise<void> | void;
+  onSetProject: (id: string, isProject: boolean) => Promise<void> | void;
+  onDelete: (id: string) => Promise<void> | void;
 }
 
 /** The Project view: one List or Project with its open Tasks and Progress, "Show completed" and a Tag filter. */

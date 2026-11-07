@@ -49,9 +49,9 @@ interface Device {
   tags: TagStore;
   subtasks: SubtaskStore;
   engine: SyncEngine;
-  sync(): Promise<void>;
+  sync: () => Promise<void>;
   /** Closes everything, like closing the app; the data stays. */
-  close(): void;
+  close: () => void;
 }
 
 interface DeviceOptions {

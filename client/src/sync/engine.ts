@@ -33,12 +33,12 @@ export interface SyncEngine {
    * the outcome shows in `state()`. The status is "syncing" only for a run someone asked to see
    * (`showProgress`, for the Sync now button); background runs change it only to report how they ended.
    */
-  syncNow(options?: { showProgress?: boolean }): Promise<void>;
-  state(): SyncState;
+  syncNow: (options?: { showProgress?: boolean }) => Promise<void>;
+  state: () => SyncState;
   /** Called whenever the status or the time of the last sync changes. Returns how to stop listening. */
-  subscribe(listener: (state: SyncState) => void): () => void;
+  subscribe: (listener: (state: SyncState) => void) => () => void;
   /** Called after a run that changed records on this device, so screens can reload. */
-  onRemoteChanges(listener: () => void): () => void;
+  onRemoteChanges: (listener: () => void) => () => void;
 }
 
 const toChange = ({ type, id, field, value, hlc }: OutboxEntry): Change => ({ type, id, field, value, hlc });

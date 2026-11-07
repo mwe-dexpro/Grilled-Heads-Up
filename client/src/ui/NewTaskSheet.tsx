@@ -8,9 +8,9 @@ interface NewTaskSheetProps {
   open: boolean;
   /** The List the Project view is showing: the Task is added to it. Elsewhere there is none. */
   list?: List | undefined;
-  onAdd(title: string, when: TaskWhen, listId: string | null): void;
-  onNewEvent(): void;
-  onClose(): void;
+  onAdd: (title: string, when: TaskWhen, listId: string | null) => void;
+  onNewEvent: () => void;
+  onClose: () => void;
 }
 
 /** Quick add: a title, and optionally a date and time. Without a date the Task goes to the Inbox. */

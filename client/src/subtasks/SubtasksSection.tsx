@@ -13,18 +13,18 @@ interface SubtasksSectionProps {
   task: Task;
   /** The Task's live Subtasks, in order. */
   subtasks: Subtask[];
-  onAdd(taskId: string, title: string): void;
-  onRename(id: string, title: string): void;
+  onAdd: (taskId: string, title: string) => void;
+  onRename: (id: string, title: string) => void;
   /** Saves the tick; a promise that fails tells the section that it did not happen. */
-  onSetDone(id: string, done: boolean): Promise<void> | void;
+  onSetDone: (id: string, done: boolean) => Promise<void> | void;
   /** Moves the Subtask to that index (a drop). */
-  onMove(id: string, toIndex: number): Promise<void> | void;
+  onMove: (id: string, toIndex: number) => Promise<void> | void;
   /** Moves the Subtask that many places from where it is when the move runs (an arrow key: it must not depend on the order shown). */
-  onMoveBy(id: string, by: number): Promise<void> | void;
+  onMoveBy: (id: string, by: number) => Promise<void> | void;
   /** Deletes the Subtask and offers to undo it. */
-  onDelete(subtask: Subtask): void;
+  onDelete: (subtask: Subtask) => void;
   /** Completes the Task, like the sticky button of Task detail. */
-  onCompleteTask(taskId: string): void;
+  onCompleteTask: (taskId: string) => void;
 }
 
 /**

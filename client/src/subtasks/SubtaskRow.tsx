@@ -8,26 +8,26 @@ import type { RowDragState } from "./useRowDrag";
 interface SubtaskRowProps {
   subtask: Subtask;
   /** The row's element, for the section: where the focus goes, where the places are. */
-  rowRef(node: HTMLLIElement | null): void;
+  rowRef: (node: HTMLLIElement | null) => void;
   drag: RowDragState;
   /** The pointer handlers of the handle (a drag). */
   handleProps: {
-    onPointerDown(e: PointerEvent<HTMLButtonElement>): void;
-    onPointerMove(e: PointerEvent<HTMLButtonElement>): void;
-    onPointerUp(e: PointerEvent<HTMLButtonElement>): void;
-    onLostPointerCapture(e: PointerEvent<HTMLButtonElement>): void;
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => void;
+    onPointerMove: (e: PointerEvent<HTMLButtonElement>) => void;
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => void;
+    onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => void;
   };
   /** Whether a click on the handle ends a drag (and is no tap). */
-  endsDrag(e: MouseEvent): boolean;
+  endsDrag: (e: MouseEvent) => boolean;
   /** The Move up and Move down buttons are shown. */
   moving: boolean;
-  onToggleMoving(): void;
-  onCloseMoving(): void;
-  onTick(): void;
-  onRename(title: string): void;
-  onDelete(): void;
+  onToggleMoving: () => void;
+  onCloseMoving: () => void;
+  onTick: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
   /** One place up or down, from the control (a selector in the row) that asked, which keeps the focus. */
-  onMoveBy(by: number, control: string): void;
+  onMoveBy: (by: number, control: string) => void;
 }
 
 /** One Subtask of the list: tick, title (an input while it is renamed), handle, delete, and the Move buttons when they are shown. */
@@ -142,8 +142,8 @@ function SubtaskTitleInput({
   onCancel,
 }: {
   subtask: Subtask;
-  onSave(title: string | null, withKey: boolean): void;
-  onCancel(): void;
+  onSave: (title: string | null, withKey: boolean) => void;
+  onCancel: () => void;
 }) {
   const { t } = useI18n();
   const [started] = useState(subtask.title);

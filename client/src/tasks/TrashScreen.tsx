@@ -9,7 +9,7 @@ interface TrashScreenProps {
   /** Deleted Tasks, the latest deletion first. */
   tasks: DeletedTask[];
   now: Date;
-  onRestore(id: string): void;
+  onRestore: (id: string) => void;
 }
 
 /** The Trash: Tasks deleted in the last 30 days, each with "Restore". Older ones are gone for good. */

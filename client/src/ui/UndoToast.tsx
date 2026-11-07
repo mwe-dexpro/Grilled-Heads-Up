@@ -27,8 +27,8 @@ export function UndoToast({
   deletedId: string | null;
   /** What the toast says: `toast.taskDeleted` or `toast.subtaskDeleted`. */
   message: TranslationKey;
-  onUndo(): void;
-  onExpire(): void;
+  onUndo: () => void;
+  onExpire: () => void;
 }) {
   return (
     <div className="undo-region" aria-live="polite" aria-atomic="true">
@@ -37,7 +37,7 @@ export function UndoToast({
   );
 }
 
-function Toast({ message, onUndo, onExpire }: { message: TranslationKey; onUndo(): void; onExpire(): void }) {
+function Toast({ message, onUndo, onExpire }: { message: TranslationKey; onUndo: () => void; onExpire: () => void }) {
   const { t } = useI18n();
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);

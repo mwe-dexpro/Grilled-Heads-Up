@@ -25,7 +25,7 @@ interface EventScreenProps {
   actions: TaskActions;
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;
-  onAddTask(title: string, offsetDays: number): void;
+  onAddTask: (title: string, offsetDays: number) => void;
 }
 
 /** The Event view: when and where, its Progress and risk, and its Preparation and Follow-up tasks with their Offsets. */

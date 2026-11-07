@@ -13,8 +13,8 @@ interface RescheduleSheetProps {
   today: Day;
   /** The earliest day every Task in the sheet can go to. */
   earliest: Day;
-  onChoose(day: Day): void;
-  onClose(): void;
+  onChoose: (day: Day) => void;
+  onClose: () => void;
 }
 
 /**

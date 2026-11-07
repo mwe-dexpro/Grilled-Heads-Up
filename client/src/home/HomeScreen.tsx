@@ -24,7 +24,7 @@ interface HomeScreenProps {
   lists: List[];
   now: Date;
   sync: SyncState;
-  onSyncNow(): void;
+  onSyncNow: () => void;
   actions: TaskActions;
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;

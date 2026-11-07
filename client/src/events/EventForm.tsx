@@ -12,7 +12,7 @@ interface EventFormProps {
   event?: Event;
   now: Date;
   /** `base` is what the form was opened with (editing only); the fields that differ from it are what the person changed. */
-  onSave(fields: EventFields, base?: EventFields): Promise<void>;
+  onSave: (fields: EventFields, base?: EventFields) => Promise<void>;
 }
 
 function newEventFields(now: Date): EventFields {

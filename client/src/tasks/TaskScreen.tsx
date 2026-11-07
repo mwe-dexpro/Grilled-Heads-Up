@@ -29,24 +29,24 @@ interface TaskScreenProps {
   /** Every live Subtask on this device; the screen shows the Task's own. */
   subtasks: Subtask[];
   now: Date;
-  onComplete(id: string): void;
-  onReschedule(id: string, day: Day): void;
+  onComplete: (id: string) => void;
+  onReschedule: (id: string, day: Day) => void;
   /** Deletes the Task (to the Trash), offers to undo it and goes back. */
-  onDelete(task: Task): void;
-  onLink(id: string, eventId: string, offsetDays: number): void;
-  onUnlink(id: string, date: string | null): void;
+  onDelete: (task: Task) => void;
+  onLink: (id: string, eventId: string, offsetDays: number) => void;
+  onUnlink: (id: string, date: string | null) => void;
   /** Puts the Task in a List, or in none (null). */
-  onSetList(id: string, listId: string | null): void;
+  onSetList: (id: string, listId: string | null) => void;
   /** Adds the Tag of that name, making it if there is none. */
-  onAddTag(id: string, name: string): void;
-  onRemoveTag(id: string, tagId: string): void;
-  onAddSubtask(taskId: string, title: string): void;
-  onRenameSubtask(id: string, title: string): void;
-  onSetSubtaskDone(id: string, done: boolean): Promise<void> | void;
-  onMoveSubtask(id: string, toIndex: number): Promise<void> | void;
-  onMoveSubtaskBy(id: string, by: number): Promise<void> | void;
+  onAddTag: (id: string, name: string) => void;
+  onRemoveTag: (id: string, tagId: string) => void;
+  onAddSubtask: (taskId: string, title: string) => void;
+  onRenameSubtask: (id: string, title: string) => void;
+  onSetSubtaskDone: (id: string, done: boolean) => Promise<void> | void;
+  onMoveSubtask: (id: string, toIndex: number) => Promise<void> | void;
+  onMoveSubtaskBy: (id: string, by: number) => Promise<void> | void;
   /** Deletes the Subtask and offers to undo it; the screen stays. */
-  onDeleteSubtask(subtask: Subtask): void;
+  onDeleteSubtask: (subtask: Subtask) => void;
 }
 
 /** Task detail: when it's due, its Subtasks, List and Tags, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */

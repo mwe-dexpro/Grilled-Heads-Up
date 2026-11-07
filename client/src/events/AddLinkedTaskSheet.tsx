@@ -9,8 +9,8 @@ type Direction = "before" | "onTheDay" | "after";
 interface AddLinkedTaskSheetProps {
   event: Event;
   open: boolean;
-  onAdd(title: string, offsetDays: number): void;
-  onClose(): void;
+  onAdd: (title: string, offsetDays: number) => void;
+  onClose: () => void;
 }
 
 /** Adds a Task to an Event at an Offset: a number of days before or after it, or on the day. */

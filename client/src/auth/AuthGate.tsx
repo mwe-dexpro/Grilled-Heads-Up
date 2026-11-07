@@ -18,10 +18,10 @@ type Stage =
 /** What the signed-in Owner can do about signing in, from inside the app. */
 interface SignedIn {
   /** Replaces the recovery code and shows the new one once. */
-  showNewRecoveryCode(): Promise<void>;
-  signOut(): Promise<void>;
+  showNewRecoveryCode: () => Promise<void>;
+  signOut: () => Promise<void>;
   /** Asks the server whether this device is still signed in, and shows the sign-in screen if not (e.g. a session that expired). */
-  recheck(): Promise<void>;
+  recheck: () => Promise<void>;
 }
 
 const SignedInContext = createContext<SignedIn | null>(null);
@@ -151,7 +151,7 @@ function Problem({ text }: { text: TranslationKey | null }) {
   ) : null;
 }
 
-function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | null): void }) {
+function SetupScreen({ onRegistered }: { onRegistered: (recoveryCode: string | null) => void }) {
   const { t } = useI18n();
   const { busy, message, run } = useStep();
 
@@ -179,8 +179,8 @@ function SignInScreen({
   onRecovered,
 }: {
   unreachable: boolean;
-  onSignedIn(): void;
-  onRecovered(recoveryCode: string): void;
+  onSignedIn: () => void;
+  onRecovered: (recoveryCode: string) => void;
 }) {
   const { t } = useI18n();
   const passkey = useStep();
@@ -240,7 +240,7 @@ function SignInScreen({
   );
 }
 
-function NewPasskeyScreen({ onDone }: { onDone(): void }) {
+function NewPasskeyScreen({ onDone }: { onDone: () => void }) {
   const { t } = useI18n();
   const { busy, message, run } = useStep();
 
@@ -270,7 +270,7 @@ function NewPasskeyScreen({ onDone }: { onDone(): void }) {
   );
 }
 
-function RecoveryCodeScreen({ recoveryCode, onDone }: { recoveryCode: string; onDone(): void }) {
+function RecoveryCodeScreen({ recoveryCode, onDone }: { recoveryCode: string; onDone: () => void }) {
   const { t } = useI18n();
 
   return (
