@@ -109,6 +109,12 @@ export default tseslint.config(
     },
   },
   {
+    // Relaxed for the tools' tests only: `path.matchesGlob` (Node 22.20 and later) reads the real Stryker globs in a test. The code
+    // that ships does not use it; CI and the Docker image run the current Node 22.
+    files: ["tools/src/**/*.test.ts"],
+    rules: { "n/no-unsupported-features/node-builtins": ["error", { ignores: ["sqlite", "sqlite.DatabaseSync", "path.matchesGlob"] }] },
+  },
+  {
     // Off for the bootstrap file only: the shutdown handler ends the process on purpose, once the server and the database are closed.
     files: ["server/src/server.ts"],
     rules: { "n/no-process-exit": "off" },

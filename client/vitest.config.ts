@@ -19,7 +19,11 @@ export default defineConfig({
       reporter: ["text-summary", "html", "json-summary"],
       reportsDirectory: "reports/coverage",
       // The measured values, rounded down. They only go up: raise them when a change lifts the coverage, never lower them.
-      thresholds: { lines: 45, branches: 50, functions: 43, statements: 45 },
+      // Measured and reported for every file, but gated where unit tests are the way to test: the `.ts` files, hooks left out
+      // (React components and hooks are reached by the end-to-end tests only; there is no React unit-test setup). So a new
+      // component cannot turn the unit job red, and a new untested domain module does. The whole-client figures stay in the
+      // summary: 45.0% lines, 50.5% branches, 43.8% functions, 46.0% statements when this gate was set.
+      thresholds: { "src/**/!(use[A-Z]*).ts": { lines: 99, branches: 98, functions: 99, statements: 99 } },
     },
   },
 });

@@ -63,7 +63,7 @@ The PWA needs HTTPS (or `localhost`) to be installable. To try it on a phone dur
 
 ```sh
 npm test                    # unit tests, then end-to-end tests
-npm run test:unit           # Vitest in client, server and tools, with coverage (thresholds fail the run)
+npm run test:unit           # Vitest in client, server and tools, with coverage (thresholds on the unit-testable `.ts` files fail the run)
 npm run test:e2e            # builds, starts the servers, runs Playwright on an emulated Pixel 7
 npm run test:mutation       # Stryker mutation tests of client, server and tools, every source file by glob
 npm run typecheck           # tsc in client, server, tools, and for e2e/ and the config files
@@ -114,7 +114,7 @@ The end-to-end tests run three servers, each with an in-memory database: the sig
 
 Unit tests run with the device time zone fixed to `Europe/Berlin` (set in `client/vitest.config.ts`), so day and time-zone tests mean the same on every machine, including daylight-saving changes.
 
-**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. Stryker mutates every `src/**/*.ts` of the client, the server and `tools/` by glob, so a new file is included without a config edit; each workspace's run fails below a score of 95 (client 97.7%, server 95.6%, tools 96.3%), and writes its HTML report to `reports/mutation/index.html` in the workspace. Left out, by glob: React components (`*.tsx`) and hooks (`client/src/**/use*.ts`), which only the end-to-end tests reach, the entry points (`main.tsx`, `server.ts`), test helpers, and the command-line wrappers of `tools/` (the reasons are in [docs/agents/testing.md](docs/agents/testing.md)).
+**Mutation testing** changes the code under test in small ways (a flipped condition, a removed call) and checks that a test fails for each change. Stryker mutates every `src/**/*.ts` of the client, the server and `tools/` by glob, so a new file is included without a config edit; each workspace's run fails below a score of 95 (client 97.7%, server 95.6%, tools 96.3%), and writes its HTML report to `reports/mutation/index.html` in the workspace. Left out, by glob: React components (`*.tsx`) and hooks (`client/src/**/use[A-Z]*.ts`), which only the end-to-end tests reach, the entry points (`main.tsx`, `server.ts`), test helpers, and the command-line wrappers of `tools/` (the reasons are in [docs/agents/testing.md](docs/agents/testing.md)).
 
 Mutants that survive on purpose, because no input can tell them apart or no test can place the case, by file:
 

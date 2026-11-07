@@ -46,6 +46,8 @@ Run a single workspace with `-w`, e.g. `npm run test:mutation -w server` (about 
 
 Thresholds only go up. Coverage thresholds are in each workspace's `vitest.config.ts` (the measured value rounded down); mutation `break` is in each `stryker.config.json` (never below 80). Raise them when a change lifts the score; never lower one to get green.
 
+Coverage is measured for every file, but gated where unit tests are the way to test: in the client on `src/**/!(use[A-Z]*).ts` (every `.ts` file but React hooks; components and hooks only the end-to-end tests reach, so a new component cannot turn `unit` red while a new untested domain module does), in tools on `src/*.ts` (the command-line wrappers in `src/bin/` are run as processes by `bin.test.ts`, which coverage cannot see), in the server on everything. The client's whole-tree figures (components and hooks included) stay in the summary.
+
 ## What is mutation-tested and what is not
 
 Stryker mutates every `src/**/*.ts` of client, server and tools by glob, so a new file is included without editing a list. Excluded, each by glob and for a reason:
@@ -53,10 +55,10 @@ Stryker mutates every `src/**/*.ts` of client, server and tools by glob, so a ne
 | Excluded | Why |
 | --- | --- |
 | `*.tsx` (not matched by `src/**/*.ts`) | React components: there is no React unit-test setup (README, "Not covered by a test"); the end-to-end tests cover them, and Stryker does not run those. Coverage still measures them. |
-| `client/src/**/use*.ts` | React hooks, for the same reason. |
+| `client/src/**/use[A-Z]*.ts` | React hooks (use, then a capital: a file like `user.ts` or `useful.ts` stays in), for the same reason. |
 | `client/src/main.tsx`, `server/src/server.ts` | Entry points that read the environment and start listening. |
 | `**/*.test.ts`, `src/**/testing/**`, `tools/src/fixtures/**` | Tests and their helpers. |
-| `tools/src/bin/**` | Thin command-line wrappers around functions that are tested. |
+| `tools/src/bin/**` | One-line command-line wrappers; the code they run is in `src/cli.ts`, which is mutated, and `bin.test.ts` starts every wrapper as a process. |
 
 Anything else stays in, `app/navigation.ts` and `auth/authApi.ts` included (they are tested with a fake browser and a fake `fetch`). Adding an exclusion needs a reason in this table and in the README.
 
