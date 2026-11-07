@@ -173,6 +173,20 @@ describe("npmAuditCommand", () => {
   });
 });
 
+describe("an allowlist that is not valid, for the commands that read it", () => {
+  it("names every error on a line of its own, the way the allowlist check does", () => {
+    const root = repository({ [allowlistFile]: allowlist(entry({ tool: "snyk" }), entry({ reason: "" })) });
+
+    const result = run(npmAuditCommand, root, [], fixture("npm-audit-fixed.json"));
+
+    expect(result).toEqual({
+      exitCode: 1,
+      stdout: "",
+      stderr: 'Entry 1: the tool "snyk" is not one of npm-audit, trivy, codeql, gitleaks.\nEntry 2: the reason is missing.\n',
+    });
+  });
+});
+
 describe("sarifGateCommand", () => {
   const sarif = (rule: string, severity: string, line: number) =>
     JSON.stringify({
@@ -206,6 +220,12 @@ describe("sarifGateCommand", () => {
     const result = run(sarifGateCommand, root, ["sarif"]);
 
     expect(result.stderr.split("\n")).toEqual(["2 high or critical CodeQL results:", "critical  js/a  a.ts:1  m", "high      js/b  a.ts:2  m", ""]);
+  });
+
+  it("reads the files of a folder in the order of their names, so the first broken one is the one named", () => {
+    const root = repository({ [allowlistFile]: allowlist(), "sarif/b.sarif": "{", "sarif/a.sarif": "{", "sarif/c.sarif": "{" });
+
+    expect(run(sarifGateCommand, root, ["sarif"]).stderr).toBe(`${join("sarif", "a.sarif")} is not valid SARIF JSON.\n`);
   });
 
   it("takes a file as it is, several paths together, and leaves options out of the paths", () => {
@@ -321,6 +341,20 @@ describe("checkSkipsCommand", () => {
     expect(result.stderr).toContain(
       `${join("server/src/a.test.ts")}:1: a skipped test needs the issue that brings it back (#123 or its address): ${disable}\n`,
     );
+  });
+
+  it("trims the line it shows, and reads files that end in .ts or .tsx, not ones that merely contain it", () => {
+    const disable = "// eslint-disable-next-line vitest/no-disabled-tests -- later";
+    const root = repository({
+      ...folders,
+      "client/src/a.test.ts": `    ${disable}   \n`,
+      "client/src/old.ts.bak": `${disable}\n`,
+      "client/src/old.tsx.orig": `${disable}\n`,
+    });
+
+    const result = run(checkSkipsCommand, root);
+
+    expect(result.stderr).toBe(`${join("client/src/a.test.ts")}:1: a skipped test needs the issue that brings it back (#123 or its address): ${disable}\n`);
   });
 
   it("reads source files only", () => {

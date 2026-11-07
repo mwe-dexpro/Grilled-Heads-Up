@@ -396,4 +396,46 @@ describe("gateSarif", () => {
       output: "No high or critical CodeQL results (0 results of lower severity).\n",
     });
   });
+
+  it('takes a severity of only blanks for no severity (Number(" ") would be 0, a result that passes)', () => {
+    const text = sarif([{ id: "js/blank", severity: "   " }], [{ rule: "js/blank", file: "a.ts", line: 1 }]);
+
+    expect(gateSarif([file(text)], [], today).output).toBe(
+      "1 high, critical or unclassified CodeQL result:\nunclassified  js/blank  a.ts:1  A problem of js/blank\n",
+    );
+  });
+
+  it("names a result by the rule it is found to be, when rule.id is no text; and finds the rule in the driver when toolComponent names no index", () => {
+    const rule = { id: "js/x", properties: { "security-severity": "8.0", tags: ["security"] } };
+    const result = { rule: { id: 5, index: 0, toolComponent: { name: "CodeQL" } }, message: { text: "m" } };
+    const text = JSON.stringify({
+      runs: [{ tool: { driver: { rules: [rule] }, extensions: [{ rules: [{ id: "js/other", properties: { tags: ["quality"] } }] }] }, results: [result] }],
+    });
+
+    expect(gateSarif([file(text)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  (no location)  m\n");
+  });
+
+  it("leaves the message empty when it is no text", () => {
+    const rule = { id: "js/x", properties: { "security-severity": "8.0", tags: ["security"] } };
+    const text = JSON.stringify({ runs: [{ tool: { driver: { rules: [rule] } }, results: [{ ruleId: "js/x", message: { text: 5 } }] }] });
+
+    expect(gateSarif([file(text)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  (no location)  \n");
+  });
+
+  it("writes each allowed rule on a line of its own also when nothing else fails", () => {
+    const text = sarif(
+      [
+        { id: "js/one", severity: "8.0" },
+        { id: "js/two", severity: "8.0" },
+      ],
+      [
+        { rule: "js/one", file: "a.ts", line: 1 },
+        { rule: "js/two", file: "b.ts", line: 2 },
+      ],
+    );
+
+    expect(gateSarif([file(text)], [allow("js/one", { reason: "One." }), allow("js/two", { reason: "Two." })], today).output).toBe(
+      "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-31: js/one (One.)\nAllowed until 2026-12-31: js/two (Two.)\n",
+    );
+  });
 });

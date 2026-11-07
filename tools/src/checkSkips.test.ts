@@ -136,4 +136,32 @@ describe("skipsWithoutIssue", () => {
     expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- #42")).toEqual([]);
     expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- see #42, #43")).toEqual([]);
   });
+
+  it("reads a .tsx file as TSX (text in a JSX element is no comment) and a .ts file as TypeScript (an unclosed `<b>` is a type assertion there)", () => {
+    const text = "const a = <p>see // eslint-disable-line vitest/no-disabled-tests</p>;";
+
+    expect(skipsWithoutIssue([{ path: "Probe.tsx", text }])).toEqual([]);
+    expect(skipsWithoutIssue([{ path: "probe.ts", text: "const a = <b>c; // eslint-disable-line vitest/no-disabled-tests" }])).toHaveLength(1);
+  });
+
+  it("takes only comments for directives: text that begins with eslint-disable, and is none, is not one", () => {
+    expect(check("eslint-disable vitest/no-disabled-tests")).toEqual([]);
+  });
+
+  it("does not read the words after a block comment as part of it", () => {
+    expect(check("/* eslint-disable vitest/no-disabled-tests */#12")).toHaveLength(1);
+  });
+
+  it("lists the disables of a file in the order of its lines, also when a comment after a block comes before the ones inside it", () => {
+    const found = check(
+      "if (a) {",
+      "  // eslint-disable-next-line vitest/no-disabled-tests -- one",
+      "  it.skip('x', () => {});",
+      "  // eslint-disable-next-line vitest/no-disabled-tests -- two",
+      "  it.skip('y', () => {});",
+      "} // eslint-disable-line vitest/no-disabled-tests -- three",
+    );
+
+    expect(found.map(({ line }) => line)).toEqual([2, 4, 6]);
+  });
 });
