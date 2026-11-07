@@ -137,7 +137,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
           </span>
         </div>
       </div>
-      {inOtherTimeZone(fields) && <p className="hint">{t("event.timeZone", { zone: fields.timeZone! })}</p>}
+      {inOtherTimeZone(fields) && <p className="hint">{t("event.timeZone", { zone: fields.timeZone })}</p>}
 
       <div className="card form-card spaced">
         <label className="field">

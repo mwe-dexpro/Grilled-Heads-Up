@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../tasks/taskStore";
-import { withEventDate, type Event, type EventFields } from "./event";
+import { linkedTasksOf, type Event, type EventFields } from "./event";
 import { countdown, eventRisk, linkedRole, putsEventAtRisk } from "./risk";
 import { defined } from "../testing/defined";
 
@@ -177,7 +177,7 @@ describe("eventRisk", () => {
       // Its Task is due today, so it is not passed yet.
       expect(eventRisk(tokyo, [onTheDay], at(12))).toMatchObject({ status: "critical", daysUntil: 0, overdue: [] });
       expect(eventRisk(tokyo, [onTheDay], at(13)).status).toBe("passed");
-      expect(putsEventAtRisk(withEventDate(onTheDay, tokyo), tokyo, at(13))).toBe(false);
+      expect(putsEventAtRisk(defined(linkedTasksOf(tokyo, [onTheDay])[0]), tokyo, at(13))).toBe(false);
     });
   });
 
@@ -192,7 +192,7 @@ describe("eventRisk", () => {
 });
 
 describe("putsEventAtRisk: an Overdue Preparation task of an Event that hasn't passed", () => {
-  const dated = (task: Task) => withEventDate(task, event());
+  const dated = (task: Task) => defined(linkedTasksOf(event(), [task])[0]);
 
   it("is true for an Overdue Preparation task", () => {
     expect(putsEventAtRisk(dated(linked(-7)), event(), at(6))).toBe(true);
@@ -205,7 +205,7 @@ describe("putsEventAtRisk: an Overdue Preparation task of an Event that hasn't p
     expect(putsEventAtRisk(dated(linked(1)), event(), at(14))).toBe(false);
     expect(putsEventAtRisk(dated(linked(-7)), event(), at(13))).toBe(false);
     // An Overdue Follow-up task while a multi-day Event is still going on.
-    expect(putsEventAtRisk(withEventDate(linked(1), weekend), weekend, at(18))).toBe(false);
+    expect(putsEventAtRisk(defined(linkedTasksOf(weekend, [linked(1)])[0]), weekend, at(18))).toBe(false);
   });
 });
 
@@ -214,7 +214,7 @@ describe("countdown: the Event's Preparation tasks on a line towards it", () => 
     const cake = linked(-8, done);
     const gift = linked(-7);
     const wrap = linked(-1);
-    const line = countdown(event(), [wrap, cake, linked(2), gift], at(6))!;
+    const line = defined(countdown(event(), [wrap, cake, linked(2), gift], at(6)));
 
     expect(line.marks.map((m) => [m.offsetDays, m.state, m.tasks.map((t) => t.id)])).toEqual([
       [-8, "done", [cake.id]],
@@ -227,13 +227,13 @@ describe("countdown: the Event's Preparation tasks on a line towards it", () => 
   });
 
   it("starts the line at Today when Today comes before every Task", () => {
-    const line = countdown(event(), [linked(-2)], at(2))!;
+    const line = defined(countdown(event(), [linked(-2)], at(2)));
     expect(line.todayPosition).toBe(0);
     expect(defined(line.marks[0]).position).toBeCloseTo((8 / 10) * 0.9);
   });
 
   it("puts Tasks on the same day on one mark, showing the most pressing state", () => {
-    const line = countdown(event(), [linked(-3, done), linked(-3), linked(-2, done), linked(-1, done), linked(-1)], at(10))!;
+    const line = defined(countdown(event(), [linked(-3, done), linked(-3), linked(-2, done), linked(-1, done), linked(-1)], at(10)));
     expect(line.marks.map((m) => [m.offsetDays, m.state, m.tasks.length])).toEqual([
       [-3, "overdue", 2],
       [-2, "done", 1],
@@ -242,7 +242,7 @@ describe("countdown: the Event's Preparation tasks on a line towards it", () => 
   });
 
   it("puts everything at the Event on its day", () => {
-    const line = countdown(event(), [linked(0)], at(12))!;
+    const line = defined(countdown(event(), [linked(0)], at(12)));
     expect(defined(line.marks[0]).position).toBe(0.9);
     expect(line.todayPosition).toBe(0.9);
   });

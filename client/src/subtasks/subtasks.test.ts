@@ -207,7 +207,7 @@ describe("positionAt and movedOrder", () => {
   it("gives a position that really sorts the Subtask where it was sent", () => {
     for (const [id, to] of [["d", 0], ["a", 3], ["b", 2], ["c", 1], ["d", 2]] as const) {
       const list = abcd();
-      const position = positionAt(list, id, to)!;
+      const position = defined(positionAt(list, id, to), "position");
       const moved = list.map((s) => (s.id === id ? { ...s, position } : s));
 
       expect(ids(orderSubtasks(moved))).toEqual(ids(movedOrder(list, id, to)));

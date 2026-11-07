@@ -147,7 +147,7 @@ export function TaskScreen({
             </span>
             <span className="task-text">
               <span className="part-of-label">
-                {t("task.partOf")} · {formatOffset(task.offsetDays!, t)}
+                {t("task.partOf")} · {formatOffset(task.offsetDays ?? 0, t)}
               </span>
               <span className="event-title">{event.title}</span>
               <span className="task-meta">

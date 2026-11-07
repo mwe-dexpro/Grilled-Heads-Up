@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "../i18n/i18n";
-import type { Task } from "../tasks/taskStore";
-import type { Event, EventFields } from "./event";
+import type { Event, EventFields, LinkedTask } from "./event";
 import { formatRiskExplanation, formatRiskStatus } from "./formatRisk";
 import type { EventRisk } from "./risk";
 
@@ -41,7 +40,7 @@ describe("formatRiskExplanation", () => {
   /** Sunday 4 October 2026. */
   const now = new Date(2026, 9, 4, 13, 5);
   const birthday: Event = { ...timed, id: "e", createdAt: "", externalSource: null, externalId: null, deletedAt: null };
-  const overdueTask = (title: string, date: string): Task => ({
+  const overdueTask = (title: string, date: string): LinkedTask => ({
     id: title,
     title,
     date,

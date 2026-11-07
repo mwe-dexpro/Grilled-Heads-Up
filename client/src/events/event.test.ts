@@ -7,6 +7,7 @@ import {
   eventProgress,
   eventStart,
   linkedTaskDate,
+  linkedTasksOf,
   validateEvent,
   withEventDates,
   zonedInstant,
@@ -90,6 +91,13 @@ describe("Event start, end and days on this device", () => {
     expect(eventDays(event(allDay))).toEqual({ first: "2026-10-17", last: "2026-10-19" });
     expect(eventStart(event(allDay))).toEqual(new Date(2026, 9, 17));
     expect(eventEnd(event(allDay))).toEqual(new Date(2026, 9, 20));
+  });
+
+  it("reads a timed Event whose times or time zone have not arrived yet as whole days", () => {
+    expect(eventStart(event({ startTime: null }))).toEqual(new Date(2026, 9, 12));
+    expect(eventStart(event({ timeZone: null }))).toEqual(new Date(2026, 9, 12));
+    expect(eventEnd(event({ endTime: null }))).toEqual(new Date(2026, 9, 13));
+    expect(eventEnd(event({ timeZone: null }))).toEqual(new Date(2026, 9, 13));
   });
 
   it("does not count the next day for a timed Event that ends at midnight", () => {
@@ -185,6 +193,22 @@ describe("Linked task dates come from the Event's start day plus the Offset", ()
 
   it("leaves a Task undated when its Event is missing", () => {
     expect(withEventDates([task({ eventId: "gone", offsetDays: -1 })], [event()])[0]?.date).toBeNull();
+  });
+});
+
+describe("linkedTasksOf", () => {
+  it("gives the Event's Linked tasks their Offset and the date it makes, and leaves other Tasks out", () => {
+    const gift = task({ id: "gift", eventId: "e1", offsetDays: -7 });
+    const other = task({ id: "other", eventId: "e2", offsetDays: -1 });
+    const plain = task({ id: "plain", date: "2026-10-20" });
+
+    const linked = linkedTasksOf(event(), [plain, gift, other]);
+
+    expect(linked.map((t) => [t.id, t.offsetDays, t.date])).toEqual([["gift", -7, "2026-10-05"]]);
+  });
+
+  it("counts a Task whose Offset has not arrived yet as on the day", () => {
+    expect(linkedTasksOf(event(), [task({ eventId: "e1", offsetDays: null })]).map((t) => [t.offsetDays, t.date])).toEqual([[0, "2026-10-12"]]);
   });
 });
 

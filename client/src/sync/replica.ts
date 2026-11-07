@@ -50,9 +50,9 @@ export interface Table<T extends Synced> {
    */
   delete(id: string): Promise<boolean>;
   /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
-  getDeleted(id: string): Promise<T | undefined>;
+  getDeleted(id: string): Promise<Deleted<T> | undefined>;
   /** Deleted records (tombstones), in no particular order. */
-  listDeleted(): Promise<T[]>;
+  listDeleted(): Promise<Array<Deleted<T>>>;
   /**
    * Un-deletes a deleted record: writes `deletedAt` = null under a new clock (one field, one outbox entry), in
    * one transaction. That is an ordinary last-write-wins write, so it beats the older deletion on every device.
@@ -60,6 +60,11 @@ export interface Table<T extends Synced> {
    */
   restore(id: string): Promise<T | undefined>;
 }
+
+/** A record that is deleted: it has the time of its deletion. */
+export type Deleted<T extends Synced> = T & { deletedAt: string };
+
+const isDeleted = <T extends Synced>(record: T): record is Deleted<T> => record.deletedAt !== null;
 
 /** Fields of a record that a store operation sets; never the id, and not `deletedAt`, which only `delete` and `restore` write. */
 export type Patch<T extends Synced> = Partial<Omit<T, "id" | "deletedAt">>;
@@ -193,12 +198,12 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
 
     async getDeleted(id) {
       const record = await stored(id);
-      return record?.deletedAt === null ? undefined : record;
+      return record !== undefined && isDeleted(record) ? record : undefined;
     },
 
     async listDeleted() {
       const all = (await db.getAll(storeName)) as Array<Partial<T> & { id: string }>;
-      return all.map(withDefaults).filter((record) => record.deletedAt !== null);
+      return all.map(withDefaults).filter(isDeleted);
     },
 
     async restore(id) {

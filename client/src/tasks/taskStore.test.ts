@@ -347,7 +347,7 @@ describe("Rescheduling a Task", () => {
     const store = await openTaskStore(dbName, { now: clock() });
     const task = await store.addTask("Half", { date: "2026-10-09" });
     const db = await openAppDb(dbName);
-    await db.put("tasks", { ...(await db.get("tasks", task.id))!, eventId: "e1", offsetDays: null });
+    await db.put("tasks", { ...defined(await db.get("tasks", task.id)), eventId: "e1", offsetDays: null });
     db.close();
     // The Event started on 2026-10-01: were the Task taken for a Linked task, it would be Overdue and could not come to today.
     const eventStart = () => "2026-10-01";
@@ -601,7 +601,7 @@ describe("The Trash", () => {
     const task = await store.addTask("Half");
     await store.deleteTask(task.id);
     const db = await openAppDb(dbName);
-    await db.put("tasks", { ...(await db.get("tasks", task.id))!, eventId: "e1", offsetDays: null });
+    await db.put("tasks", { ...defined(await db.get("tasks", task.id)), eventId: "e1", offsetDays: null });
     db.close();
 
     expect(defined((await store.listTrash())[0])).toMatchObject({ eventId: null, offsetDays: null });
@@ -722,7 +722,7 @@ describe("Lists and Tags of a Task", () => {
     const task = await store.addTask("Call");
     // Another change lands (a sync, say) between the screen's read and this change.
     const db = await openAppDb(dbName);
-    await db.put("tasks", { ...(await db.get("tasks", task.id))!, tagIds: ["g-from-sync"] });
+    await db.put("tasks", { ...defined(await db.get("tasks", task.id)), tagIds: ["g-from-sync"] });
     db.close();
 
     await store.addTaskTag(task.id, "g1");

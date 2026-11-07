@@ -102,7 +102,13 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const id = randomBytes(16).toString("base64url");
     const expires = Date.now() + ceremonyMinutes * 60 * 1000;
     for (const [key, old] of ceremonies) if (old.expires < Date.now()) ceremonies.delete(key);
-    if (ceremonies.size >= maxCeremonies) ceremonies.delete(ceremonies.keys().next().value!);
+    if (ceremonies.size >= maxCeremonies) {
+      // The oldest one gives way (a Map keeps the order things were added in).
+      for (const oldest of ceremonies.keys()) {
+        ceremonies.delete(oldest);
+        break;
+      }
+    }
     ceremonies.set(id, { ...ceremony, expires });
     res.cookie(ceremonyCookie, id, { httpOnly: true, sameSite: "strict", secure, path: "/api/auth", maxAge: ceremonyMinutes * 60 * 1000 });
   }
@@ -282,8 +288,9 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
 /** 20 characters of Crockford base32 (100 bits), in groups of four: `7K2M-…`. */
 export function generateRecoveryCode(): string {
   const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  const characters = Array.from({ length: 20 }, () => alphabet[randomInt(alphabet.length)]);
-  return characters.join("").match(/.{4}/g)!.join("-");
+  const characters = Array.from({ length: 20 }, () => alphabet.charAt(randomInt(alphabet.length)));
+  const groups = Array.from({ length: 5 }, (_, group) => characters.slice(group * 4, group * 4 + 4).join(""));
+  return groups.join("-");
 }
 
 /** Ignores case, spaces and dashes, and reads the letters people mistake for digits as those digits. */

@@ -148,7 +148,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   async function apply(changes: Change[], cursor: number, serverTime: number): Promise<boolean> {
     const tx = transactionOver(db, storeNames);
     const clocksOf = new Map<string, FieldClocks>();
-    const touched = new Set<string>();
+    const touched = new Set<FieldClocks>();
     let applied = false;
 
     for (const change of changes) {
@@ -167,7 +167,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       const base = ((await store.get(change.id)) as Partial<Synced> | undefined) ?? {};
       await store.put(recordType.withDefaults({ ...base, id: change.id, [change.field]: change.value }));
       clocks.clocks[change.field] = change.hlc;
-      touched.add(key);
+      touched.add(clocks);
       applied = true;
 
       // A pending edit of this field is older than the change that just won, so the server would drop it anyway.
@@ -175,7 +175,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       if (pending && pending.hlc < change.hlc) await tx.objectStore("outbox").delete([change.type, change.id, change.field]);
     }
 
-    for (const key of touched) await tx.objectStore("fieldClocks").put(clocksOf.get(key)!);
+    for (const clocks of touched) await tx.objectStore("fieldClocks").put(clocks);
     await receiveTimestamps(tx, [...changes.map(({ hlc }) => decode(hlc)), { wall: serverTime, counter: 0 }], now());
     // Another tab may have read further meanwhile; never move the position back.
     const saved = ((await tx.objectStore("syncInfo").get("cursor")) as number | undefined) ?? 0;

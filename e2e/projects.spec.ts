@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { boxOf, expect, test } from "./fixtures";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: today is Oct 7, so Oct 5 is Overdue and Oct 9 is ahead. */
@@ -619,9 +619,9 @@ test("the button that removes a Tag is big enough to hit (24 by 24 pixels at lea
   await openTask(page, "Sort boxes");
   await addTag(page, "Errand");
 
-  const box = await page.getByRole("button", { name: "Remove tag Errand" }).boundingBox();
-  expect(box!.width).toBeGreaterThanOrEqual(24);
-  expect(box!.height).toBeGreaterThanOrEqual(24);
+  const box = await boxOf(page.getByRole("button", { name: "Remove tag Errand" }));
+  expect(box.width).toBeGreaterThanOrEqual(24);
+  expect(box.height).toBeGreaterThanOrEqual(24);
 });
 
 test.describe("a Task that another tab deleted meanwhile", () => {

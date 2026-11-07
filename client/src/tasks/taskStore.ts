@@ -28,6 +28,14 @@ export interface Task {
   deletedAt: string | null;
 }
 
+/** A Task that has a date (a Linked task has one once its Event's date is applied; see `withEventDates`). */
+export type DatedTask = Task & { date: Day };
+
+/** A Task in the Trash: it has the time it was deleted. */
+export type DeletedTask = Task & { deletedAt: string };
+
+export const isDated = (task: Task): task is DatedTask => task.date !== null;
+
 /** A change was asked for a Task that is not there (never was, or a sync has deleted it). Other failures are not this. */
 export class NoTaskError extends Error {
   constructor(id: string) {
@@ -88,7 +96,7 @@ export interface TaskStore {
   /** Tasks in the order they were added; deleted ones are left out. */
   listTasks(): Promise<Task[]>;
   /** The Trash: Tasks deleted less than 30 days ago, the latest deletion first. */
-  listTrash(): Promise<Task[]>;
+  listTrash(): Promise<DeletedTask[]>;
   close(): void;
 }
 
@@ -121,7 +129,7 @@ export const taskRecordType: RecordType<Task> = {
  * A Linked task has both its Event and its Offset. One of them can be missing for a while after a sync (the
  * fields arrive one by one); the Task then shows as a Task without an Event. Only the reading is changed.
  */
-function wholeLink(task: Task): Task {
+function wholeLink<T extends Task>(task: T): T {
   if (task.eventId !== null && task.offsetDays === null) return { ...task, eventId: null };
   if (task.eventId === null && task.offsetDays !== null) return { ...task, offsetDays: null };
   return task;
@@ -222,7 +230,7 @@ export async function openTaskStore(
     async restoreTask(id) {
       const at = now();
       const deleted = await tasks.getDeleted(id);
-      if (deleted && !isExpired(deleted.deletedAt!, at)) await tasks.restore(id);
+      if (deleted && !isExpired(deleted.deletedAt, at)) await tasks.restore(id);
     },
 
     async listTasks() {
@@ -232,9 +240,9 @@ export async function openTaskStore(
     async listTrash() {
       const at = now();
       return (await tasks.listDeleted())
-        .filter((task) => !isExpired(task.deletedAt!, at))
+        .filter((task) => !isExpired(task.deletedAt, at))
         .map(wholeLink)
-        .sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!));
+        .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
     },
 
     close() {

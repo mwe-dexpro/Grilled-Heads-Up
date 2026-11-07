@@ -67,9 +67,10 @@ export function HomeScreen({ ready, tasks, events, lists, now, sync, onSyncNow, 
     const { done, total } = bucket.progress;
     const count =
       done > 0 ? t("home.progress", { done: String(done), total: String(total) }) : String(total + bucket.events.length);
-    if (bucket.kind === "tomorrow") return `${formatShortDay(bucket.firstDay!, language)} · ${count}`;
-    if (bucket.kind === "nextDays")
-      return `${formatWeekday(bucket.firstDay!, language)} – ${formatWeekday(bucket.lastDay!, language)} · ${count}`;
+    const { firstDay, lastDay } = bucket;
+    if (bucket.kind === "tomorrow" && firstDay !== null) return `${formatShortDay(firstDay, language)} · ${count}`;
+    if (bucket.kind === "nextDays" && firstDay !== null && lastDay !== null)
+      return `${formatWeekday(firstDay, language)} – ${formatWeekday(lastDay, language)} · ${count}`;
     return count;
   };
 

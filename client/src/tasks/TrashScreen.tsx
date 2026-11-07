@@ -2,12 +2,12 @@ import { dayOf } from "../home/days";
 import { formatMonthDay } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
 import { NavBar } from "../ui/NavBar";
-import type { Task } from "./taskStore";
+import type { DeletedTask } from "./taskStore";
 import { daysLeft, isExpired } from "./trash";
 
 interface TrashScreenProps {
   /** Deleted Tasks, the latest deletion first. */
-  tasks: Task[];
+  tasks: DeletedTask[];
   now: Date;
   onRestore(id: string): void;
 }
@@ -15,7 +15,7 @@ interface TrashScreenProps {
 /** The Trash: Tasks deleted in the last 30 days, each with "Restore". Older ones are gone for good. */
 export function TrashScreen({ tasks, now, onRestore }: TrashScreenProps) {
   const { language, t } = useI18n();
-  const inTrash = tasks.filter((task) => !isExpired(task.deletedAt!, now));
+  const inTrash = tasks.filter((task) => !isExpired(task.deletedAt, now));
 
   return (
     <div className="screen">
@@ -28,9 +28,9 @@ export function TrashScreen({ tasks, now, onRestore }: TrashScreenProps) {
       ) : (
         <ul className="card task-list">
           {inTrash.map((task) => {
-            const left = daysLeft(task.deletedAt!, now);
+            const left = daysLeft(task.deletedAt, now);
             const meta = [
-              t("trash.deleted", { date: formatMonthDay(dayOf(new Date(task.deletedAt!)), language) }),
+              t("trash.deleted", { date: formatMonthDay(dayOf(new Date(task.deletedAt)), language) }),
               left === 1 ? t("trash.daysLeftOne") : t("trash.daysLeft", { count: String(left) }),
             ].join(" · ");
             return (

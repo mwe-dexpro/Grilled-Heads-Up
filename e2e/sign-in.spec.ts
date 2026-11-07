@@ -1,4 +1,5 @@
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
+import { siteUrl, textOf } from "./fixtures";
 import { addAuthenticator, passkeysOf, syncPasskeys, type Authenticator, type Passkeys } from "./passkeys";
 
 // One story on one server, from the first launch on: each test builds on the ones before.
@@ -43,7 +44,7 @@ test("on first launch, a passkey is registered and the recovery code is shown on
   await page.getByRole("button", { name: "Create passkey" }).click();
 
   await expect(page.getByRole("heading", { name: "Your recovery code" })).toBeVisible();
-  recoveryCode = (await page.getByText(recoveryCodeShape).textContent())!;
+  recoveryCode = await textOf(page.getByText(recoveryCodeShape));
   phonePasskeys = await passkeysOf(phone);
   expect(phonePasskeys).toHaveLength(1);
   await page.getByRole("button", { name: "I've stored it" }).click();
@@ -78,7 +79,7 @@ test("the passkey signs in on Android Chrome", async ({ page }) => {
 });
 
 test("the synced passkey signs in on a desktop browser", async ({ browser, baseURL }) => {
-  const desktop = await device(browser, { baseURL: baseURL!, desktop: true });
+  const desktop = await device(browser, { baseURL: siteUrl(baseURL), desktop: true });
   await desktop.page.goto("/");
 
   await signInWithSyncedPasskey(desktop.page, desktop.authenticator);
@@ -90,7 +91,7 @@ test("the synced passkey signs in on a desktop browser", async ({ browser, baseU
   // A recovery code that got lost before it was stored is replaced from a signed-in session.
   await desktop.page.getByRole("button", { name: "New recovery code" }).click();
   await expect(desktop.page.getByRole("heading", { name: "Your recovery code" })).toBeVisible();
-  const replacedCode = (await desktop.page.getByText(recoveryCodeShape).textContent())!;
+  const replacedCode = await textOf(desktop.page.getByText(recoveryCodeShape));
   expect(replacedCode).not.toBe(recoveryCode);
   recoveryCode = replacedCode;
   await desktop.page.getByRole("button", { name: "I've stored it" }).click();
@@ -99,14 +100,14 @@ test("the synced passkey signs in on a desktop browser", async ({ browser, baseU
 });
 
 test("the recovery code signs in on a new phone and registers a new passkey", async ({ browser, baseURL }) => {
-  const newPhone = await device(browser, { baseURL: baseURL! });
+  const newPhone = await device(browser, { baseURL: siteUrl(baseURL) });
   await newPhone.page.goto("/");
 
   await signInWithRecoveryCode(newPhone.page, recoveryCode.toLowerCase());
 
   // The used code is spent, so the new one is shown first, before anything that could be interrupted.
   await expect(newPhone.page.getByRole("heading", { name: "Your recovery code" })).toBeVisible();
-  const newCode = (await newPhone.page.getByText(recoveryCodeShape).textContent())!;
+  const newCode = await textOf(newPhone.page.getByText(recoveryCodeShape));
   expect(newCode).not.toBe(recoveryCode);
   await newPhone.page.getByRole("button", { name: "I've stored it" }).click();
   await expect(newPhone.page.getByRole("heading", { name: "Create a new passkey" })).toBeVisible();

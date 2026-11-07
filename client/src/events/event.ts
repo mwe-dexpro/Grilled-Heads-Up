@@ -80,11 +80,13 @@ function localMidnight(day: Day): Date {
 }
 
 export function eventStart(event: EventFields): Date {
-  return event.allDay ? localMidnight(event.startDate) : zonedInstant(event.startDate, event.startTime!, event.timeZone!);
+  if (event.allDay || event.startTime === null || event.timeZone === null) return localMidnight(event.startDate);
+  return zonedInstant(event.startDate, event.startTime, event.timeZone);
 }
 
 export function eventEnd(event: EventFields): Date {
-  return event.allDay ? localMidnight(addDays(event.endDate, 1)) : zonedInstant(event.endDate, event.endTime!, event.timeZone!);
+  if (event.allDay || event.endTime === null || event.timeZone === null) return localMidnight(addDays(event.endDate, 1));
+  return zonedInstant(event.endDate, event.endTime, event.timeZone);
 }
 
 /** First and last day the Event covers on this device. An Event ending exactly at midnight doesn't cover the next day. */
@@ -118,6 +120,19 @@ export function linkedTaskDate(event: Pick<Event, "startDate">, offsetDays: numb
 export function withEventDates(tasks: Task[], events: Event[]): Task[] {
   const byId = new Map(events.map((event) => [event.id, event]));
   return tasks.map((task) => withEventDate(task, task.eventId === null ? undefined : byId.get(task.eventId)));
+}
+
+/** A Task Linked to an Event that is there: it has its Offset, and the date its Event and Offset make. */
+export type LinkedTask = Task & { eventId: string; offsetDays: number; date: Day };
+
+/** The Event's Linked tasks, dated. A Task that has no Offset (yet) counts as on the day. */
+export function linkedTasksOf(event: Event, tasks: Task[]): LinkedTask[] {
+  return tasks
+    .filter((task) => task.eventId === event.id)
+    .map((task) => {
+      const offsetDays = task.offsetDays ?? 0;
+      return { ...task, eventId: event.id, offsetDays, date: linkedTaskDate(event, offsetDays) };
+    });
 }
 
 /** One Task with the date its Event (`undefined` if it has none, or the Event is missing) and Offset make. */

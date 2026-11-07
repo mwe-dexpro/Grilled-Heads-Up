@@ -6,7 +6,7 @@ import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
 import { SubtaskCount } from "../subtasks/SubtaskCount";
-import type { Task } from "../tasks/taskStore";
+import { isDated, type Task } from "../tasks/taskStore";
 import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { taskMeta, type BucketKind, type Progress } from "./buckets";
 import { formatShortDay, formatTime } from "./format";
@@ -46,7 +46,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
   }
 
   // An Overdue Preparation task says it puts its Event At risk, instead of its age.
-  const atRisk = event !== undefined && meta?.kind === "overdue" && putsEventAtRisk(task, event, now);
+  const atRisk = event !== undefined && meta?.kind === "overdue" && isDated(task) && putsEventAtRisk(task, event, now);
   const eventLink = event && (
     <a className={atRisk ? "event-link at-risk" : "event-link"} href={hrefOf({ name: "event", id: event.id })}>
       {event.title}

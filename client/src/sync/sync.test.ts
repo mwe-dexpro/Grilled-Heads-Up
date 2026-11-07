@@ -2,7 +2,7 @@ import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import type { EventFields } from "../events/event";
-import { eventDays, eventEnd, eventStart, validateEvent, withEventDates } from "../events/event";
+import { eventDays, eventEnd, eventStart, linkedTasksOf, validateEvent, withEventDates } from "../events/event";
 import { eventRecordType, openEventStore, type EventStore } from "../events/eventStore";
 import { formatEventTime, formatEventWhen, formatOffset, formatRelativeDay, inOtherTimeZone } from "../events/formatEvent";
 import { formatRiskExplanation, formatRiskStatus } from "../events/formatRisk";
@@ -1148,8 +1148,8 @@ describe("Sync between two devices", () => {
           countdown(event, tasks, now);
           formatRiskStatus(risk, t);
           formatRiskExplanation(event, risk, now, t);
-          for (const task of withEventDates(tasks.filter((linked) => linked.eventId === event.id), [event])) {
-            formatOffset(task.offsetDays!, t);
+          for (const task of linkedTasksOf(event, tasks)) {
+            formatOffset(task.offsetDays, t);
             isOverdue(task, today);
             linkedRole(task, event);
           }
@@ -1292,7 +1292,7 @@ describe("Sync between two devices", () => {
       const task = await b.tasks.addTask("Stamped with server time");
       await b.sync();
 
-      const stamp = decode(server.stored("task", task.id, "title")!.hlc);
+      const stamp = decode(defined(server.stored("task", task.id, "title")).hlc);
       expect(stamp.wall).toBeGreaterThanOrEqual(world.ms - 1000);
     });
   });

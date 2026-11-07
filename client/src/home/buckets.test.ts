@@ -130,9 +130,9 @@ describe("arrangeHome", () => {
 
     const home = arrangeHome([completedToday, completedYesterday, overdueCompletedToday, inboxCompletedLastWeek], now);
 
-    expect(home.find((b) => b.kind === "today")!.tasks).toEqual([completedToday]);
-    expect(home.find((b) => b.kind === "overdue")!.tasks).toEqual([overdueCompletedToday]);
-    expect(home.find((b) => b.kind === "inbox")!.tasks).toEqual([]);
+    expect(defined(home.find((b) => b.kind === "today")).tasks).toEqual([completedToday]);
+    expect(defined(home.find((b) => b.kind === "overdue")).tasks).toEqual([overdueCompletedToday]);
+    expect(defined(home.find((b) => b.kind === "inbox")).tasks).toEqual([]);
   });
 
   it("keeps a Task Completed today crossed out until 23:59 and drops it from its Bucket at midnight", () => {
@@ -262,7 +262,7 @@ function event(fields: Partial<Event> = {}): Event {
 
 describe("Events on the home screen", () => {
   const eventsIn = (kind: BucketKind, events: Event[]) =>
-    arrangeHome([], now, events).find((b) => b.kind === kind)!.events.map((e) => e.title);
+    defined(arrangeHome([], now, events).find((b) => b.kind === kind)).events.map((e) => e.title);
 
   it("puts an Event into the Bucket of the day it starts", () => {
     const events = [
@@ -306,8 +306,8 @@ describe("Events on the home screen", () => {
 
     const home = arrangeHome([gift, cake], now, [birthday]);
 
-    expect(home.find((b) => b.kind === "today")!.tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
-    expect(home.find((b) => b.kind === "tomorrow")!.tasks.map((t) => t.id)).toEqual([gift.id]);
+    expect(defined(home.find((b) => b.kind === "today")).tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
+    expect(defined(home.find((b) => b.kind === "tomorrow")).tasks.map((t) => t.id)).toEqual([gift.id]);
   });
 
   it("treats a Linked task whose Event hasn't arrived on this device (yet) as undated", () => {
@@ -316,7 +316,7 @@ describe("Events on the home screen", () => {
 
     const home = arrangeHome([orphan], now, [other]);
 
-    expect(home.find((b) => b.kind === "inbox")!.tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
+    expect(defined(home.find((b) => b.kind === "inbox")).tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
     expect(taskMeta(defined(defined(home.find((b) => b.kind === "inbox")).tasks[0]), "inbox", now)).toBeNull();
   });
 });

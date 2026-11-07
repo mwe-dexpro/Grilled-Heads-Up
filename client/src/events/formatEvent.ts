@@ -44,6 +44,6 @@ export function formatEventTime(event: Event, language: Language, t: Translate):
 }
 
 /** Whether the Event's times are in another zone than the device's, so the screen should say which. */
-export function inOtherTimeZone(event: EventFields): boolean {
-  return !event.allDay && event.timeZone !== deviceTimeZone();
+export function inOtherTimeZone(event: EventFields): event is EventFields & { timeZone: string } {
+  return !event.allDay && event.timeZone !== null && event.timeZone !== deviceTimeZone();
 }

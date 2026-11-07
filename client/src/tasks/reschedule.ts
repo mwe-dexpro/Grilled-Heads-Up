@@ -86,10 +86,11 @@ export function reschedulePatch(
 
   const link = linkOf(task);
   let current: Day | null = task.date;
-  let start: Day | undefined;
+  let linked: { eventId: string; start: Day } | null = null;
   if (link) {
-    start = eventStart(link.eventId);
+    const start = eventStart(link.eventId);
     if (start === undefined) return null;
+    linked = { eventId: link.eventId, start };
     current = addDays(start, link.offsetDays);
   }
   if (day < earliestRescheduleDay({ date: current, completedAt: task.completedAt }, today)) {
@@ -98,6 +99,6 @@ export function reschedulePatch(
   if (day === current) return null;
 
   const rescheduleCount = current === null ? task.rescheduleCount : task.rescheduleCount + 1;
-  if (start === undefined) return { date: day, rescheduleCount };
-  return { eventId: link!.eventId, offsetDays: daysBetween(start, day), date: null, rescheduleCount };
+  if (linked === null) return { date: day, rescheduleCount };
+  return { eventId: linked.eventId, offsetDays: daysBetween(linked.start, day), date: null, rescheduleCount };
 }

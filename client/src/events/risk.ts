@@ -1,6 +1,6 @@
 import { addDays, dayOf, daysBetween, type Day } from "../home/days";
-import type { Task } from "../tasks/taskStore";
-import { withEventDates, type Event } from "./event";
+import type { DatedTask, Task } from "../tasks/taskStore";
+import { linkedTasksOf, type Event, type LinkedTask } from "./event";
 
 /** Preparation tasks are dated on or before the day their Event starts; Follow-up tasks after it. */
 export type LinkedRole = "preparation" | "followUp";
@@ -21,29 +21,25 @@ export interface EventRisk {
   /** Preparation tasks not Completed yet. */
   openPreparation: number;
   /** Overdue Preparation tasks, dated, the most Overdue first. */
-  overdue: Task[];
+  overdue: LinkedTask[];
   /** Days from today to the Event's start date; negative once it has started. */
   daysUntil: number;
 }
 
 /**
  * Counted from the Event's own start date, like the Offset, so a Task "on the day" is always Preparation.
- * The Task must be dated (see `withEventDates`).
  */
-export function linkedRole(task: Pick<Task, "date">, event: Pick<Event, "startDate">): LinkedRole {
-  return task.date! <= event.startDate ? "preparation" : "followUp";
+export function linkedRole(task: { date: Day }, event: Pick<Event, "startDate">): LinkedRole {
+  return task.date <= event.startDate ? "preparation" : "followUp";
 }
 
-const isOpen = (task: Task) => task.completedAt === null;
-/** Not Completed and dated before today; the Task must be dated. */
-export const isOverdue = (task: Task, today: Day) => isOpen(task) && task.date! < today;
+const isOpen = (task: Pick<Task, "completedAt">) => task.completedAt === null;
+/** Not Completed and dated before today. */
+export const isOverdue = (task: Pick<Task, "completedAt"> & { date: Day }, today: Day) => isOpen(task) && task.date < today;
 
 /** The Event's Linked tasks with their dates, Preparation ones only. */
-function preparationTasks(event: Event, tasks: Task[]): Task[] {
-  return withEventDates(
-    tasks.filter((task) => task.eventId === event.id),
-    [event],
-  ).filter((task) => linkedRole(task, event) === "preparation");
+function preparationTasks(event: Event, tasks: Task[]): LinkedTask[] {
+  return linkedTasksOf(event, tasks).filter((task) => linkedRole(task, event) === "preparation");
 }
 
 /** The Event is over once its own last day is before today. A timed Event ending at midnight doesn't cover the next day. */
@@ -57,7 +53,7 @@ export function eventRisk(event: Event, tasks: Task[], now: Date): EventRisk {
   const today = dayOf(now);
   const preparation = preparationTasks(event, tasks);
   const openPreparation = preparation.filter(isOpen).length;
-  const overdue = preparation.filter((task) => isOverdue(task, today)).sort((a, b) => a.date!.localeCompare(b.date!));
+  const overdue = preparation.filter((task) => isOverdue(task, today)).sort((a, b) => a.date.localeCompare(b.date));
   const daysUntil = daysBetween(today, event.startDate);
 
   let status: RiskStatus = "none";
@@ -69,7 +65,7 @@ export function eventRisk(event: Event, tasks: Task[], now: Date): EventRisk {
 }
 
 /** A dated Linked task that makes its Event At risk: an Overdue Preparation task of an Event that hasn't passed. */
-export function putsEventAtRisk(task: Task, event: Event, now: Date): boolean {
+export function putsEventAtRisk(task: DatedTask, event: Event, now: Date): boolean {
   const today = dayOf(now);
   return linkedRole(task, event) === "preparation" && isOverdue(task, today) && !hasPassed(event, today);
 }
@@ -79,7 +75,7 @@ export interface CountdownMark {
   /** 0 = left end of the line, 1 = the Event. */
   position: number;
   /** The Preparation tasks on that day. */
-  tasks: Task[];
+  tasks: LinkedTask[];
   /** Overdue if any of them is, else open if any is, else done. */
   state: "overdue" | "open" | "done";
 }
@@ -103,11 +99,11 @@ export function countdown(event: Event, tasks: Task[], now: Date): Countdown | n
   const preparation = preparationTasks(event, tasks);
   if (preparation.length === 0 || todayOffset > 0) return null;
 
-  const start = Math.min(todayOffset, ...preparation.map((task) => task.offsetDays!));
+  const start = Math.min(todayOffset, ...preparation.map((task) => task.offsetDays));
   const position = (offsetDays: number) => (start === 0 ? 1 : (offsetDays - start) / -start) * eventDayPosition;
 
-  const byOffset = new Map<number, Task[]>();
-  for (const task of preparation) byOffset.set(task.offsetDays!, [...(byOffset.get(task.offsetDays!) ?? []), task]);
+  const byOffset = new Map<number, LinkedTask[]>();
+  for (const task of preparation) byOffset.set(task.offsetDays, [...(byOffset.get(task.offsetDays) ?? []), task]);
 
   const marks = [...byOffset]
     .sort(([a], [b]) => a - b)

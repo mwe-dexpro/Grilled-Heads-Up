@@ -28,7 +28,7 @@ export function formatRiskExplanation(event: Event, risk: EventRisk, now: Date, 
   if (otherOverdue.length > 0) {
     what = t("risk.overdueTasks", { count: String(risk.overdue.length) });
   } else if (task !== undefined) {
-    const days = daysBetween(task.date!, today);
+    const days = daysBetween(task.date, today);
     what = days === 1 ? t("risk.overdueOne", { title: task.title }) : t("risk.overdueMany", { title: task.title, count: String(days) });
   } else {
     what = risk.openPreparation === 1 ? t("risk.openOne") : t("risk.openMany", { count: String(risk.openPreparation) });

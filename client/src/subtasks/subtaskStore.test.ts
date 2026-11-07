@@ -110,7 +110,7 @@ describe("Subtask store", () => {
 
     expect(Date.parse(boots.createdAt)).toBeGreaterThanOrEqual(before - 1000);
     expect(Date.parse(boots.createdAt)).toBeLessThanOrEqual(Date.now());
-    expect(Date.parse(defined((await subtasks.listSubtasks())[0]).completedAt!)).toBeLessThanOrEqual(Date.now());
+    expect(Date.parse(defined(defined((await subtasks.listSubtasks())[0]).completedAt))).toBeLessThanOrEqual(Date.now());
   });
 
   it("refuses an empty, a blank and a too long title, and takes one of exactly the limit", async () => {

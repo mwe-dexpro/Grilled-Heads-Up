@@ -7,7 +7,7 @@ import { openSubtaskStore, type Subtask, type SubtaskStore } from "../subtasks/s
 import { openTagStore, type Tag, type TagStore } from "../tags/tagStore";
 import { useSync } from "../sync/useSync";
 import { createListReader } from "./listReader";
-import { NoTaskError, openTaskStore, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
+import { NoTaskError, openTaskStore, type DeletedTask, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
 
 interface Stores {
   tasks: TaskStore;
@@ -25,7 +25,7 @@ export function useAppData() {
   const stores = useRef<Stores | null>(null);
   const [ready, setReady] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [trash, setTrash] = useState<Task[]>([]);
+  const [trash, setTrash] = useState<DeletedTask[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);

@@ -300,7 +300,7 @@ describe("Replica table", () => {
     it("refuses an id that is taken, also by a deleted record, and leaves the stored record alone", async () => {
       const { tasks, push } = await open();
       await tasks.put(task());
-      const staleCopy = (await tasks.get("t1"))!;
+      const staleCopy = defined(await tasks.get("t1"));
 
       await expect(tasks.put({ ...staleCopy, title: "Written from a copy" })).rejects.toThrow("exists already");
       await tasks.delete("t1");

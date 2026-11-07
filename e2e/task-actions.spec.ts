@@ -1,4 +1,4 @@
-import { expect, test, type TouchType } from "./fixtures";
+import { boxOf, expect, test, type TouchType } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: tomorrow is Thu Oct 8, next Monday is Oct 12. */
@@ -19,7 +19,7 @@ const row = (page: Page, title: string) => page.getByRole("listitem").filter({ h
 
 /** Drags a row with the mouse (pointer events, like a finger), from `fromX` pixels from the left of the window. */
 async function drag(page: Page, title: string, fromX: number, byX: number) {
-  const box = (await row(page, title).boundingBox())!;
+  const box = await boxOf(row(page, title));
   const y = box.y + box.height / 2;
   await page.mouse.move(fromX, y);
   await page.mouse.down();
@@ -32,7 +32,7 @@ async function drag(page: Page, title: string, fromX: number, byX: number) {
  * the browser's own handling (the touch is captured by the row it started on, `touch-action`, `pointercancel`).
  */
 async function touchSwipe(page: Page, title: string, fromX: number, byX: number) {
-  const box = (await row(page, title).boundingBox())!;
+  const box = await boxOf(row(page, title));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
   const send = (type: TouchType, x: number) =>
@@ -58,7 +58,7 @@ async function swipeLeft(page: Page, title: string) {
   await drag(page, title, 330, -230);
 }
 
-const rectOf = async (locator: Locator) => (await locator.boundingBox())!;
+const rectOf = async (locator: Locator) => await boxOf(locator);
 const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -112,7 +112,7 @@ test("opening a row closes the one that was open, and scrolling the page closes 
 test("a swipe that starts at either screen edge opens nothing, and changes nothing on an open row", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
-  const width = page.viewportSize()!.width;
+  const width = await page.evaluate(() => window.innerWidth);
   const content = row(page, "Pay dentist invoice").locator(".swipe-content");
 
   // Right edge: a leftward swipe would open the row.
@@ -162,8 +162,8 @@ test("a press that goes down and is let go outside the row leaves nothing armed:
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
   await addTask(page, "Order cake", { date: "2026-10-07" });
   const content = row(page, "Pay dentist invoice").locator(".swipe-content");
-  const box = (await row(page, "Pay dentist invoice").boundingBox())!;
-  const other = (await row(page, "Order cake").boundingBox())!;
+  const box = await boxOf(row(page, "Pay dentist invoice"));
+  const other = await boxOf(row(page, "Order cake"));
 
   await page.mouse.move(330, box.y + 10);
   await page.mouse.down();
@@ -187,7 +187,7 @@ test("a short swipe snaps back, and a vertical drag moves nothing", async ({ pag
   await drag(page, "Pay dentist invoice", 330, -40);
   await expect(content).toHaveCSS("transform", "none");
 
-  const box = (await row(page, "Pay dentist invoice").boundingBox())!;
+  const box = await boxOf(row(page, "Pay dentist invoice"));
   await page.mouse.move(330, box.y + 10);
   await page.mouse.down();
   await page.mouse.move(300, box.y + 60, { steps: 6 });
@@ -383,14 +383,14 @@ test("the undo toast is announced: its live region is in the page before it, and
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
 
   await expect(region).toContainText("Task deleted");
-  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await regionHandle.evaluate((element) => element.isConnected)).toBe(true);
   const firstToast = await region.locator(".undo-toast").elementHandle();
   await row(page, "Call the plumber").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   // The second toast is a new element in the same region, which is what a screen reader reads out.
-  await expect.poll(() => firstToast!.evaluate((element) => element.isConnected)).toBe(false);
+  await expect.poll(() => firstToast.evaluate((element) => element.isConnected)).toBe(false);
   await expect(region.locator(".undo-toast")).toHaveCount(1);
-  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await regionHandle.evaluate((element) => element.isConnected)).toBe(true);
   // It is not a second status line: the page's one `status` is the sync line, which the sync tests listen to.
   await expect(page.getByRole("status")).toHaveCount(1);
 });

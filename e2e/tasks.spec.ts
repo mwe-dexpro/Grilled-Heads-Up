@@ -57,8 +57,8 @@ test("is installable as a full-screen app", async ({ page, request }) => {
   await page.goto("/");
   await waitForOfflineReady(page);
 
-  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
-  const manifest = await (await request.get(manifestHref!)).json();
+  const manifestUrl = await page.locator('link[rel="manifest"]').evaluate((link: HTMLLinkElement) => link.href);
+  const manifest = await (await request.get(manifestUrl)).json();
 
   expect(manifest).toMatchObject({ name: "Grilled Heads-Up", start_url: "/", display: "standalone" });
   expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes)).toEqual(
