@@ -45,6 +45,9 @@ export default tseslint.config(
       "@eslint-community/eslint-comments/no-unlimited-disable": "error",
       "@eslint-community/eslint-comments/no-unused-disable": "error",
       "@eslint-community/eslint-comments/disable-enable-pair": "error",
+      // Off: it flags every `obj[key]` (25 hits here, none a real injection: keys are literals, enum values or ids looked up in
+      // a Map or Record we built). With noUncheckedIndexedAccess the compiler already makes every such read prove it exists.
+      "security/detect-object-injection": "off",
       // The typed rules must stay errors (the issue's list); the strict preset has most of them, listed so they cannot be dropped.
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-misused-promises": "error",
@@ -133,14 +136,6 @@ export default tseslint.config(
       "playwright/no-skipped-test": "error",
       "playwright/missing-playwright-await": "error",
       "playwright/no-wait-for-timeout": "error",
-    },
-  },
-
-  // TEMPORARY: rules whose violations are fixed in the commits that follow, one rule or rule group per commit. Each
-  // commit deletes its lines from here; this block is empty (and gone) at the end of the issue.
-  {
-    rules: {
-      "security/detect-object-injection": "off", // 25
     },
   },
 
