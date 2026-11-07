@@ -93,7 +93,7 @@ export function App() {
     setMenuId(null);
     if (action === "complete") completeTask(menuTask.id);
     else if (action === "reschedule") setRescheduleIds([menuTask.id]);
-    else void actions.remove(menuTask);
+    else actions.remove(menuTask);
   }
 
   const outdated = useDatabaseOutdated();
@@ -319,7 +319,7 @@ function Screen({
           onComplete={data.completeTask}
           onReschedule={(id, day) => void data.rescheduleTask(id, day)}
           onDelete={(task) => {
-            void actions.remove(task);
+            actions.remove(task);
             goBack();
           }}
           onLink={data.linkTask}

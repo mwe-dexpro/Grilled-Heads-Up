@@ -60,6 +60,9 @@ export default tseslint.config(
       "@typescript-eslint/prefer-nullish-coalescing": "error",
       "@typescript-eslint/only-throw-error": "error",
       "@typescript-eslint/require-await": "error",
+      // Relaxed: `onClick={() => setOpen(false)}` is how React handlers are written; a void call as an arrow's whole body
+      // is clear, and the rule still flags a void value used anywhere else (returned, assigned, passed on).
+      "@typescript-eslint/no-confusing-void-expression": ["error", { ignoreArrowShorthand: true }],
     },
   },
 
@@ -112,7 +115,6 @@ export default tseslint.config(
   // commit deletes its lines from here; this block is empty (and gone) at the end of the issue.
   {
     rules: {
-      "@typescript-eslint/no-confusing-void-expression": "off", // 133
       "@typescript-eslint/restrict-template-expressions": "off", // 69
       "@typescript-eslint/strict-boolean-expressions": "off", // 41
       "security/detect-object-injection": "off", // 25

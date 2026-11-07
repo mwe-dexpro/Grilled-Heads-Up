@@ -67,7 +67,10 @@ export function useAppData() {
     let cancelled = false;
     Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
       opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
-      if (cancelled) return close(opened);
+      if (cancelled) {
+        close(opened);
+        return;
+      }
       stores.current = opened;
       await reload();
       setReady(true);

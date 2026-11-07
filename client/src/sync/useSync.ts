@@ -24,7 +24,10 @@ export function useSync(onRemoteChanges: () => void) {
     let stop = () => {};
     openAppDb(defaultDatabaseName).then(async (db) => {
       const opened = await createSyncEngine({ db, types: recordTypes, transport: httpTransport });
-      if (cancelled) return db.close();
+      if (cancelled) {
+        db.close();
+        return;
+      }
       engine.current = opened;
       setState(opened.state());
       const stopState = opened.subscribe(setState);
