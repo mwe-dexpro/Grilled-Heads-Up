@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { DatabaseSync } from "node:sqlite";
@@ -340,6 +341,37 @@ describe("cookies and what is stored", () => {
     expect((await inTime.post("/api/auth/sign-in/verify", passkey.signIn(inTimeOptions))).status).toBe(204);
     vi.setSystemTime(asked + 5 * 60 * 1000 + 1);
     expect((await late.post("/api/auth/sign-in/verify", passkey.signIn(lateOptions))).status).toBe(401);
+  });
+
+  test("a waiting sign-in is still good in the last millisecond of its five minutes, also when another sign-in begins in that very millisecond", async () => {
+    const { passkey } = await becomeOwner();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now());
+    const asked = Date.now();
+    const first = browser();
+    const options = await first.signInOptions();
+
+    vi.setSystemTime(asked + 5 * 60 * 1000);
+    await browser().signInOptions();
+
+    expect((await first.post("/api/auth/sign-in/verify", passkey.signIn(options))).status).toBe(204);
+  });
+
+  test("a session cookie whose value contains = is read whole (a token as another encoder writes it, with base64 padding)", async () => {
+    await becomeOwner();
+    const owner = db.prepare("SELECT id FROM users").get() as { id: string };
+    const token = "dG9rZW4=.c2lnbg==";
+    const expires = new Date(Date.now() + day).toISOString();
+    db.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)").run(
+      createHash("sha256").update(token).digest("hex"),
+      owner.id,
+      new Date().toISOString(),
+      expires,
+    );
+
+    const response = await fetch(`${baseUrl}/api/passkeys`, { headers: { cookie: `theme=dark; session=${token}` } });
+
+    expect(response.status).toBe(200);
   });
 
   test("a challenge is answered once: a failed answer uses it up", async () => {
