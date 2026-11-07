@@ -45,5 +45,7 @@ describe("Translations", () => {
     saveLanguage(storage, "de");
 
     expect(loadLanguage(storage)).toBe("de");
+    // The key is part of what a person's device has stored: renaming it would forget everyone's choice.
+    expect(storage.getItem("language")).toBe("de");
   });
 });

@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goBack, navigate, useRoute } from "./app/navigation";
+import { goBack, navigate } from "./app/navigation";
+import { useRoute } from "./app/useRoute";
 import type { Route } from "./app/routes";
 import { useAppData } from "./app/useAppData";
 import { useSignedIn } from "./auth/AuthGate";

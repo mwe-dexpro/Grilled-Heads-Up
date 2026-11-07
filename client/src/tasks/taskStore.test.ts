@@ -3,7 +3,7 @@ import { openDB } from "idb";
 import { openAppDb } from "../data/database";
 import { createSyncStores } from "../sync/syncDb";
 import { maxTitleLength } from "../data/limits";
-import { NoTaskError, openTaskStore, taskRecordType, type Task } from "./taskStore";
+import { isDated, NoTaskError, openTaskStore, taskRecordType, type Task } from "./taskStore";
 import { defined } from "../testing/defined";
 
 let dbCounter = 0;
@@ -172,6 +172,25 @@ describe("Task dates", () => {
       ["Order cake", "2026-10-04", null],
       ["Call the plumber", "2026-10-04", "13:00"],
     ]);
+  });
+
+  it("keeps the time of a Linked task, which has no date of its own", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await store.addTask("Pack the car", { eventId: "e1", offsetDays: -1, time: "09:00" });
+
+    expect(await store.listTasks()).toMatchObject([{ title: "Pack the car", eventId: "e1", offsetDays: -1, date: null, time: "09:00" }]);
+  });
+
+  it("tells a Task that has a date from one that has none", () => {
+    expect(isDated({ date: "2026-10-04" })).toBe(true);
+    expect(isDated({ date: null })).toBe(false);
+  });
+
+  it("names the error for a Task that is not there", async () => {
+    const store = await openTaskStore(freshDbName());
+
+    await expect(store.deleteTask("missing")).rejects.toMatchObject({ name: "NoTaskError", message: "No Task with id missing" });
   });
 
   it("refuses a time without a date", async () => {

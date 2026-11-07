@@ -34,7 +34,7 @@ export type DatedTask = Task & { date: Day };
 /** A Task in the Trash: it has the time it was deleted. */
 export type DeletedTask = Task & { deletedAt: string };
 
-export const isDated = (task: Task): task is DatedTask => task.date !== null;
+export const isDated = <T extends Pick<Task, "date">>(task: T): task is T & { date: Day } => task.date !== null;
 
 /** A change was asked for a Task that is not there (never was, or a sync has deleted it). Other failures are not this. */
 export class NoTaskError extends Error {

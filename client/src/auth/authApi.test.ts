@@ -14,16 +14,21 @@ interface Answer {
 
 /** A server that answers each path with what the test says, and remembers what it was sent. */
 function server(answers: Record<string, Answer>) {
-  const received: { method: string; path: string; body: unknown }[] = [];
+  const received: { method: string; path: string; body: unknown; headers: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string, init: RequestInit) => {
       const path = url.replace("/api/auth/", "");
-      received.push({ method: init.method ?? "", path, body: typeof init.body === "string" ? (JSON.parse(init.body) as unknown) : undefined });
+      received.push({
+        method: init.method ?? "",
+        path,
+        body: typeof init.body === "string" ? (JSON.parse(init.body) as unknown) : undefined,
+        headers: init.headers,
+      });
       const answer = answers[path] ?? { status: 404 };
       if (answer.offline === true) return Promise.reject(new TypeError("Failed to fetch"));
       const status = answer.status ?? 200;
-      return Promise.resolve(new Response(status === 204 ? null : JSON.stringify(answer.body ?? {}), { status }));
+      return Promise.resolve(new Response(status === 204 ? null : JSON.stringify("body" in answer ? answer.body : {}), { status }));
     }),
   );
   return received;
@@ -67,7 +72,7 @@ describe("session", () => {
 
     await fetchSession();
 
-    expect(received).toEqual([{ method: "GET", path: "session", body: undefined }]);
+    expect(received).toEqual([{ method: "GET", path: "session", body: undefined, headers: undefined }]);
   });
 
   it("is unreachable when there is no connection, and refused when the server says no", async () => {
@@ -197,7 +202,7 @@ describe("recovery codes", () => {
 
     expect(await signInWithRecoveryCode("AAAA-BBBB")).toEqual({ recoveryCode: "CCCC-DDDD" });
 
-    expect(received).toEqual([{ method: "POST", path: "recover", body: { code: "AAAA-BBBB" } }]);
+    expect(received).toEqual([{ method: "POST", path: "recover", body: { code: "AAAA-BBBB" }, headers: { "Content-Type": "application/json" } }]);
   });
 
   it("is refused for a wrong code and for an answer without a new code", async () => {
@@ -215,7 +220,7 @@ describe("recovery codes", () => {
 
     expect(await newRecoveryCode()).toEqual({ recoveryCode: "EEEE-FFFF" });
 
-    expect(received).toEqual([{ method: "POST", path: "recovery-code", body: undefined }]);
+    expect(received).toEqual([{ method: "POST", path: "recovery-code", body: undefined, headers: undefined }]);
   });
 
   it("is refused for a new code when not signed in, and for an answer without one", async () => {
@@ -233,7 +238,7 @@ describe("signing out", () => {
 
     await signOut();
 
-    expect(received).toEqual([{ method: "POST", path: "sign-out", body: undefined }]);
+    expect(received).toEqual([{ method: "POST", path: "sign-out", body: undefined, headers: undefined }]);
   });
 
   it("is refused when the server says no", async () => {

@@ -1,3 +1,4 @@
+import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import { taskRecordType, type Task } from "../tasks/taskStore";
@@ -46,6 +47,38 @@ const task = (fields: Partial<Task> = {}): Task => ({
 
 const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "listId", "offsetDays", "rescheduleCount", "tagIds", "time", "title"];
 
+describe("Records saved before sync existed", () => {
+  const raw = (id: string) => ({ id, title: `Saved ${id}`, createdAt: "2026-09-28T09:00:00.000Z", completedAt: null });
+
+  it("are queued once, and only those that no sync has given clocks to; a record that arrives later is not queued by it", async () => {
+    const name = `replica-test-${dbCounter++}`;
+    (await openAppDb(name)).close();
+    // Opened without the app's types: the records are as an older version saved them, which Task no longer describes.
+    const older = await openDB(name);
+    await older.put("tasks", raw("old"));
+    await older.put("tasks", raw("synced"));
+    await older.put("fieldClocks", { type: "task", id: "synced", clocks: { title: "000000000000001-00000-other" } });
+    older.close();
+    const db = await openAppDb(name);
+
+    await openTable(db, taskRecordType, tickingClock());
+
+    const queued = (await db.getAll("outbox")).map((entry) => [entry.id, entry.field]);
+    expect(queued.filter(([id]) => id === "synced")).toEqual([]);
+    expect(queued.filter(([id]) => id === "old").map(([, field]) => field)).toContain("title");
+    expect(await db.get("fieldClocks", ["task", "synced"])).toEqual({ type: "task", id: "synced", clocks: { title: "000000000000001-00000-other" } });
+    expect(await db.get("syncInfo", "queued:task")).toBeDefined();
+
+    const lateWriter = await openDB(name);
+    await lateWriter.put("tasks", raw("later"));
+    lateWriter.close();
+    const before = (await db.getAll("outbox")).length;
+    await openTable(db, taskRecordType, tickingClock());
+    expect((await db.getAll("outbox")).length).toBe(before);
+    db.close();
+  });
+});
+
 describe("Replica table", () => {
   it("sends every field of a new record, all under one clock, and none for the id", async () => {
     const { tasks, push } = await open();
@@ -92,12 +125,15 @@ describe("Replica table", () => {
   });
 
   it("sends nothing for an update that names no field", async () => {
-    const { tasks, server, push } = await open();
+    const { db, tasks, server, push } = await open();
     await tasks.put(task());
     await push();
     const pushed = server.pushedChanges;
 
+    const clock = await db.get("syncInfo", "clock");
     await tasks.update("t1", {});
+    // The device's clock did not move for it either: nothing was stamped.
+    expect(await db.get("syncInfo", "clock")).toEqual(clock);
     await push();
 
     expect(server.pushedChanges).toBe(pushed);

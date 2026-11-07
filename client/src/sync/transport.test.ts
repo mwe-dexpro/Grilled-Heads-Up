@@ -38,6 +38,7 @@ describe("HTTP transport", () => {
     const [url, init] = defined(vi.mocked(fetch).mock.calls[0]);
     expect(url).toBe("/api/sync/push");
     expect(init?.method).toBe("POST");
+    expect(init?.headers).toEqual({ "Content-Type": "application/json" });
     expect(init?.body).toBe(JSON.stringify({ changes: [{ type: "task", id: "t1", field: "title", value: "x", hlc: "h" }] }));
   });
 
@@ -63,6 +64,12 @@ describe("HTTP transport", () => {
     answer(400, { error: "Change 3 is malformed.", index: 3 });
 
     expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { badChange: 3 } });
+  });
+
+  it("tells a 400 that names the first change as a refusal of that change", async () => {
+    answer(400, { error: "Change 0 is malformed.", index: 0 });
+
+    expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { badChange: 0 } });
   });
 
   it("tells a 413 as a refusal for being too big", async () => {

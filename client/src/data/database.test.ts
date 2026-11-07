@@ -1,12 +1,16 @@
 import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { createSyncStores } from "../sync/syncDb";
-import { onDatabaseOutdated, openAppDb } from "./database";
+import { defaultDatabaseName, onDatabaseOutdated, openAppDb } from "./database";
 
 let counter = 0;
 const freshName = () => `database-test-${counter++}`;
 
 describe("App database", () => {
+  it("is called grilled-heads-up on the device: another name would leave every person's data behind", () => {
+    expect(defaultDatabaseName).toBe("grilled-heads-up");
+  });
+
   it("has a store for every kind of record, and for sync", async () => {
     const db = await openAppDb(freshName());
 

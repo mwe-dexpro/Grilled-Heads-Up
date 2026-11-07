@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import { canGoBack, depthAfterMove, depthOf } from "./historyDepth";
-import { hrefOf, parseRoute, type Route } from "./routes";
+import { hrefOf, type Route } from "./routes";
 
 // The depth of the current history entry (see `historyDepth.ts`), kept in each entry's `history.state` so that it
 // survives reloads and Back / Forward.
@@ -38,14 +37,4 @@ export function goBack(): void {
     depth -= 1;
     window.history.back();
   } else navigate({ name: "today" }, { replace: true });
-}
-
-export function useRoute(): Route {
-  const [route, setRoute] = useState(() => parseRoute(window.location.hash));
-  useEffect(() => {
-    const update = () => setRoute(parseRoute(window.location.hash));
-    window.addEventListener("hashchange", update);
-    return () => window.removeEventListener("hashchange", update);
-  }, []);
-  return route;
 }

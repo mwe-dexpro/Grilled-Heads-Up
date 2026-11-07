@@ -1637,6 +1637,22 @@ describe("Sync between two devices", () => {
       expect(await titles(b)).toEqual(["Mine"]);
     });
 
+    it("reports a pull the server refuses as failed: rejected is for changes this device sent", async () => {
+      const { a } = await twoDevices();
+      const engine = await createSyncEngine({
+        db: await openAppDb(a.name),
+        types: recordTypes,
+        transport: {
+          push: () => Promise.resolve({ serverTime: 0 }),
+          pull: () => Promise.reject(new TransportError("rejected", { tooBig: true })),
+        },
+      });
+
+      await engine.syncNow();
+
+      expect(engine.state().status).toBe("failed");
+    });
+
     it("reports any other failure as failed", async () => {
       const { a } = await twoDevices();
       const broken = await createSyncEngine({
