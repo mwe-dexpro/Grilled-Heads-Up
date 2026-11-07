@@ -1150,7 +1150,7 @@ test("a drop that another reload overlaps never shows the old order again before
     await page.mouse.up();
     await expect(titlesOf(page).first()).toHaveText(mover);
     await expect(page.locator("li.subtask[style*='transform']")).toHaveCount(0);
-    await page.evaluate(() => ((window as { mover?: string }).mover = undefined));
+    await page.evaluate(() => ((window as { mover?: string | undefined }).mover = undefined));
   }
   expect(await page.evaluate(() => (window as { snapBack?: string[] }).snapBack), "the order before the drop was shown for a moment").toEqual([]);
 });

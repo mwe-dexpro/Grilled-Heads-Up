@@ -165,7 +165,7 @@ test("a tab that another tab's database upgrade waits for lets go and asks to be
 });
 
 test("the sync routes refuse requests without a session", async ({ playwright, baseURL }) => {
-  const stranger = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+  const stranger = await playwright.request.newContext({ ...(baseURL === undefined ? {} : { baseURL }), storageState: { cookies: [], origins: [] } });
 
   expect((await stranger.get("/api/sync/pull")).status()).toBe(401);
   expect((await stranger.post("/api/sync/push", { data: { changes: [] } })).status()).toBe(401);

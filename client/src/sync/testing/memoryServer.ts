@@ -4,7 +4,7 @@ export interface MemoryServerOptions {
   /** The server's clock in ms. */
   time?: () => number;
   /** Most changes it returns per pull, below what the client asks for. */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /** The largest push it takes, as the JSON text in bytes; a bigger one is refused like the real server's 413. */
   maxPushBytes?: number;
 }

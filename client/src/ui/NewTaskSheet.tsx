@@ -7,7 +7,7 @@ import type { TaskWhen } from "../tasks/taskStore";
 interface NewTaskSheetProps {
   open: boolean;
   /** The List the Project view is showing: the Task is added to it. Elsewhere there is none. */
-  list?: List;
+  list?: List | undefined;
   onAdd(title: string, when: TaskWhen, listId: string | null): void;
   onNewEvent(): void;
   onClose(): void;

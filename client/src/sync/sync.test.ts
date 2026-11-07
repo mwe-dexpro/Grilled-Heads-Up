@@ -55,9 +55,9 @@ interface Device {
 
 interface DeviceOptions {
   name?: string;
-  clockOffsetMs?: number;
+  clockOffsetMs?: number | undefined;
   /** How the device reaches the server; the in-memory server's transport unless a test runs the real HTTP one. */
-  transport?: Transport;
+  transport?: Transport | undefined;
 }
 
 async function openDevice(world: World, server: MemoryServer, { name = freshDbName(), clockOffsetMs = 0, transport = server.transport() }: DeviceOptions = {}): Promise<Device> {

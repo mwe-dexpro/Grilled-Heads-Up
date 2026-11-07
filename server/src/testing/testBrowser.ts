@@ -21,7 +21,7 @@ export class TestBrowser {
         "content-type": "application/json",
         cookie: [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; "),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     for (const cookie of response.headers.getSetCookie()) {
       const [pair, ...attributes] = cookie.split(";");

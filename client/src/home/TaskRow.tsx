@@ -16,14 +16,14 @@ interface TaskRowProps {
   bucket: BucketKind;
   now: Date;
   /** The Event of a Linked task; its name opens the Event view. */
-  event?: Event;
+  event?: Event | undefined;
   /** The Task's List; its name opens the Project view, in place of an Event name. Left out where the List is the screen. */
-  list?: List;
+  list?: List | undefined;
   /** Ids of the Events on this device. */
   eventIds: { has(id: string): boolean };
   actions: TaskActions;
   /** How many of the Task's Subtasks are ticked; undefined when it has none. Ends the second line ("3/5"). */
-  subtasks?: Progress;
+  subtasks?: Progress | undefined;
 }
 
 export function TaskRow({ task, bucket, now, event, list, eventIds, actions, subtasks }: TaskRowProps) {

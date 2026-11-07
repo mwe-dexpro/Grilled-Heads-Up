@@ -16,11 +16,9 @@ export class AuthError extends Error {
 async function call(method: "GET" | "POST", path: string, body?: unknown): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(`/api/auth/${path}`, {
-      method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    const init: RequestInit =
+      body === undefined ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+    response = await fetch(`/api/auth/${path}`, init);
   } catch {
     throw new AuthError("unreachable");
   }
