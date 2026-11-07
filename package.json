@@ -7,22 +7,27 @@
   },
   "workspaces": [
     "client",
-    "server"
+    "server",
+    "tools"
   ],
   "scripts": {
     "dev": "npm run dev -w client",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w client && npm run typecheck -w server && tsc -p tsconfig.json",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server && npm run typecheck -w tools && tsc -p tsconfig.json",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "npm run test -w client && npm run test -w server",
+    "test:unit": "npm run test -w client && npm run test -w server && npm run test -w tools",
     "test:e2e": "npm run build && playwright test",
-    "test:mutation": "npm run test:mutation -w client && npm run test:mutation -w server",
+    "test:mutation": "npm run test:mutation -w client && npm run test:mutation -w server && npm run test:mutation -w tools",
     "lint:eslint": "eslint . --max-warnings 0",
     "lint:format": "prettier --check .",
     "format": "prettier --write .",
     "lint:knip": "knip",
-    "lint": "npm run lint:eslint && npm run lint:knip && npm run lint:format"
+    "lint": "npm run lint:eslint && npm run lint:knip && npm run lint:format && npm run lint:skips",
+    "lint:skips": "npm run build -w tools && node tools/dist/bin/checkSkips.js",
+    "security:allowlist": "npm run build -w tools && node tools/dist/bin/allowlist.js",
+    "security:audit": "npm run build -w tools && npm audit --json | node tools/dist/bin/npmAudit.js",
+    "security:ignorefiles": "npm run build -w tools && node tools/dist/bin/ignoreFiles.js"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",

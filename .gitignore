@@ -7,3 +7,5 @@ playwright-report/
 reports/
 .stryker-tmp/
 *.tsbuildinfo
+.trivyignore
+.gitleaksignore

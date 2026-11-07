@@ -111,6 +111,11 @@ export default tseslint.config(
     files: ["server/src/database.ts"],
     rules: { "security/detect-non-literal-fs-filename": "off" },
   },
+  {
+    // Off for the command-line tools: they read the files they are told to on the command line, run by a developer or by CI.
+    files: ["tools/src/bin/**/*.ts"],
+    rules: { "security/detect-non-literal-fs-filename": "off" },
+  },
 
   // Unit tests.
   {
