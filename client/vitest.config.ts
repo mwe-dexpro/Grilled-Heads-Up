@@ -9,5 +9,15 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     environment: "node",
     setupFiles: ["fake-indexeddb/auto"],
+    // A committed `.only` fails the run, here and in CI.
+    allowOnly: false,
+    coverage: {
+      provider: "v8",
+      // Every source file counts, also those no test loads. Components are measured too, although only the e2e tests reach them.
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["**/*.test.ts", "src/**/testing/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "html", "json-summary"],
+      reportsDirectory: "reports/coverage",
+    },
   },
 });
