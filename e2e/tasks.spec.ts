@@ -58,13 +58,15 @@ test("is installable as a full-screen app", async ({ page, request }) => {
   await waitForOfflineReady(page);
 
   const manifestUrl = await page.locator('link[rel="manifest"]').evaluate((link: HTMLLinkElement) => link.href);
-  const manifest = await (await request.get(manifestUrl)).json();
+  const manifest: unknown = await (await request.get(manifestUrl)).json();
 
-  expect(manifest).toMatchObject({ name: "Grilled Heads-Up", start_url: "/", display: "standalone" });
-  expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes)).toEqual(
-    expect.arrayContaining(["192x192", "512x512"]),
-  );
-  for (const icon of manifest.icons) expect((await request.get(icon.src)).ok()).toBe(true);
+  const icons = [
+    { src: "/icons/icon-192.png", sizes: "192x192" },
+    { src: "/icons/icon-512.png", sizes: "512x512" },
+    { src: "/icons/icon-maskable-512.png", sizes: "512x512", purpose: "maskable" },
+  ];
+  expect(manifest).toMatchObject({ name: "Grilled Heads-Up", start_url: "/", display: "standalone", icons });
+  for (const icon of icons) expect((await request.get(icon.src)).ok(), icon.src).toBe(true);
 });
 
 test("starts in English and remembers a switch to German", async ({ page }) => {

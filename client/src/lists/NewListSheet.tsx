@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 
@@ -22,7 +22,7 @@ export function NewListSheet({ open, onCreate, onClose }: NewListSheetProps) {
     if (!open && element.open) element.close();
   }, [open]);
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SyntheticEvent) {
     event.preventDefault();
     if (name.trim() === "") return;
     onCreate(name, isProject);

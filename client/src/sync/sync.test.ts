@@ -581,7 +581,9 @@ describe("Sync between two devices", () => {
       await b.sync();
       await a.sync();
 
-      for (const device of [a, b]) expect(await device.subtasks.listSubtasks()).toMatchObject([{ id: present.id, title: "Voucher", completedAt: expect.any(String) }]);
+      for (const device of [a, b]) {
+        expect((await device.subtasks.listSubtasks()).map((s) => [s.id, s.title, typeof s.completedAt])).toEqual([[present.id, "Voucher", "string"]]);
+      }
     });
 
     it("lets the later untick beat the earlier tick on the other device", async () => {
@@ -957,7 +959,18 @@ describe("Sync between two devices", () => {
     await a.sync();
     await b.sync();
     world.advance();
-    const { id, createdAt, externalSource, externalId, deletedAt, ...opened } = defined((await a.events.listEvents())[0]);
+    const shown = defined((await a.events.listEvents())[0]);
+    const opened: EventFields = {
+      title: shown.title,
+      allDay: shown.allDay,
+      startDate: shown.startDate,
+      startTime: shown.startTime,
+      endDate: shown.endDate,
+      endTime: shown.endTime,
+      timeZone: shown.timeZone,
+      location: shown.location,
+      notes: shown.notes,
+    };
 
     await b.events.updateEvent(event.id, { ...party, location: "Garden" });
     await b.sync();
@@ -1421,7 +1434,9 @@ describe("Sync between two devices", () => {
     await a.sync();
     // A second tab of B reads the first page, then stalls until the first tab has read everything and the connection drops.
     const real = server.transport();
-    let release: () => void = () => {};
+    let release: () => void = () => {
+      /* set when the push is held back */
+    };
     const held = new Promise<void>((resolve) => (release = resolve));
     let pulls = 0;
     const slowTab = await createSyncEngine({

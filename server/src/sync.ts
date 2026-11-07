@@ -42,6 +42,11 @@ function isChange(value: unknown): value is Change {
   );
 }
 
+/** Stored values are JSON text the server wrote itself; what they hold is the clients' business. */
+function parseJson(text: string): unknown {
+  return JSON.parse(text);
+}
+
 /** A non-negative whole number from a query string, or the fallback when absent; null when it isn't one. */
 function wholeNumber(raw: unknown, fallback: number): number | null {
   if (raw === undefined) return fallback;
@@ -68,7 +73,8 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
   );
 
   routes.post("/push", (req, res) => {
-    const changes: unknown = req.body?.changes;
+    const body: unknown = req.body;
+    const changes: unknown = typeof body === "object" && body !== null && "changes" in body ? body.changes : undefined;
     if (!Array.isArray(changes) || changes.length > maxChangesPerRequest) {
       res.status(400).json({ error: `Send an array of at most ${maxChangesPerRequest} changes.` });
       return;
@@ -83,7 +89,7 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
     const ownerId = res.locals["userId"] as string;
     transaction(db, () => {
       let seq = (lastSeq.get(ownerId) as { seq: number }).seq;
-      for (const { type, id, field, value, hlc } of changes) {
+      for (const { type, id, field, value, hlc } of changes.filter(isChange)) {
         const { changes: written } = upsert.run(ownerId, type, id, field, JSON.stringify(value), hlc, seq + 1);
         if (written > 0) seq += 1;
       }
@@ -101,7 +107,7 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
     const rows = feed.all(res.locals["userId"] as string, after, limit + 1) as unknown as (Change & { value: string; seq: number })[];
     const page = rows.slice(0, limit);
     res.json({
-      changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: JSON.parse(value), hlc })),
+      changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: parseJson(value), hlc })),
       cursor: page.at(-1)?.seq ?? after,
       more: rows.length > limit,
       serverTime: Date.now(),

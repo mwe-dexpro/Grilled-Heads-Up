@@ -1,5 +1,5 @@
 import { Calendar, Check, ChevronRight, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { hrefOf } from "../app/routes";
 import { maxTagLength } from "../data/limits";
 import { eventDays, eventProgress, withEventDate, type Event } from "../events/event";
@@ -105,7 +105,7 @@ export function TaskScreen({
   const upcoming = events.filter((e) => eventDays(e).last >= today);
   const actions = availableActions(task, new Set(events.map((e) => e.id)));
 
-  function addTag(e: FormEvent) {
+  function addTag(e: SyntheticEvent) {
     e.preventDefault();
     if (newTag.trim() === "") return;
     onAddTag(task.id, newTag);

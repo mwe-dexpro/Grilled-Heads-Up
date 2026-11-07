@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/i18n";
 import { fetchSession, newRecoveryCode, registerPasskey, signInWithPasskey, signInWithRecoveryCode, signOut } from "./authApi";
@@ -187,7 +187,7 @@ function SignInScreen({
   const recovery = useStep();
   const [code, setCode] = useState("");
 
-  function handleRecover(event: FormEvent) {
+  function handleRecover(event: SyntheticEvent) {
     event.preventDefault();
     if (code.trim() === "") return;
     void recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });

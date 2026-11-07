@@ -281,7 +281,7 @@ function Screen({
       );
     case "editEvent": {
       const event = data.events.find((e) => e.id === route.id);
-      if (!event) return <EventScreen event={undefined} tasks={[]} now={now} actions={actions} counts={counts} onAddTask={() => {}} />;
+      if (!event) return <EventScreen event={undefined} tasks={[]} now={now} actions={actions} counts={counts} onAddTask={() => { /* an Event that is not there takes no Tasks */ }} />;
       return (
         <EventForm
           key={event.id}

@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
@@ -65,7 +65,7 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     setAnnouncement((current) => ({ text, n: current.n + 1 }));
   }
 
-  function add(e: FormEvent) {
+  function add(e: SyntheticEvent) {
     e.preventDefault();
     const title = newTitle.trim();
     if (title === "") return;

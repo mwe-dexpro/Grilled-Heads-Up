@@ -120,16 +120,9 @@ export default tseslint.config(
     rules: {
       "security/detect-object-injection": "off", // 25
       "n/no-unsupported-features/node-builtins": "off", // 10
-      "@typescript-eslint/no-deprecated": "off", // 9
-      "@typescript-eslint/no-unsafe-assignment": "off", // 8
-      "@typescript-eslint/no-unused-vars": "off", // 5
-      "@typescript-eslint/no-unsafe-argument": "off", // 5
       "react-hooks/exhaustive-deps": "off", // 4
       "playwright/no-conditional-in-test": "off", // 4
-      "@typescript-eslint/no-unsafe-member-access": "off", // 4
-      "@typescript-eslint/no-empty-function": "off", // 3
       "react-hooks/refs": "off", // 3
-      "@typescript-eslint/no-unsafe-return": "off", // 3
       "vitest/valid-expect": "off", // 2
       "react-hooks/set-state-in-effect": "off", // 2
       "@eslint-community/eslint-comments/require-description": "off", // 2
@@ -140,7 +133,6 @@ export default tseslint.config(
       "react-hooks/immutability": "off", // 1
       "playwright/no-conditional-expect": "off", // 1
       "security/detect-non-literal-regexp": "off", // 1
-      "@typescript-eslint/no-unsafe-call": "off", // 1
       "security/detect-non-literal-fs-filename": "off", // 1
       "n/no-process-exit": "off", // 1
       "n/no-unsupported-features/es-syntax": "off", // 1

@@ -1,5 +1,5 @@
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "./listStore";
@@ -33,7 +33,7 @@ export function EditListSheet({ list, taskCount, onSave, onDelete, onClose }: Ed
     if (element && !element.open) element.showModal();
   }, []);
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SyntheticEvent) {
     event.preventDefault();
     if (name.trim() === "") return;
     onSave(listChanges(initial, { name, isProject }));

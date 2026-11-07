@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { goBack } from "../app/navigation";
 import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { dayOf } from "../home/days";
@@ -60,7 +60,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
     update({ startDate, endDate: fields.endDate < startDate ? startDate : fields.endDate });
   }
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (problem) {
       setShowProblem(true);

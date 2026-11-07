@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { httpTransport, TransportError } from "./transport";
+import { defined } from "../testing/defined";
 
 function answer(status: number, body: unknown = {}) {
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))));
@@ -31,7 +32,10 @@ describe("HTTP transport", () => {
 
     expect(await httpTransport.push([{ type: "task", id: "t1", field: "title", value: "x", hlc: "h" }])).toEqual({ serverTime: 42 });
 
-    expect(fetch).toHaveBeenCalledWith("/api/sync/push", expect.objectContaining({ method: "POST", body: expect.stringContaining('"title"') }));
+    const [url, init] = defined(vi.mocked(fetch).mock.calls[0]);
+    expect(url).toBe("/api/sync/push");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBe(JSON.stringify({ changes: [{ type: "task", id: "t1", field: "title", value: "x", hlc: "h" }] }));
   });
 
   it("asks for a page after a position", async () => {

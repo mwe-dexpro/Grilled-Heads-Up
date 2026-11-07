@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
@@ -28,7 +28,7 @@ export function NewTaskSheet({ open, list, onAdd, onNewEvent, onClose }: NewTask
     if (!open && element.open) element.close();
   }, [open]);
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SyntheticEvent) {
     event.preventDefault();
     if (title.trim() === "") return;
     onAdd(title, { date: date || null, time: date && time ? time : null }, list?.id ?? null);
