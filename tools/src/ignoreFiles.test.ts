@@ -49,6 +49,12 @@ describe("trivyIgnore", () => {
     expect(text.split("\n").filter((line) => !line.startsWith("#") && line !== "")).toEqual(["CVE-2026-0001 exp:2026-12-31"]);
   });
 
+  it("trims a reason, and joins its lines with one space however many line breaks lie between them", () => {
+    expect(trivyIgnore([entry({ reason: "  padded  " })])).toContain("\n# padded\n");
+    expect(trivyIgnore([entry({ reason: "one\n\n  two\r\n\r\nthree" })])).toContain("\n# one two three\n");
+    expect(trivyIgnore([entry({ reason: "a b  c" })])).toContain("\n# a b  c\n");
+  });
+
   it("still writes an entry that has run out: Trivy drops it by its date, and the allowlist check fails it as well", () => {
     expect(trivyIgnore([entry({ expires: "2020-01-01" })])).toContain("CVE-2026-0001 exp:2020-01-01");
   });
@@ -56,7 +62,10 @@ describe("trivyIgnore", () => {
 
 describe("gitleaksIgnore", () => {
   it("writes each gitleaks entry's fingerprint under the reason as a comment", () => {
-    const text = gitleaksIgnore([entry({ tool: "gitleaks", id: "abc123:docs/example.md:generic-api-key:12", reason: "An example key from the docs." })]);
+    const text = gitleaksIgnore(
+      [entry({ tool: "gitleaks", id: "abc123:docs/example.md:generic-api-key:12", reason: "An example key from the docs." })],
+      "2026-11-07",
+    );
 
     expect(text).toBe(
       [
@@ -69,7 +78,7 @@ describe("gitleaksIgnore", () => {
   });
 
   it("leaves out the entries of other tools", () => {
-    const text = gitleaksIgnore([entry({}), entry({ tool: "npm-audit", id: "GHSA-1" })]);
+    const text = gitleaksIgnore([entry({}), entry({ tool: "npm-audit", id: "GHSA-1" })], "2026-11-07");
 
     expect(text).toBe("# Generated from .github/security-allowlist.json by `npm run security:ignorefiles`. Do not edit; do not commit.\n");
   });

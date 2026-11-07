@@ -1,4 +1,4 @@
-import { isAllowed, type AllowlistEntry } from "./allowlist.js";
+import { allowedBy, type AllowlistEntry } from "./allowlist.js";
 
 export interface AuditFinding {
   /** The package the advisory is about. */
@@ -72,13 +72,11 @@ export function gateNpmAudit(report: string, allowlist: AllowlistEntry[], today:
     return { exitCode: 1, output: "npm audit gave a report in a format this check does not know (expected auditReportVersion 2).\n" };
   }
 
-  const findings = highFindings(audit);
-  const open = findings.filter((finding) => !isAllowed(allowlist, "npm-audit", finding.id, today));
-  const allowed = findings.filter((finding) => !open.includes(finding));
-  const allowedLines = allowed.map((finding) => {
-    const entry = allowlist.find((candidate) => candidate.tool === "npm-audit" && candidate.id === finding.id);
-    return `Allowed until ${entry?.expires ?? "?"}: ${finding.name} ${finding.id} (${entry?.reason ?? ""})\n`;
-  });
+  const found = highFindings(audit).map((finding) => ({ finding, entry: allowedBy(allowlist, "npm-audit", finding.id, today) }));
+  const open = found.filter(({ entry }) => entry === undefined).map(({ finding }) => finding);
+  const allowedLines = found.flatMap(({ finding, entry }) =>
+    entry === undefined ? [] : [`Allowed until ${entry.expires}: ${finding.name} ${finding.id} (${entry.reason})\n`],
+  );
 
   if (open.length === 0) {
     return {

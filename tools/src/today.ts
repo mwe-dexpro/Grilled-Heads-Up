@@ -6,9 +6,8 @@ export function todayFrom(args: string[], env: Record<string, string | undefined
   const argument = args.find((arg) => arg.startsWith("--today="))?.slice("--today=".length);
   const named = argument ?? (env["SECURITY_TODAY"] === "" ? undefined : env["SECURITY_TODAY"]);
   if (named === undefined) return now.toISOString().slice(0, 10);
-  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(named) ? new Date(`${named}T00:00:00Z`) : undefined;
-  if (parsed === undefined || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== named) {
-    throw new Error(`"${named}" is not a day as YYYY-MM-DD.`);
-  }
+  const date = new Date(`${named}T00:00:00Z`);
+  // Only the day as written by `toISOString` survives the round trip: no other text, and no day that does not exist.
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== named) throw new Error(`"${named}" is not a day as YYYY-MM-DD.`);
   return named;
 }

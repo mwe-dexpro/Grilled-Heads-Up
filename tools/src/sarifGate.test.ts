@@ -174,6 +174,111 @@ describe("gateSarif", () => {
     });
   });
 
+  it("says result for one and results for more, below the line as well", () => {
+    const one = sarif([{ id: "js/low", severity: "1.0" }], [{ rule: "js/low", file: "a.ts", line: 1 }]);
+    const two = sarif(
+      [{ id: "js/low", severity: "1.0" }],
+      [
+        { rule: "js/low", file: "a.ts", line: 1 },
+        { rule: "js/low", file: "a.ts", line: 2 },
+      ],
+    );
+
+    expect(gateSarif([file(one)], [], today).output).toBe("No high or critical CodeQL results (1 result of lower severity).\n");
+    expect(gateSarif([file(two)], [], today).output).toBe("No high or critical CodeQL results (2 results of lower severity).\n");
+  });
+
+  it("writes an allowed rule once, with its day and reason, however many results it has", () => {
+    const text = sarif(
+      [{ id: "js/one", severity: "8.0" }],
+      [
+        { rule: "js/one", file: "a.ts", line: 1 },
+        { rule: "js/one", file: "b.ts", line: 2 },
+      ],
+    );
+
+    expect(gateSarif([file(text)], [allow("js/one", { reason: "Checked before.", expires: "2026-12-01" })], today).output).toBe(
+      "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-01: js/one (Checked before.)\n",
+    );
+  });
+
+  it("writes each allowed rule on a line of its own, and each finding too", () => {
+    const text = sarif(
+      [
+        { id: "js/one", severity: "8.0" },
+        { id: "js/two", severity: "8.0" },
+        { id: "js/three", severity: "8.0" },
+      ],
+      [
+        { rule: "js/one", file: "a.ts", line: 1 },
+        { rule: "js/two", file: "b.ts", line: 2 },
+        { rule: "js/three", file: "c.ts", line: 3 },
+      ],
+    );
+
+    expect(gateSarif([file(text)], [allow("js/one", { reason: "One." }), allow("js/two", { reason: "Two." })], today).output).toBe(
+      "1 high or critical CodeQL result:\nhigh      js/three  c.ts:3  A problem of js/three\nAllowed until 2026-12-31: js/one (One.)\nAllowed until 2026-12-31: js/two (Two.)\n",
+    );
+    expect(gateSarif([file(text)], [], today).output.split("\n")).toHaveLength(5);
+  });
+
+  it("writes the place as file and line, the file alone without a line, and says so without a location", () => {
+    const withoutLine = JSON.stringify({
+      runs: [
+        {
+          tool: { driver: { rules: [{ id: "js/x", properties: { "security-severity": "8" } }] } },
+          results: [{ ruleId: "js/x", message: { text: "m" }, locations: [{ physicalLocation: { artifactLocation: { uri: "a.ts" } } }] }],
+        },
+      ],
+    });
+    const oddLocation = JSON.stringify({
+      runs: [
+        {
+          tool: { driver: { rules: [{ id: "js/x", properties: { "security-severity": "8" } }] } },
+          results: [{ ruleId: "js/x", message: { text: "m" }, locations: [null, { physicalLocation: { artifactLocation: { uri: 5 } } }] }],
+        },
+      ],
+    });
+
+    expect(gateSarif([file(withoutLine)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  a.ts  m\n");
+    expect(gateSarif([file(oddLocation)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  (no location)  m\n");
+  });
+
+  it("copes with a result that has no rule or no message, and with rules and results that are not objects", () => {
+    const text = JSON.stringify({
+      runs: [
+        {
+          tool: {
+            driver: {
+              rules: [
+                null,
+                "text",
+                { id: "js/x", properties: { "security-severity": "8" } },
+                { id: 5, properties: { "security-severity": "9" } },
+                { id: "js/np", properties: "none" },
+              ],
+            },
+            extensions: [null, { rules: "none" }],
+          },
+          results: [
+            null,
+            "text",
+            { ruleId: "js/x", locations: [{ physicalLocation: { artifactLocation: { uri: "a.ts" }, region: { startLine: 3 } } }] },
+            { message: { text: "no rule" } },
+            { ruleId: "js/x", message: "plain", locations: "none" },
+          ],
+        },
+        { tool: null, results: "none" },
+        { tool: { driver: { rules: {} }, extensions: {} } },
+      ],
+    });
+
+    expect(gateSarif([file(text)], [], today)).toEqual({
+      exitCode: 1,
+      output: "2 high or critical CodeQL results:\nhigh      js/x  (no location)  \nhigh      js/x  a.ts:3  \n",
+    });
+  });
+
   it("fails when there is nothing to read: an analysis that wrote no results is not a pass", () => {
     expect(gateSarif([], [], today)).toEqual({ exitCode: 1, output: "No SARIF files were found, so nothing was checked.\n" });
   });

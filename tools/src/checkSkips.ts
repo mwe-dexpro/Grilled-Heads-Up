@@ -10,22 +10,23 @@ export interface Skip {
   text: string;
 }
 
-const skipRules = /(?:no-disabled-tests|no-skipped-test)\b/;
+const skipRules = /no-disabled-tests|no-skipped-test/;
 /** `#42`, or an address of an issue: `…/issues/42`. */
-const issue = /#\d+|https?:\/\/\S+\/issues\/\d+/;
+const issue = /#\d|https?:\/\/\S+\/issues\/\d/;
 
-/** Where a comment starts on the line, outside any string: `//` or `/*`; -1 for none. */
-function commentStart(line: string): number {
+/** The comment at the end of a line of code, or the line itself if it is one; a `//` or `/*` inside a string is no comment. */
+function commentOf(line: string): string | undefined {
   let quote = "";
-  for (let at = 0; at < line.length; at++) {
-    const char = line.charAt(at);
-    if (quote !== "") {
-      if (char === "\\") at += 1;
+  let escaped = false;
+  for (const [at, char] of line.split("").entries()) {
+    if (escaped) escaped = false;
+    else if (quote !== "") {
+      if (char === "\\") escaped = true;
       else if (char === quote) quote = "";
     } else if (char === '"' || char === "'" || char === "`") quote = char;
-    else if (char === "/" && (line.charAt(at + 1) === "/" || line.charAt(at + 1) === "*")) return at;
+    else if (char === "/" && ["/", "*"].includes(line.charAt(at + 1))) return line.slice(at);
   }
-  return -1;
+  return undefined;
 }
 
 /**
@@ -36,10 +37,8 @@ export function skipsWithoutIssue(files: SourceFile[]): Skip[] {
   return files.flatMap(({ path, text }) =>
     text
       .split(/\r?\n/)
-      .map((line, index) => ({ path, line: index + 1, text: line }))
-      .filter(({ text: line }) => {
-        const at = commentStart(line);
-        return at !== -1 && line.slice(at).includes("eslint-disable") && skipRules.test(line.slice(at)) && !issue.test(line.slice(at));
-      }),
+      .map((line, index) => ({ path, line: index + 1, text: line, comment: commentOf(line) }))
+      .filter(({ comment }) => comment?.includes("eslint-disable") === true && skipRules.test(comment) && !issue.test(comment))
+      .map(({ path: file, line, text: source }) => ({ path: file, line, text: source })),
   );
 }

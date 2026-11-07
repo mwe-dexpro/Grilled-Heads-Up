@@ -1,4 +1,4 @@
-import { isAllowed, type AllowlistEntry } from "./allowlist.js";
+import { allowedBy, type AllowlistEntry } from "./allowlist.js";
 
 /** From this security severity on, a CodeQL result is high; from 9.0 critical. */
 const highFrom = 7;
@@ -73,12 +73,11 @@ export function gateSarif(files: { name: string; text: string }[], allowlist: Al
     }
   }
 
-  const open = findings.filter((finding) => !isAllowed(allowlist, "codeql", finding.rule, today));
-  const allowedRules = [...new Set(findings.filter((finding) => !open.includes(finding)).map((finding) => finding.rule))];
-  const allowedLines = allowedRules.map((rule) => {
-    const entry = allowlist.find((candidate) => candidate.tool === "codeql" && candidate.id === rule);
-    return `Allowed until ${entry?.expires ?? "?"}: ${rule} (${entry?.reason ?? ""})\n`;
-  });
+  const found = findings.map((finding) => ({ finding, entry: allowedBy(allowlist, "codeql", finding.rule, today) }));
+  const open = found.filter(({ entry }) => entry === undefined).map(({ finding }) => finding);
+  const allowed = new Map<string, AllowlistEntry>();
+  for (const { finding, entry } of found) if (entry !== undefined) allowed.set(finding.rule, entry);
+  const allowedLines = [...allowed].map(([rule, entry]) => `Allowed until ${entry.expires}: ${rule} (${entry.reason})\n`);
 
   if (open.length === 0) {
     return {

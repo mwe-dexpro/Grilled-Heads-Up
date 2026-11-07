@@ -17,18 +17,22 @@ export interface AllowlistEntry {
 /** An exception holds for at most this many days from the day it is added. */
 export const maxDays = 90;
 
-const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
-const isToolName = (value: unknown): value is ToolName => toolNames.some((name) => name === value);
+const dayPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const hasText = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+const textOf = (value: unknown): string | undefined => (typeof value === "string" && value.trim() !== "" ? value : undefined);
+const toolOf = (value: unknown): ToolName | undefined => toolNames.find((name) => name === value);
 
-/** The time of a day (midnight UTC), or undefined for text that is no day of the calendar. */
+/** The time of a day (midnight UTC), or undefined for anything that is no day of the calendar. */
 function timeOfDay(day: string): number | undefined {
-  if (!dayPattern.test(day)) return undefined;
-  const time = Date.parse(`${day}T00:00:00Z`);
+  const match = dayPattern.exec(day);
+  if (match === null) return undefined;
+  const [, year = "", month = "", date = ""] = match;
+  const time = Date.UTC(Number(year), Number(month) - 1, Number(date));
   // `Date` rolls 30 February over to March; a day that survives the round trip exists.
-  return Number.isNaN(time) || new Date(time).toISOString().slice(0, 10) !== day ? undefined : time;
+  return new Date(time).toISOString().slice(0, 10) === day ? time : undefined;
 }
+
+const dayOf = (value: unknown): string | undefined => (typeof value === "string" && timeOfDay(value) !== undefined ? value : undefined);
 
 /** Reads the allowlist: the entries that are valid, and a message for everything that is not. */
 export function parseAllowlist(text: string): { entries: AllowlistEntry[]; errors: string[] } {
@@ -51,18 +55,18 @@ export function parseAllowlist(text: string): { entries: AllowlistEntry[]; error
       errors.push(`${label} is not an object.`);
       return;
     }
-    const { tool, id, reason, expires } = row;
-    const problems: string[] = [];
-    if (!isToolName(tool)) problems.push(`the tool ${typeof tool === "string" ? `"${tool}"` : String(tool)} is not one of ${toolNames.join(", ")}.`);
-    if (!hasText(id)) problems.push("the id is missing.");
-    if (!hasText(reason)) problems.push("the reason is missing.");
-    if (typeof expires !== "string" || timeOfDay(expires) === undefined) problems.push("the expiry date must be a day as YYYY-MM-DD.");
-    if (problems.length > 0) {
-      errors.push(...problems.map((problem) => `${label}: ${problem}`));
+    const tool = toolOf(row["tool"]);
+    const id = textOf(row["id"]);
+    const reason = textOf(row["reason"]);
+    const expires = dayOf(row["expires"]);
+    if (tool === undefined || id === undefined || reason === undefined || expires === undefined) {
+      if (tool === undefined)
+        errors.push(`${label}: the tool ${typeof row["tool"] === "string" ? `"${row["tool"]}"` : String(row["tool"])} is not one of ${toolNames.join(", ")}.`);
+      if (id === undefined) errors.push(`${label}: the id is missing.`);
+      if (reason === undefined) errors.push(`${label}: the reason is missing.`);
+      if (expires === undefined) errors.push(`${label}: the expiry date must be a day as YYYY-MM-DD.`);
       return;
     }
-    // The checks above made these what the entry says.
-    if (!isToolName(tool) || !hasText(id) || !hasText(reason) || typeof expires !== "string") return;
     const first = entries.findIndex((other) => other.tool === tool && other.id === id);
     if (first !== -1) {
       errors.push(`${label}: ${tool} ${id} is on the allowlist already (entry ${first + 1}).`);
@@ -78,9 +82,9 @@ export function expired(entries: AllowlistEntry[], today: string): AllowlistEntr
   return entries.filter((entry) => entry.expires < today);
 }
 
-/** Whether an exception for this finding holds today. An expired one excepts nothing. */
-export function isAllowed(entries: AllowlistEntry[], tool: ToolName, id: string, today: string): boolean {
-  return entries.some((entry) => entry.tool === tool && entry.id === id && entry.expires >= today);
+/** The exception that holds for this finding today, if there is one. An expired exception excepts nothing. */
+export function allowedBy(entries: AllowlistEntry[], tool: ToolName, id: string, today: string): AllowlistEntry | undefined {
+  return entries.find((entry) => entry.tool === tool && entry.id === id && entry.expires >= today);
 }
 
 /** What `npm run security:allowlist` says: is the file valid, has nothing expired, does nothing run longer than 90 days. */

@@ -72,8 +72,22 @@ describe("skipsWithoutIssue", () => {
   });
 
   it("does not take a mention in prose for a disable comment", () => {
-    expect(check("// Names the rule no-disabled-tests, which eslint-disable cannot switch off without an issue.")).toHaveLength(1);
+    expect(check("// The rule no-disabled-tests is on for every test file.")).toEqual([]);
+    expect(check("// eslint-disable-next-line no-console -- a mention of no-skipped-test: still a disable comment that names it")).toHaveLength(1);
     expect(check(" * An `eslint-disable` of `vitest/no-disabled-tests` needs an issue.")).toEqual([]);
+  });
+
+  it("finds the comment after code, also one that follows a string with a quote or an escape in it", () => {
+    expect(check('check("don\'t"); // eslint-disable-line vitest/no-disabled-tests')).toHaveLength(1);
+    expect(check("const s = 'it\\'s'; // eslint-disable-line vitest/no-disabled-tests")).toHaveLength(1);
+    expect(check('const s = "a \\" // eslint-disable-line vitest/no-disabled-tests";')).toEqual([]);
+    expect(check("const s = 'a'; const t = 'b'; /* eslint-disable vitest/no-disabled-tests */")).toHaveLength(1);
+    expect(check("const url = a / b; // eslint-disable-line playwright/no-skipped-test")).toHaveLength(1);
+  });
+
+  it("accepts an issue at an address with http as well as https", () => {
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- http://tracker.example/issues/3")).toEqual([]);
+    expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- https://tracker.example/x/issues/3")).toEqual([]);
   });
 
   it("reads lines ended by Windows line breaks too", () => {

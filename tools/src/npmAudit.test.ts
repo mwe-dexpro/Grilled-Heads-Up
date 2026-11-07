@@ -177,7 +177,89 @@ describe("gateNpmAudit", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("fails when npm audit itself failed, rather than passing for lack of findings", () => {
+  it("counts the moderate and low advisories, each once", () => {
+    const text = audit({
+      a: { via: [advisory("moderate", "GHSA-1", { name: "a" }), advisory("moderate", "GHSA-2", { name: "a" }), advisory("low", "GHSA-3", { name: "a" })] },
+      b: { via: [advisory("moderate", "GHSA-1", { name: "a" }), advisory("low", "GHSA-4", { name: "b" }), advisory("low", "GHSA-5", { name: "b" }), "a"] },
+    });
+
+    expect(gateNpmAudit(text, [], today)).toEqual({ exitCode: 0, output: "No high or critical advisories (2 moderate, 3 low).\n" });
+  });
+
+  it("says advisory for one and advisories for more", () => {
+    const one = gateNpmAudit(audit({ p: { via: [advisory("high", "GHSA-1", { name: "p" })] } }), [], today);
+    const two = gateNpmAudit(audit({ p: { via: [advisory("high", "GHSA-1", { name: "p" }), advisory("high", "GHSA-2", { name: "p" })] } }), [], today);
+
+    expect(one.output.split("\n")[0]).toBe("1 high or critical advisory (npm audit):");
+    expect(two.output.split("\n")[0]).toBe("2 high or critical advisories (npm audit):");
+  });
+
+  it("writes a finding as severity, package, advisory, address and title, and an allowed one with its day and reason", () => {
+    const text = audit({
+      p: { via: [advisory("high", "GHSA-1", { name: "p", title: "It breaks" }), advisory("high", "GHSA-2", { name: "q", title: "It leaks" })] },
+    });
+
+    expect(gateNpmAudit(text, [allow("GHSA-2", { reason: "Dev only.", expires: "2026-12-01" })], today).output).toBe(
+      "1 high or critical advisory (npm audit):\nhigh      p  GHSA-1  https://github.com/advisories/GHSA-1  It breaks\nAllowed until 2026-12-01: q GHSA-2 (Dev only.)\n",
+    );
+  });
+
+  it("writes each allowed advisory on a line of its own", () => {
+    const text = audit({ p: { via: [advisory("high", "GHSA-1", { name: "p" }), advisory("high", "GHSA-2", { name: "q" })] } });
+
+    expect(gateNpmAudit(text, [allow("GHSA-1", { reason: "One." }), allow("GHSA-2", { reason: "Two." })], today).output).toBe(
+      "No high or critical advisories (0 moderate, 0 low).\nAllowed until 2026-12-31: p GHSA-1 (One.)\nAllowed until 2026-12-31: q GHSA-2 (Two.)\n",
+    );
+  });
+
+  it("explains each way npm audit can fail", () => {
+    const failed = (error: unknown) => gateNpmAudit(JSON.stringify({ error }), [], today).output;
+
+    expect(failed({ code: "ENOTFOUND", summary: "no registry" })).toBe("npm audit failed (ENOTFOUND): no registry\n");
+    expect(failed({ summary: "no registry" })).toBe("npm audit failed: no registry\n");
+    expect(failed({ code: "E401" })).toBe("npm audit failed (E401): no reason given\n");
+    expect(failed({})).toBe("npm audit failed: no reason given\n");
+    expect(failed("plain")).toBe("npm audit failed: no reason given\n");
+    expect(failed({ code: 401, summary: 5 })).toBe("npm audit failed: no reason given\n");
+    expect(gateNpmAudit("", [], today)).toEqual({ exitCode: 1, output: "npm audit gave no JSON, so nothing was checked.\n" });
+    expect(gateNpmAudit("{}", [], today)).toEqual({
+      exitCode: 1,
+      output: "npm audit gave a report in a format this check does not know (expected auditReportVersion 2).\n",
+    });
+  });
+
+  it("reads reports that are odd in places without failing: advisories that are not objects, a package that is not an object", () => {
+    const odd = JSON.stringify({
+      auditReportVersion: 2,
+      vulnerabilities: { a: null, b: "text", c: { via: "no list" }, d: { via: [null, 5, [], advisory("high", "GHSA-1", { name: "d" })] } },
+    });
+
+    expect(highFindings(JSON.parse(odd)).map(({ id }) => id)).toEqual(["GHSA-1"]);
+    expect(highFindings(null)).toEqual([]);
+    expect(highFindings("text")).toEqual([]);
+    expect(highFindings([])).toEqual([]);
+    expect(highFindings({ vulnerabilities: "none" })).toEqual([]);
+    expect(highFindings({ vulnerabilities: [] })).toEqual([]);
+  });
+
+  it("names an advisory by its number when its address is empty or ends in a slash", () => {
+    const found = highFindings(
+      JSON.parse(
+        audit({
+          p: {
+            via: [
+              { source: 7, name: "p", severity: "high", url: "" },
+              { source: 8, name: "p", severity: "high", url: "https://example.com/advisories/" },
+            ],
+          },
+        }),
+      ),
+    );
+
+    expect(found.map(({ id }) => id)).toEqual(["7", "8"]);
+  });
+
+  it("fails when npm audit failed, rather than passing for lack of findings", () => {
     const result = gateNpmAudit(
       JSON.stringify({ message: "x", error: { code: "ENOTFOUND", summary: "request to the registry failed", detail: "..." } }),
       [],

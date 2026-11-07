@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAllowlist, expired, isAllowed, maxDays, parseAllowlist, type AllowlistEntry } from "./allowlist.js";
+import { allowedBy, checkAllowlist, expired, maxDays, parseAllowlist, type AllowlistEntry } from "./allowlist.js";
 
 const entry = (fields: Partial<AllowlistEntry> = {}): AllowlistEntry => ({
   tool: "npm-audit",
@@ -75,7 +75,25 @@ describe("parseAllowlist", () => {
   });
 
   it("refuses a missing, malformed or impossible expiry date", () => {
-    const bad = [undefined, "", "soon", "2026-1-5", "05.01.2026", "2026-01-05T00:00:00Z", "2026-13-01", "2026-02-30", "2026-00-10", "2026-04-31", 20261231];
+    const bad = [
+      undefined,
+      "",
+      "soon",
+      "2026-1-5",
+      "05.01.2026",
+      "2026-01-05T00:00:00Z",
+      "2026-13-01",
+      "2026-02-30",
+      "2026-00-10",
+      "2026-04-31",
+      20261231,
+      "2026-01-011",
+      "x2026-01-01",
+      "2026-01-01 ",
+      "02026-01-01",
+      null,
+      ["2026-01-01"],
+    ];
     const result = parseAllowlist(file(bad.map((expires) => ({ ...entry(), expires }))));
 
     expect(result.entries).toEqual([]);
@@ -137,22 +155,22 @@ describe("expired", () => {
   });
 });
 
-describe("isAllowed", () => {
+describe("allowedBy", () => {
   const entries = [entry(), entry({ tool: "trivy", id: "CVE-1", expires: "2026-07-15" })];
 
-  it("is true for a tool and id that are on the allowlist", () => {
-    expect(isAllowed(entries, "npm-audit", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBe(true);
-    expect(isAllowed(entries, "trivy", "CVE-1", "2026-07-15")).toBe(true);
+  it("is the entry for a tool and id that are on the allowlist", () => {
+    expect(allowedBy(entries, "npm-audit", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBe(entries[0]);
+    expect(allowedBy(entries, "trivy", "CVE-1", "2026-07-15")).toBe(entries[1]);
   });
 
-  it("is false for another id, or the same id of another tool", () => {
-    expect(isAllowed(entries, "npm-audit", "GHSA-other", "2026-07-01")).toBe(false);
-    expect(isAllowed(entries, "codeql", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBe(false);
-    expect(isAllowed([], "npm-audit", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBe(false);
+  it("is nothing for another id, or the same id of another tool", () => {
+    expect(allowedBy(entries, "npm-audit", "GHSA-other", "2026-07-01")).toBeUndefined();
+    expect(allowedBy(entries, "codeql", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBeUndefined();
+    expect(allowedBy([], "npm-audit", "GHSA-aaaa-bbbb-cccc", "2026-07-01")).toBeUndefined();
   });
 
-  it("is false once the entry has expired: it excepts nothing then", () => {
-    expect(isAllowed(entries, "trivy", "CVE-1", "2026-07-16")).toBe(false);
+  it("is nothing once the entry has expired: it excepts nothing then", () => {
+    expect(allowedBy(entries, "trivy", "CVE-1", "2026-07-16")).toBeUndefined();
   });
 });
 

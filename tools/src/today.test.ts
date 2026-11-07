@@ -27,5 +27,8 @@ describe("todayFrom", () => {
   it("refuses a day that is no day, rather than checking against the wrong one", () => {
     expect(() => todayFrom(["--today=tomorrow"], {}, noon)).toThrow('"tomorrow" is not a day as YYYY-MM-DD');
     expect(() => todayFrom([], { SECURITY_TODAY: "2026-02-30" }, noon)).toThrow('"2026-02-30" is not a day as YYYY-MM-DD');
+    for (const text of ["2026-11-071", "x2026-11-07", "2026-11-07 ", "2026-1-7", "07.11.2026", "2026-11-07T10:00:00Z"]) {
+      expect(() => todayFrom([`--today=${text}`], {}, noon), text).toThrow(`"${text}" is not a day as YYYY-MM-DD`);
+    }
   });
 });
