@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type RefObject } from "react";
+import { useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import type { Subtask } from "./subtaskStore";
 import { dropIndex } from "./subtasks";
 
@@ -49,9 +49,8 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
   const dragFrom = drag ? subtasks.findIndex((s) => s.id === drag.id) : -1;
   const dragging = drag !== null && dragFrom !== -1 ? drag : null;
 
-  useLayoutEffect(() => {
-    if (drag && !dragging) setDrag(null);
-  }, [drag, dragging]);
+  // A drag whose Subtask is gone ends in the render that finds it gone (state adjusted while rendering, not in an effect).
+  if (drag !== null && dragging === null) setDrag(null);
 
   function startDrag(e: PointerEvent<HTMLButtonElement>, subtask: Subtask, index: number) {
     if (e.pointerType === "mouse" && e.button !== 0) return;

@@ -34,31 +34,29 @@ export function useAppData() {
   // Reads from the stores as they are when it runs, so a sync that reports changes while the stores are still
   // opening is not lost: the stores are set before the first read. Screens stay mounted, so an open form
   // keeps what was typed.
-  const reload = useMemo(
-    () =>
-      createListReader(
-        async () =>
-          stores.current
-            ? {
-                tasks: await stores.current.tasks.listTasks(),
-                trash: await stores.current.tasks.listTrash(),
-                events: await stores.current.events.listEvents(),
-                lists: await stores.current.lists.listLists(),
-                tags: await stores.current.tags.listTags(),
-                subtasks: await stores.current.subtasks.listSubtasks(),
-              }
-            : null,
-        (read) => {
-          setTasks(read.tasks);
-          setTrash(read.trash);
-          setEvents(read.events);
-          setLists(read.lists);
-          setTags(read.tags);
-          setSubtasks(read.subtasks);
-        },
-      ),
+  const readAll = useCallback(
+    async () =>
+      stores.current
+        ? {
+            tasks: await stores.current.tasks.listTasks(),
+            trash: await stores.current.tasks.listTrash(),
+            events: await stores.current.events.listEvents(),
+            lists: await stores.current.lists.listLists(),
+            tags: await stores.current.tags.listTags(),
+            subtasks: await stores.current.subtasks.listSubtasks(),
+          }
+        : null,
     [],
   );
+  const deliver = useCallback((read: NonNullable<Awaited<ReturnType<typeof readAll>>>) => {
+    setTasks(read.tasks);
+    setTrash(read.trash);
+    setEvents(read.events);
+    setLists(read.lists);
+    setTags(read.tags);
+    setSubtasks(read.subtasks);
+  }, []);
+  const reload = useMemo(() => createListReader(readAll, deliver), [readAll, deliver]);
   const sync = useSync(() => void reload());
   const { syncSoon } = sync;
 

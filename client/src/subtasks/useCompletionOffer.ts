@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { Task } from "../tasks/taskStore";
 import type { Subtask } from "./subtaskStore";
 import { offersCompletion, stillPending, subtaskProgress, withPendingTicks } from "./subtasks";
@@ -37,10 +37,14 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
     // The tick that made the offer is over (it failed, or was undone) and the offer does not hold: forget it.
     if (offered !== null && !offering && !pendingTicks.current.has(offered)) setOffered(null);
   }, [subtasks, offered, offering]);
+  // (An Effect Event: which Subtask the offer is for is read as it is when the offer appears.)
+  const rememberOffer = useEffectEvent(() => {
+    offeredFor.current = offered;
+  });
   useLayoutEffect(() => {
     if (offering) {
       completeButton.current?.focus();
-      offeredFor.current = offered;
+      rememberOffer();
     } else if (offeredFor.current !== null) {
       // The offer went by itself (a Subtask was unticked or added, or the Task was Completed elsewhere). If it held the
       // focus, the button that had it is gone: the ticked Subtask's check gets it.
@@ -50,7 +54,7 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
       }
       offeredFor.current = null;
     }
-  }, [offering]);
+  }, [offering, rows, addInput]);
 
   function tick(subtask: Subtask) {
     // What the tick does, and whether it is the last open one, is decided on the Subtasks with the ticks still being saved.

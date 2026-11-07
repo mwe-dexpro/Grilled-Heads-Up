@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { actionWidth, canStartSwipe, dragOffset, settle } from "./swipe";
 
 export interface SwipeAction {
@@ -57,9 +57,11 @@ export function SwipeRow({ actions, onMenu, className, children }: SwipeRowProps
   }
 
   // An open row closes when the pointer lands anywhere else, and when the page scrolls.
+  // (An Effect Event: it closes the row as the row is when the pointer or the scroll comes.)
+  const closeRow = useEffectEvent(() => show(0));
   useEffect(() => {
     if (!open || dragging) return;
-    const close = () => show(0);
+    const close = () => closeRow();
     const closeOutside = (event: globalThis.PointerEvent) => {
       if (row.current?.contains(event.target as Node) !== true) close();
     };

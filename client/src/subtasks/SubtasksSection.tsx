@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
@@ -50,20 +50,22 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
   const offer = useCompletionOffer({ task, subtasks, onSetDone, rows, addInput });
   const drag = useRowDrag({ subtasks, list, rows, onMove, onDragged: () => setMovingId(null) });
 
+  const announce = useCallback((text: string) => {
+    setAnnouncement((current) => ({ text, n: current.n + 1 }));
+  }, []);
+  // (An Effect Event: the words are made with the language as it is when a move has landed, not a reason to run the effect again.)
+  const announceMove = useEffectEvent((title: string, to: number) => announce(t("subtask.moved", { title, position: String(to + 1), total: String(subtasks.length) })));
+
   useLayoutEffect(() => {
     const moved = refocus.current;
     if (moved !== null) {
       rows.current.get(moved.id)?.querySelector<HTMLElement>(moved.control)?.focus();
       const to = subtasks.findIndex((s) => s.id === moved.id);
       const landed = subtasks[to];
-      if (landed !== undefined && to !== moved.from) announce(t("subtask.moved", { title: landed.title, position: String(to + 1), total: String(subtasks.length) }));
+      if (landed !== undefined && to !== moved.from) announceMove(landed.title, to);
     }
     refocus.current = null;
   }, [subtasks]);
-
-  function announce(text: string) {
-    setAnnouncement((current) => ({ text, n: current.n + 1 }));
-  }
 
   function add(e: SyntheticEvent) {
     e.preventDefault();

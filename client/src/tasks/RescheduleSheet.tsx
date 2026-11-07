@@ -31,8 +31,9 @@ export function RescheduleSheet({ open, title, today, earliest, onChoose, onClos
     if (!element) return;
     if (open && !element.open) element.showModal();
     if (!open && element.open) element.close();
-    if (!open) setPicking(false);
   }, [open]);
+  // Closed, the sheet starts at its options again (state adjusted while rendering, not in an effect).
+  if (!open && picking) setPicking(false);
 
   return (
     <dialog ref={dialog} className="sheet" aria-labelledby="reschedule-heading" onClose={onClose}>

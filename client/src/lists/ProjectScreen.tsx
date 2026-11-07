@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { navigate } from "../app/navigation";
 import { parseRoute } from "../app/routes";
 import { bucketOf, type Progress } from "../home/buckets";
@@ -52,8 +52,10 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
   const chips = list ? tagsInList(tasks, list.id, tags) : [];
   const chosen = chips.some((tag) => tag.id === tagId) ? tagId : null;
   // And it is forgotten, not only hidden: it must not filter again when a Task gets that Tag back.
+  // (An Effect Event: it uses the view and `onView` as they are when the effect runs, which only the three values below start.)
+  const forgetTag = useEffectEvent(() => onView({ ...view, tagId: null }));
   useEffect(() => {
-    if (list && tagId !== null && chosen === null) onView({ ...view, tagId: null });
+    if (list && tagId !== null && chosen === null) forgetTag();
   }, [list, tagId, chosen]);
 
   if (leaving) return null;

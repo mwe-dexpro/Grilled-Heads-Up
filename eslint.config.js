@@ -80,6 +80,11 @@ export default tseslint.config(
   {
     files: ["client/src/**/*.{ts,tsx}"],
     extends: [reactHooks.configs.flat.recommended],
+    rules: {
+      // Off: a false positive. It follows a function that reads a ref into everything that receives it (the list reader of
+      // `useAppData`, the Subtasks offer's handlers), although none is called while rendering; refs are read only in handlers and effects.
+      "react-hooks/refs": "off",
+    },
   },
 
   // The server and the tools run in Node.
@@ -120,17 +125,12 @@ export default tseslint.config(
     rules: {
       "security/detect-object-injection": "off", // 25
       "n/no-unsupported-features/node-builtins": "off", // 10
-      "react-hooks/exhaustive-deps": "off", // 4
       "playwright/no-conditional-in-test": "off", // 4
-      "react-hooks/refs": "off", // 3
       "vitest/valid-expect": "off", // 2
-      "react-hooks/set-state-in-effect": "off", // 2
       "@eslint-community/eslint-comments/require-description": "off", // 2
       "playwright/expect-expect": "off", // 2
       "security/detect-unsafe-regex": "off", // 2
       "playwright/no-wait-for-timeout": "off", // 2
-      "react-hooks/preserve-manual-memoization": "off", // 1
-      "react-hooks/immutability": "off", // 1
       "playwright/no-conditional-expect": "off", // 1
       "security/detect-non-literal-regexp": "off", // 1
       "security/detect-non-literal-fs-filename": "off", // 1
