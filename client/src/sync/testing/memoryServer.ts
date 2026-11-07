@@ -109,7 +109,7 @@ export class MemoryServer {
    * what the transport does with each status is part of what is tested.
    */
   fetch: typeof fetch = async (input, init) => {
-    const url = new URL(String(input), "http://localhost");
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://localhost");
     const transport = this.transport();
     const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
     if (url.pathname === "/api/sync/push" && this.pushStatus !== null) {
@@ -118,7 +118,7 @@ export class MemoryServer {
     }
     try {
       if (url.pathname === "/api/sync/push") {
-        const { changes } = JSON.parse(String(init?.body)) as { changes: Change[] };
+        const { changes } = JSON.parse(typeof init?.body === "string" ? init.body : "") as { changes: Change[] };
         return json(200, await transport.push(changes));
       }
       return json(200, await transport.pull(Number(url.searchParams.get("after")), Number(url.searchParams.get("limit"))));

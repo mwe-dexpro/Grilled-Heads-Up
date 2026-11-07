@@ -528,16 +528,16 @@ test("a drag ends where the row was dropped: when the saved order arrives no row
   // Watch every frame from now on: once the first row is "Swimwear" (the saved order is shown), take 20 more frames.
   const frames = page.evaluate(
     () =>
-      new Promise<Array<Record<string, number>>>((resolve) => {
+      new Promise<Record<string, number>[]>((resolve) => {
         const tops = () => {
           const found: Record<string, number> = {};
           for (const row of document.querySelectorAll("li.subtask")) {
             const title = row.querySelector(".subtask-title")?.textContent;
-            if (title !== undefined && title !== null && title !== "") found[title] = Math.round(row.getBoundingClientRect().top);
+            if (title !== undefined && title !== "") found[title] = Math.round(row.getBoundingClientRect().top);
           }
           return found;
         };
-        const settled: Array<Record<string, number>> = [];
+        const settled: Record<string, number>[] = [];
         let arrived = false;
         const frame = () => {
           const now = tops();
@@ -578,7 +578,7 @@ test("a reload while a row is dragged, or while it waits to be saved, does not d
 
   // A tick that is saved and shown reloads the Subtasks, with the drag under way. (`click()` of the element keeps the
   // pointer and the focus where they are, as a change that arrives from another device would.)
-  await page.evaluate(() => (document.querySelector('input[aria-label="Chargers"]') as HTMLInputElement).click());
+  await page.evaluate(clickCheck, "Chargers");
   await expect(page.getByRole("checkbox", { name: "Chargers" })).toBeChecked();
   await page.mouse.move(grip.x + grip.width / 2, first.y - 10, { steps: 4 });
   await page.mouse.up();
@@ -671,7 +671,7 @@ test("leaving a rename input that was not typed in does not write the old title 
   await other.close();
 
   // A change here reloads the Subtasks, so the input is open with the title it began with while "Sandals" is stored.
-  await page.evaluate(() => (document.querySelector('input[aria-label="Jacket"]') as HTMLInputElement).click());
+  await page.evaluate(clickCheck, "Jacket");
   await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeChecked();
   // The input is still open, and still holds "Boots": it began with that.
   await expect(page.locator(".subtask-title-input")).toHaveValue("Boots");

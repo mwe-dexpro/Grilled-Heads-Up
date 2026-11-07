@@ -112,7 +112,7 @@ export async function openEventStore(
       const clean = checked(fields);
       const event = await events.update(id, (current) => {
         const from: EventFields = base ?? current;
-        const changed = (Object.keys(clean) as Array<keyof EventFields>).filter((field) => clean[field] !== from[field]);
+        const changed = (Object.keys(clean) as (keyof EventFields)[]).filter((field) => clean[field] !== from[field]);
         // Any change to when the Event is writes all of it, so that it is won or lost as a unit.
         const written = changed.some((field) => (whenFields as readonly string[]).includes(field)) ? [...new Set([...changed, ...whenFields])] : changed;
         return Object.fromEntries(written.map((field) => [field, clean[field]]));

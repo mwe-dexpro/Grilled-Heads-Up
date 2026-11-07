@@ -52,7 +52,7 @@ export interface Table<T extends Synced> {
   /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
   getDeleted: (id: string) => Promise<Deleted<T> | undefined>;
   /** Deleted records (tombstones), in no particular order. */
-  listDeleted: () => Promise<Array<Deleted<T>>>;
+  listDeleted: () => Promise<Deleted<T>[]>;
   /**
    * Un-deletes a deleted record: writes `deletedAt` = null under a new clock (one field, one outbox entry), in
    * one transaction. That is an ordinary last-write-wins write, so it beats the older deletion on every device.
@@ -77,7 +77,7 @@ async function writeRecord<T extends Synced>(
   tx: SyncTransaction,
   { type, storeName }: RecordType<T>,
   next: T,
-  changed: Array<keyof T & string>,
+  changed: (keyof T & string)[],
   now: Date,
 ): Promise<void> {
   if (changed.length === 0) return;
@@ -93,7 +93,7 @@ async function writeRecord<T extends Synced>(
   await tx.objectStore("fieldClocks").put(clocks);
 }
 
-const fieldsOf = <T extends Synced>(record: T) => Object.keys(record).filter((field) => field !== "id") as Array<keyof T & string>;
+const fieldsOf = <T extends Synced>(record: T) => Object.keys(record).filter((field) => field !== "id") as (keyof T & string)[];
 
 /**
  * Records saved before sync existed have no field clocks yet; they are given clocks and outbox entries here,
@@ -109,7 +109,7 @@ export async function queuePreSyncRecords<T extends Synced>(db: SyncDb, recordTy
   const tx = transactionOver(db, [storeName]);
   // Checked again inside the transaction: another tab may have finished between the two.
   if ((await tx.objectStore("syncInfo").get(done)) === undefined) {
-    for (const raw of (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>) {
+    for (const raw of (await tx.objectStore(storeName).getAll()) as (Partial<T> & { id: string })[]) {
       if ((await tx.objectStore("fieldClocks").get([type, raw.id])) === undefined) {
         const record = withDefaults(raw);
         await writeRecord(tx, recordType, record, fieldsOf(record), now());
@@ -137,7 +137,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
     },
 
     async list() {
-      const all = (await db.getAll(storeName)) as Array<Partial<T> & { id: string }>;
+      const all = (await db.getAll(storeName)) as (Partial<T> & { id: string })[];
       return all.map(withDefaults).filter((record) => record.deletedAt === null);
     },
 
@@ -154,7 +154,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
 
     async findOrPut(record, pick) {
       const tx = transactionOver(db, [storeName]);
-      const all = (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>;
+      const all = (await tx.objectStore(storeName).getAll()) as (Partial<T> & { id: string })[];
       const found = pick(all.map(withDefaults).filter((other) => other.deletedAt === null));
       if (found) {
         await tx.done;
@@ -180,7 +180,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       }
       const patch = typeof change === "function" ? change(prev) : change;
       const next = { ...prev, ...patch };
-      await writeRecord(tx, recordType, next, Object.keys(patch) as Array<keyof T & string>, now());
+      await writeRecord(tx, recordType, next, Object.keys(patch) as (keyof T & string)[], now());
       await tx.done;
       return next;
     },
@@ -190,8 +190,8 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const raw = (await tx.objectStore(storeName).get(id)) as (Partial<T> & { id: string }) | undefined;
       const prev = raw && withDefaults(raw);
       const at = now();
-      const live = prev !== undefined && prev.deletedAt === null;
-      if (live) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
+      const live = prev?.deletedAt === null;
+      if (live) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as (keyof T & string)[], at);
       await tx.done;
       return live;
     },
@@ -202,7 +202,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
     },
 
     async listDeleted() {
-      const all = (await db.getAll(storeName)) as Array<Partial<T> & { id: string }>;
+      const all = (await db.getAll(storeName)) as (Partial<T> & { id: string })[];
       return all.map(withDefaults).filter(isDeleted);
     },
 
@@ -215,7 +215,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
         return undefined;
       }
       const next = { ...prev, deletedAt: null };
-      await writeRecord(tx, recordType, next, ["deletedAt"] as Array<keyof T & string>, now());
+      await writeRecord(tx, recordType, next, ["deletedAt"] as (keyof T & string)[], now());
       await tx.done;
       return next;
     },

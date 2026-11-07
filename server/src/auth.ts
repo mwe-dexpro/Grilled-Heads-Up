@@ -203,9 +203,10 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   routes.post("/sign-in/verify", async (req, res) => {
     const ceremony = takeCeremony(req, res, "signIn");
     const response = req.body as AuthenticationResponseJSON;
+    const presentedId = (req.body as { id?: unknown } | undefined)?.id;
     const passkey =
-      typeof response?.id === "string"
-        ? (db.prepare("SELECT * FROM passkeys WHERE id = ?").get(response.id) as PasskeyRow | undefined)
+      typeof presentedId === "string"
+        ? (db.prepare("SELECT * FROM passkeys WHERE id = ?").get(presentedId) as PasskeyRow | undefined)
         : undefined;
     if (!ceremony || !passkey) {
       res.status(401).json({ error: "Sign-in didn't work." });

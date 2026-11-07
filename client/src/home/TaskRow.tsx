@@ -58,7 +58,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
       {list.name}
     </a>
   );
-  const place = eventLink || listLink;
+  const place = eventLink ?? listLink;
   const [beforeEvent, afterEvent] = t("risk.putsAtRisk").split("{event}");
 
   // The second line: what the row says about the Task, then " · " and the Subtask count (ALIGNMENT §1).

@@ -43,7 +43,7 @@ async function outbox(dbName: string) {
 }
 
 /** Saves Subtasks as they are, with positions and times of the test's choosing (as two devices' adds would leave them). */
-async function seed(dbName: string, subtasks: Array<Pick<Subtask, "id" | "taskId" | "createdAt" | "position">>) {
+async function seed(dbName: string, subtasks: Pick<Subtask, "id" | "taskId" | "createdAt" | "position">[]) {
   const db = await openAppDb(dbName);
   const table = await openTable(db, subtaskRecordType, () => new Date("2026-10-01T08:00:00.000Z"));
   for (const subtask of subtasks) await table.put({ title: subtask.id.toUpperCase(), completedAt: null, deletedAt: null, ...subtask });

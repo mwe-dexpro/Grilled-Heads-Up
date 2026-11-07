@@ -15,7 +15,7 @@ export function SignInSettings() {
         type="button"
         className="button-text"
         disabled={busy}
-        onClick={() => run(async () => void (await registerPasskey()), { refused: "auth.problem.createPasskey", done: "settings.passkeyAdded" })}
+        onClick={() => run(async () => { await registerPasskey(); }, { refused: "auth.problem.createPasskey", done: "settings.passkeyAdded" })}
       >
         {t("settings.addPasskey")}
       </button>

@@ -109,7 +109,7 @@ export function SwipeRow({ actions, onMenu, className, children }: SwipeRowProps
 
   function handleMove(event: PointerEvent<HTMLDivElement>) {
     const g = gesture.current;
-    if (!g || event.pointerId !== g.id) return;
+    if (g?.id !== event.pointerId) return;
     // A mouse moving with no button down is not dragging, whatever became of the release.
     if (event.pointerType === "mouse" && event.buttons === 0) {
       stopListening.current?.();

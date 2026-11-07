@@ -77,7 +77,7 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     // The row goes when the deletion is saved; the focus moves to a row that stays, else to "Add subtask".
     const next = subtasks[index + 1] ?? subtasks[index - 1];
     const title = next && rows.current.get(next.id)?.querySelector<HTMLElement>(".subtask-title");
-    (title || addInput.current)?.focus();
+    (title ?? addInput.current)?.focus();
     onDelete(subtask);
   }
 

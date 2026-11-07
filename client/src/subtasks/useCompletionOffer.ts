@@ -46,7 +46,7 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
       // focus, the button that had it is gone: the ticked Subtask's check gets it.
       if (document.activeElement === document.body || document.activeElement === null) {
         const check = rows.current.get(offeredFor.current)?.querySelector<HTMLElement>(".check");
-        (check || addInput.current)?.focus();
+        (check ?? addInput.current)?.focus();
       }
       offeredFor.current = null;
     }

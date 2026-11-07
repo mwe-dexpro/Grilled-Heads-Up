@@ -125,7 +125,7 @@ test("when the session has expired, the next sync leads to the sign-in screen an
           request.onerror = () => reject(request.error);
           request.onsuccess = () => {
             open.result.close();
-            resolve((request.result as Array<{ title: string }>).map((task) => task.title));
+            resolve((request.result as { title: string }[]).map((task) => task.title));
           };
         };
       }),

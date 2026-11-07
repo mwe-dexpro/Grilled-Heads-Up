@@ -35,7 +35,7 @@ export function earliestRescheduleDay(task: Pick<Task, "date" | "completedAt">, 
 }
 
 /** "Reschedule without a chosen date means tomorrow." */
-export function chosenDay(day: Day | undefined | "", today: Day): Day {
+export function chosenDay(day: Day | undefined, today: Day): Day {
   return day === undefined || day === "" ? addDays(today, 1) : day;
 }
 

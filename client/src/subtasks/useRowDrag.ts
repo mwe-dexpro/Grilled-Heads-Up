@@ -72,7 +72,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
   }
 
   function dragTo(e: PointerEvent<HTMLButtonElement>) {
-    if (dragging === null || e.pointerId !== dragging.pointerId || dragging.dropped === true) return;
+    if (dragging?.pointerId !== e.pointerId || dragging.dropped === true) return;
     const dy = e.clientY - dragging.startY;
     if (Math.abs(dy) > 4) {
       dragMoved.current = true;
@@ -99,7 +99,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
    * moved the row's node, and a cancelled pointer loses it too).
    */
   function endDrag(e: PointerEvent<HTMLButtonElement>, drop: boolean) {
-    if (dragging === null || e.pointerId !== dragging.pointerId || dragging.dropped === true) return;
+    if (dragging?.pointerId !== e.pointerId || dragging.dropped === true) return;
     if (drop && dragging.target !== dragFrom) {
       const dropped = { ...dragging, dropped: true, dy: waySlot(dragFrom, dragging.target) };
       setDrag(dropped);

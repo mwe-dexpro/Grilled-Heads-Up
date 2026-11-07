@@ -46,7 +46,7 @@ const toChange = ({ type, id, field, value, hlc }: OutboxEntry): Change => ({ ty
 export interface SyncEngineOptions {
   db: SyncDb;
   /** Everything that syncs. A Change of a type missing here (from a newer version elsewhere) is skipped. */
-  types: Array<RecordType<Synced>>;
+  types: RecordType<Synced>[];
   transport: Transport;
   now?: () => Date;
 }
@@ -201,7 +201,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   async function run() {
     if (progressWanted) setState({ status: "syncing" });
     progressWanted = false;
-    let applied = false;
+    const applied = { remote: false };
     try {
       // A push that fails for another reason than the connection or the session doesn't keep the pull from running.
       let pushFailure: unknown = null;
@@ -213,7 +213,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         if (error instanceof TransportError && (error.kind === "offline" || error.kind === "signedOut")) throw error;
         pushFailure = error;
       }
-      await pull(() => (applied = true));
+      await pull(() => (applied.remote = true));
       if (pushFailure !== null) throw pushFailure;
       const lastSyncedAt = now().getTime();
       await db.put("syncInfo", lastSyncedAt, "lastSyncedAt");
@@ -222,7 +222,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     } catch (error) {
       setState({ status: error instanceof TransportError && error.kind !== "rejected" ? error.kind : "failed" });
     }
-    if (applied) for (const listener of remoteListeners) listener();
+    if (applied.remote) for (const listener of remoteListeners) listener();
   }
 
   let current: Promise<void> | null = null;

@@ -122,7 +122,7 @@ describe("Replica table", () => {
 
     expect(await tasks.get("t1")).toBeUndefined();
     expect(await tasks.list()).toEqual([]);
-    expect(((await db.get("tasks", "t1")) as Task).deletedAt).toBe("2026-10-01T09:00:01.000Z");
+    expect(defined(await db.get("tasks", "t1")).deletedAt).toBe("2026-10-01T09:00:01.000Z");
     const sent = await push();
     expect(defined(sent["deletedAt"]).value).toBe("2026-10-01T09:00:01.000Z");
     expect(defined(sent["deletedAt"]).hlc > defined(sent["title"]).hlc).toBe(true);
@@ -183,7 +183,7 @@ describe("Replica table", () => {
     const deleted = await tasks.listDeleted();
 
     expect(deleted.map((t) => t.id).sort()).toEqual(["t2", "t3"]);
-    expect(deleted.every((t) => t.deletedAt !== null)).toBe(true);
+    expect(deleted.map((t) => t.deletedAt)).not.toContain(null);
     expect(deleted.find((t) => t.id === "t2")).toMatchObject({ title: "Doomed" });
   });
 

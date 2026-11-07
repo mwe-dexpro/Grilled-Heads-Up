@@ -29,7 +29,7 @@ async function signedInOwner() {
   return phone;
 }
 
-type Pulled = { changes: ReturnType<typeof change>[]; cursor: number; more: boolean; serverTime: number };
+interface Pulled { changes: ReturnType<typeof change>[]; cursor: number; more: boolean; serverTime: number }
 const pull = async (phone: TestBrowser, query = ""): Promise<Pulled> => (await (await phone.get(`/api/sync/pull${query}`)).json()) as Pulled;
 const push = (phone: TestBrowser, changes: unknown) => phone.post("/api/sync/push", { changes });
 const fieldsOf = (page: Pulled) => page.changes.map((c) => [c.field, c.value]);

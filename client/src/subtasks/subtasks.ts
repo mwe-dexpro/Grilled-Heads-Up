@@ -71,7 +71,7 @@ export function positionAt(siblings: Subtask[], movingId: string, toIndex: numbe
  */
 export function completesLastOpen(subtasks: Subtask[], tickedId: string): boolean {
   const ticked = subtasks.find((subtask) => subtask.id === tickedId);
-  return ticked !== undefined && ticked.completedAt === null && subtasks.every((subtask) => subtask.id === tickedId || subtask.completedAt !== null);
+  return ticked?.completedAt === null && subtasks.every((subtask) => subtask.id === tickedId || subtask.completedAt !== null);
 }
 
 /** Whether to offer Completing the Task after this tick: it is the last open Subtask, and the Task is still open. */

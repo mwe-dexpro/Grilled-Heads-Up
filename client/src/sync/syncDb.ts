@@ -69,7 +69,7 @@ export async function stampLocalChange(tx: SyncTransaction, now: Date): Promise<
 }
 
 /** Moves the clock past timestamps seen elsewhere (other devices' changes, the server's time). */
-export async function receiveTimestamps(tx: SyncTransaction, seen: Array<Pick<Timestamp, "wall" | "counter">>, now: Date): Promise<void> {
+export async function receiveTimestamps(tx: SyncTransaction, seen: Pick<Timestamp, "wall" | "counter">[], now: Date): Promise<void> {
   const info = tx.objectStore("syncInfo");
   let clock = await loadClock(tx);
   for (const remote of seen) clock = receive(clock, remote, now.getTime());
