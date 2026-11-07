@@ -43,8 +43,12 @@ export interface Table<T extends Synced> {
    * or undefined when there is none (missing or deleted). `change` can compute the fields from the stored record.
    */
   update(id: string, change: Patch<T> | ((current: T) => Patch<T>)): Promise<T | undefined>;
-  /** Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. */
-  delete(id: string): Promise<void>;
+  /**
+   * Marks the record deleted now (the tombstone); it stays stored so the deletion can sync. Returns whether this call
+   * wrote the tombstone: false when the record is missing or was deleted already (nothing is written then). Looking
+   * and writing are one transaction, so of two deletes at once exactly one says true.
+   */
+  delete(id: string): Promise<boolean>;
   /** A record that is deleted (a tombstone), by id; undefined when it is missing or live. */
   getDeleted(id: string): Promise<T | undefined>;
   /** Deleted records (tombstones), in no particular order. */
@@ -181,8 +185,10 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
       const raw = (await tx.objectStore(storeName).get(id)) as (Partial<T> & { id: string }) | undefined;
       const prev = raw && withDefaults(raw);
       const at = now();
-      if (prev && prev.deletedAt === null) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
+      const live = prev !== undefined && prev.deletedAt === null;
+      if (live) await writeRecord(tx, recordType, { ...prev, deletedAt: at.toISOString() }, ["deletedAt"] as Array<keyof T & string>, at);
       await tx.done;
+      return live;
     },
 
     async getDeleted(id) {

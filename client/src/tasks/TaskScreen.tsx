@@ -42,7 +42,7 @@ interface TaskScreenProps {
   onRemoveTag(id: string, tagId: string): void;
   onAddSubtask(taskId: string, title: string): void;
   onRenameSubtask(id: string, title: string): void;
-  onSetSubtaskDone(id: string, done: boolean): void;
+  onSetSubtaskDone(id: string, done: boolean): Promise<void> | void;
   onMoveSubtask(id: string, toIndex: number): Promise<void> | void;
   onMoveSubtaskBy(id: string, by: number): Promise<void> | void;
   /** Deletes the Subtask and offers to undo it; the screen stays. */

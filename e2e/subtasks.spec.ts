@@ -464,11 +464,15 @@ test("a key held down moves a Subtask one place for every press, none is lost an
   // The screen shows what a save left a moment after the save is done: React renders it in a later task. Here that
   // task is held back by 40 ms (React's scheduler posts a message to itself), so a key that repeats while the screen
   // is behind is certain to meet it, not only now and then.
+  // The posts held back are counted: if React stops scheduling that way the patch slows nothing, and this test must say so.
   await page.addInitScript(() => {
     const post = MessagePort.prototype.postMessage;
     MessagePort.prototype.postMessage = function (this: MessagePort, ...args: [unknown]) {
-      if ((window as { slowScreen?: boolean }).slowScreen) setTimeout(() => post.apply(this, args), 40);
-      else post.apply(this, args);
+      const slow = window as { slowScreen?: boolean; delayedPosts?: number };
+      if (slow.slowScreen) {
+        slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
+        setTimeout(() => post.apply(this, args), 40);
+      } else post.apply(this, args);
     };
   });
   await packWith(page, "A", "B", "C", "D", "E", "F");
@@ -486,6 +490,7 @@ test("a key held down moves a Subtask one place for every press, none is lost an
   for (let round = 0; round < 3; round++) {
     await handleOf(page, "A").focus();
     await hold("ArrowDown", 5);
+    if (round === 0) expect(await page.evaluate(() => (window as { delayedPosts?: number }).delayedPosts ?? 0), "the screen was really slowed").toBeGreaterThan(0);
     await expect(titlesOf(page)).toHaveText(["B", "C", "D", "E", "F", "A"]);
     await expect(handleOf(page, "A")).toBeFocused();
     await hold("ArrowUp", 5);
@@ -667,7 +672,7 @@ test("leaving a rename input that was not typed in does not write the old title 
 test("an arrow-key move is described to a screen reader before and announced after: where the Subtask went", async ({ page }) => {
   await packWith(page, "Boots", "Jacket", "Chargers");
   const handle = handleOf(page, "Boots");
-  await expect(handle).toHaveAccessibleDescription("Use the up and down arrow keys to move it");
+  await expect(handle).toHaveAccessibleDescription("Use the up and down arrow keys to move it, or activate it for buttons that move it");
   const announcement = section(page).locator("[aria-live='polite']");
 
   await handle.focus();
@@ -706,10 +711,252 @@ test("Subtasks speak German when moved: the hint and the announcement", async ({
   }
 
   const handle = page.getByRole("button", { name: "Schuhe verschieben" });
-  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben und unten verschieben");
+  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben und unten verschieben, oder aktivieren für Schaltflächen zum Verschieben");
   await handle.focus();
   await page.keyboard.press("ArrowDown");
   await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe verschoben auf Platz 2 von 2");
+});
+
+test("a drag whose row is moved in the page by a change that arrives meanwhile ends, and leaves no row displaced", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + 20, { steps: 4 });
+
+  // A change that moves "Jacket" above the dragged row (as one from another device would) makes React move the row's node,
+  // and the browser then takes the pointer from the handle: no `pointerup` will come to it.
+  await handleOf(page, "Jacket").focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Boots", "Chargers", "Swimwear"]);
+  await page.mouse.move(grip.x + grip.width / 2, last.y + last.height + 10, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(page.locator("li.subtask.reordering")).toHaveCount(0);
+  await expect(page.locator("li.subtask[style*='transform']")).toHaveCount(0);
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Boots", "Chargers", "Swimwear"]);
+});
+
+test("a drop that the saved order does not show where it was dropped still ends the drag: no row stays displaced", async ({ page, context }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  // Another tab deletes "Swimwear"; this tab does not know yet.
+  const other = await context.newPage();
+  await other.goto("/");
+  await other.getByRole("link", { name: "Pack for the weekend", exact: true }).click();
+  await other.getByRole("button", { name: "Delete subtask Swimwear" }).click();
+  await expect(other.getByRole("button", { name: "Undo" })).toBeVisible();
+  await other.close();
+
+  // Boots is dropped below the last row, which is index 3 here but 2 in what is stored: the saved order puts it at 2.
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, last.y + last.height + 10, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
+  await expect(page.locator("li.subtask.reordering")).toHaveCount(0);
+  await expect(page.locator("li.subtask[style*='transform']")).toHaveCount(0);
+});
+
+test("a dropped row is placed by the layout: past a row that is taller the saved order shows it where it already was", async ({ page }) => {
+  const tall = "A title long enough to wrap onto a second and a third line of this narrow screen, so the row is much taller";
+  await packWith(page, "Boots", tall, "Chargers", "Swimwear");
+  const rowOf = (title: string) => page.locator("li.subtask").filter({ has: page.getByRole("button", { name: `Rename ${title}` }) });
+  const before = (await rowOf("Boots").boundingBox())!;
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  expect((await rowOf(tall).boundingBox())!.height).toBeGreaterThan(before.height * 1.4);
+
+  // The transform the dropped row has when the saved order arrives (the style that goes then, read from the mutation).
+  const dropped = page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const boots = [...document.querySelectorAll("li.subtask")].find((li) => li.querySelector(".subtask-title")?.textContent === "Boots")!;
+        let last = "";
+        new MutationObserver((records) => {
+          for (const record of records) if (record.target === boots) last = record.oldValue ?? "";
+          if (!boots.getAttribute("style") && /translateY\((-?[\d.]+)px\)/.test(last)) resolve(Number(/translateY\((-?[\d.]+)px\)/.exec(last)![1]));
+        }).observe(boots, { attributes: true, attributeFilter: ["style"], attributeOldValue: true });
+      }),
+  );
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, last.y + last.height + 10, { steps: 12 });
+  await page.mouse.up();
+  const translate = await dropped;
+
+  await expect(titlesOf(page).last()).toHaveText("Boots");
+  const after = (await rowOf("Boots").boundingBox())!;
+  expect(Math.abs(translate - (after.y - before.y))).toBeLessThan(1.5);
+});
+
+test("a handle that is tapped shows Move up and Move down buttons: a screen reader on a phone can reorder with them", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const handle = handleOf(page, "Boots");
+  const up = (title: string) => page.getByRole("button", { name: `Move ${title} up` });
+  const down = (title: string) => page.getByRole("button", { name: `Move ${title} down` });
+  const announcement = section(page).locator("[aria-live='polite']");
+  await expect(handle).toHaveAttribute("aria-expanded", "false");
+  await expect(down("Boots")).toHaveCount(0);
+
+  // A tap (a touch, as an activation by a screen reader is) shows them.
+  await handle.tap();
+  await expect(handle).toHaveAttribute("aria-expanded", "true");
+  await expect(down("Boots")).toBeVisible();
+  await down("Boots").tap();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Boots", "Chargers"]);
+  await expect(announcement).toHaveText("Boots moved to 2 of 3");
+  // The button that moved the row keeps the focus, so the next activation moves it again.
+  await expect(down("Boots")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
+  await expect(announcement).toHaveText("Boots moved to 3 of 3");
+  await expect(down("Boots")).toBeFocused();
+  await up("Boots").click();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Boots", "Chargers"]);
+  await expect(up("Boots")).toBeFocused();
+
+  // Escape closes them and the handle has the focus; a keyboard activation of the handle shows them again.
+  await page.keyboard.press("Escape");
+  await expect(down("Boots")).toHaveCount(0);
+  await expect(handle).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(down("Boots")).toBeVisible();
+  await handle.click();
+  await expect(down("Boots")).toHaveCount(0);
+
+  await page.reload();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Boots", "Chargers"]);
+});
+
+test("dragging a handle does not show the Move buttons, and the next tap does", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, last.y + last.height + 10, { steps: 8 });
+  await page.mouse.up();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
+  await expect(page.locator(".subtask-moves")).toHaveCount(0);
+
+  await handleOf(page, "Boots").click();
+  await expect(page.getByRole("button", { name: "Move Boots up" })).toBeVisible();
+});
+
+test("the Move buttons speak German", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "Language" }).selectOption({ label: "Deutsch" });
+  await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+  await page.getByLabel("Titel").fill("Packen");
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.getByRole("link", { name: "Packen", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "Unteraufgabe hinzufügen" });
+  for (const title of ["Schuhe", "Jacke"]) {
+    await input.fill(title);
+    await input.press("Enter");
+    await expect(page.getByRole("button", { name: `${title} umbenennen` })).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Schuhe verschieben" }).click();
+  await page.getByRole("button", { name: "Schuhe nach unten verschieben" }).click();
+  await expect(titlesOf(page)).toHaveText(["Jacke", "Schuhe"]);
+  await expect(page.getByRole("button", { name: "Schuhe nach unten verschieben" })).toBeFocused();
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe verschoben auf Platz 2 von 2");
+});
+
+test("a tick that fails for a real reason is not remembered: the next tap on the check ticks it", async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
+      if ((window as { failWrites?: boolean }).failWrites) throw new DOMException("The disk is full", "QuotaExceededError");
+      return put.apply(this, args);
+    };
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await packWith(page, "Boots", "Jacket");
+
+  await page.evaluate(() => ((window as { failWrites?: boolean }).failWrites = true));
+  await page.evaluate(() => document.querySelector<HTMLInputElement>('input[aria-label="Boots"]')!.click());
+  await expect.poll(() => errors.length).toBe(1);
+  expect(errors[0]).toContain("disk is full");
+  await expect(page.getByRole("checkbox", { name: "Boots" })).not.toBeChecked();
+
+  // The saves work again: this tap is a tick, not the undoing of a tick that never happened.
+  await page.evaluate(() => ((window as { failWrites?: boolean }).failWrites = false));
+  await page.getByRole("checkbox", { name: "Boots" }).click();
+  await expect(page.getByRole("checkbox", { name: "Boots" })).toBeChecked();
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Boots" })).toBeChecked();
+});
+
+test("when the offer goes by itself while it has the focus, the focus goes to the Subtask that was ticked, not to the page", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket");
+  const offer = page.getByRole("group", { name: "All subtasks are done. Complete the task?" });
+  await toggle(page, "Boots");
+  await toggle(page, "Jacket");
+  await expect(offer.getByRole("button", { name: "Complete" })).toBeFocused();
+
+  // "Boots" is unticked by a change that does not move the focus (as one from another device would).
+  await page.evaluate(() => document.querySelector<HTMLInputElement>('input[aria-label="Boots"]')!.click());
+
+  await expect(offer).toBeHidden();
+  await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeFocused();
+});
+
+test("unticking the Subtask that made the offer withdraws the offer at once, before the untick is saved", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket");
+  const offer = page.getByRole("group", { name: "All subtasks are done. Complete the task?" });
+  await toggle(page, "Boots");
+  await toggle(page, "Jacket");
+  await expect(offer).toBeVisible();
+
+  // Straight after the click, in the same task: the saving has not even begun, and the screen shows "Jacket" still ticked.
+  const offerStays = await page.evaluate(() => {
+    document.querySelector<HTMLInputElement>('input[aria-label="Jacket"]')!.click();
+    return document.querySelector(".subtask-offer") !== null;
+  });
+
+  expect(offerStays).toBe(false);
+  await expect(page.getByRole("checkbox", { name: "Jacket" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeFocused();
+});
+
+test("a double tap on the last open Subtask, at any pace, leaves no offer and the focus on its check", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket");
+  const offer = page.getByRole("group", { name: "All subtasks are done. Complete the task?" });
+  /** Clicks without moving the focus, as a change from elsewhere would. */
+  const click = (title: string) => page.evaluate((name) => document.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!.click(), title);
+
+  for (const gap of [0, 4, 8, 12, 20, 30, 40]) {
+    await click("Boots");
+    await expect(page.getByRole("checkbox", { name: "Boots" })).toBeChecked();
+    await page.evaluate(
+      ([ms]) =>
+        new Promise<void>((resolve) => {
+          const jacket = document.querySelector<HTMLInputElement>('input[aria-label="Jacket"]')!;
+          jacket.focus();
+          jacket.click();
+          setTimeout(() => {
+            jacket.click();
+            resolve();
+          }, ms);
+        }),
+      [gap],
+    );
+    // A saved change after the double tap: when it is shown, the double tap's two changes are in.
+    await click("Boots");
+    await expect(page.getByRole("checkbox", { name: "Boots" })).not.toBeChecked();
+
+    await expect(page.getByRole("checkbox", { name: "Jacket" }), `gap ${gap} ms`).not.toBeChecked();
+    await expect(offer, `gap ${gap} ms`).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: "Jacket" }), `gap ${gap} ms`).toBeFocused();
+  }
 });
 
 test.describe("a Task or Subtask that another tab deleted meanwhile", () => {

@@ -447,6 +447,18 @@ describe("Subtask store", () => {
     expect(await (await openSubtaskStore(dbName)).listSubtasks()).toEqual([keep]);
   });
 
+  it("two stores deleting the same Subtask at once: only one says it deleted, so only one offers an undo", async () => {
+    const { dbName, subtasks, task } = await open();
+    const other = await openSubtaskStore(dbName, { now: tickingClock() });
+    const boots = await subtasks.addSubtask(task.id, "Boots");
+
+    const answers = await Promise.all([subtasks.deleteSubtask(boots.id), other.deleteSubtask(boots.id)]);
+
+    expect(answers.filter(Boolean)).toHaveLength(1);
+    expect(await queued(dbName, boots.id, "deletedAt")).toHaveLength(1);
+    other.close();
+  });
+
   it("restores a deleted Subtask exactly as it was; restoring a live or missing one changes nothing", async () => {
     const { dbName, subtasks, task } = await open();
     const boots = await subtasks.addSubtask(task.id, "Boots");

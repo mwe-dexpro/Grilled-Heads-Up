@@ -329,7 +329,7 @@ function Screen({
           onRemoveTag={(id, tagId) => void ignoreGone(data.removeTaskTag(id, tagId))}
           onAddSubtask={(id, title) => void ignoreGone(data.addSubtask(id, title))}
           onRenameSubtask={(id, title) => void ignoreGone(data.renameSubtask(id, title))}
-          onSetSubtaskDone={(id, done) => void ignoreGone(data.setSubtaskDone(id, done))}
+          onSetSubtaskDone={(id, done) => ignoreGone(data.setSubtaskDone(id, done))}
           onMoveSubtask={(id, toIndex) => ignoreGone(data.moveSubtask(id, toIndex))}
           onMoveSubtaskBy={(id, by) => ignoreGone(data.moveSubtaskBy(id, by))}
           onDeleteSubtask={(subtask) => void onDeleteSubtask(subtask)}

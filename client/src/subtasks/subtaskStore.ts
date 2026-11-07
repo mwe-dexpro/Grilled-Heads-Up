@@ -172,9 +172,8 @@ export async function openSubtaskStore(
     moveSubtaskBy: (id, by) => inOrder(() => move(id, (from) => from + by)),
 
     async deleteSubtask(id) {
-      if (!(await subtasks.get(id))) return false;
-      await subtasks.delete(id);
-      return true;
+      // The table decides inside its transaction, so of two deletes at once only one says it deleted.
+      return subtasks.delete(id);
     },
 
     async restoreSubtask(id) {

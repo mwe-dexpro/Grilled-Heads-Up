@@ -1386,6 +1386,8 @@ ul.chips {
 .subtask {
   position: relative;
   display: flex;
+  /* The Move buttons, when shown, take a line of their own. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-height: 48px;
@@ -1439,7 +1441,8 @@ ul.chips {
 }
 
 .subtask-handle,
-.subtask-delete {
+.subtask-delete,
+.subtask-move {
   display: grid;
   flex: none;
   place-items: center;
@@ -1458,6 +1461,18 @@ ul.chips {
 }
 
 .subtask-delete {
+  color: var(--ink-meta);
+}
+
+/* "Move up" and "Move down" under a row whose handle was activated: the way to reorder with a tap. */
+.subtask-moves {
+  display: flex;
+  flex-basis: 100%;
+  justify-content: flex-end;
+  padding-right: 0;
+}
+
+.subtask-move {
   color: var(--ink-meta);
 }
 
