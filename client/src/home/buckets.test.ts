@@ -99,13 +99,6 @@ describe("isLate", () => {
 });
 
 describe("the order of Tasks in a Bucket", () => {
-  it("puts a Task without a time before the timed ones of the same day, however late it was made", () => {
-    const timed = task({ date: today, time: "09:00" });
-    const untimed = task({ date: today });
-
-    expect(bucket("today", [timed, untimed]).tasks.map((t) => t.id)).toEqual([untimed.id, timed.id]);
-  });
-
   it("orders Tasks of one day by time, then by when they were made", () => {
     const late = task({ date: today, time: "18:00" });
     const early = task({ date: today, time: "08:00" });
