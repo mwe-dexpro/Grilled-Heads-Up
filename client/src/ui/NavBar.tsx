@@ -17,7 +17,7 @@ export function NavBar({ left, title, right }: { left?: ReactNode; title?: strin
         )}
       </div>
       {/* The middle cell stays even without a title, so the right action keeps to the right. */}
-      {title ? <h1 className="nav-title">{title}</h1> : <span />}
+      {title !== undefined && title !== "" ? <h1 className="nav-title">{title}</h1> : <span />}
       <div className="nav-side end">{right}</div>
     </div>
   );

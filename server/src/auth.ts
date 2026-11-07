@@ -69,11 +69,11 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   }
 
   function signedInUser(req: Request): string | null {
-    const token = readCookie(req, sessionCookie);
-    if (!token) return null;
+    const presented = readCookie(req, sessionCookie);
+    if (presented === undefined) return null;
     const row = db
       .prepare("SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?")
-      .get(hash(token), now()) as { user_id: string } | undefined;
+      .get(hash(presented), now()) as { user_id: string } | undefined;
     return row?.user_id ?? null;
   }
 
@@ -117,7 +117,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   function takeCeremony<K extends Ceremony["kind"]>(req: Request, res: Response, kind: K): Extract<Ceremony, { kind: K }> | null {
     const id = readCookie(req, ceremonyCookie);
     res.clearCookie(ceremonyCookie, { path: "/api/auth" });
-    if (!id) return null;
+    if (id === undefined) return null;
     const ceremony = ceremonies.get(id);
     ceremonies.delete(id);
     return ceremony?.kind === kind && ceremony.expires >= Date.now() ? (ceremony as Extract<Ceremony, { kind: K }>) : null;
@@ -132,12 +132,12 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
 
   routes.post("/register/options", async (req, res) => {
     const userId = signedInUser(req);
-    if (!userId && ownerExists()) {
+    if (userId === null && ownerExists()) {
       res.status(403).json({ error: "An owner exists. Sign in to add a passkey." });
       return;
     }
     const handle = userId ?? randomBytes(16).toString("base64url");
-    const existing = userId
+    const existing = userId !== null
       ? (db.prepare("SELECT id, transports FROM passkeys WHERE user_id = ?").all(userId) as { id: string; transports: string }[])
       : [];
     const options = await generateRegistrationOptions({
@@ -151,7 +151,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       // The passkey is the only factor, so it must check who holds it (fingerprint, face, screen lock).
       authenticatorSelection: { residentKey: "required", userVerification: "required" },
     });
-    beginCeremony(res, { kind: "register", challenge: options.challenge, userId: handle, newOwner: !userId });
+    beginCeremony(res, { kind: "register", challenge: options.challenge, userId: handle, newOwner: userId === null });
     res.json(options);
   });
 
@@ -168,7 +168,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       expectedRPID: rpID,
       requireUserVerification: true,
     }).catch(() => null);
-    if (!verification?.verified) {
+    if (verification?.verified !== true) {
       res.status(400).json({ error: "The passkey couldn't be verified." });
       return;
     }
@@ -182,7 +182,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
     const { credential } = verification.registrationInfo;
     const recoveryCode = newOwner ? generateRecoveryCode() : null;
     transaction(db, () => {
-      if (recoveryCode) {
+      if (recoveryCode !== null) {
         db.prepare("INSERT INTO users (id, recovery_code_hash, created_at) VALUES (?, ?, ?)").run(userId, recoveryCodeHash(recoveryCode), now());
       }
       db.prepare(
@@ -224,7 +224,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
       },
       requireUserVerification: true,
     }).catch(() => null);
-    if (!verification?.verified) {
+    if (verification?.verified !== true) {
       res.status(401).json({ error: "Sign-in didn't work." });
       return;
     }
@@ -258,7 +258,7 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   // A new code while signed in, for when the shown one got lost before it was stored.
   routes.post("/recovery-code", (req, res) => {
     const userId = signedInUser(req);
-    if (!userId) {
+    if (userId === null) {
       res.status(401).json({ error: "Sign in first." });
       return;
     }
@@ -266,15 +266,15 @@ export function createAuth(db: DatabaseSync, { origins }: AuthConfig): Auth {
   });
 
   routes.post("/sign-out", (req, res) => {
-    const token = readCookie(req, sessionCookie);
-    if (token) db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hash(token));
+    const presented = readCookie(req, sessionCookie);
+    if (presented !== undefined) db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hash(presented));
     res.clearCookie(sessionCookie, { path: "/" });
     res.status(204).end();
   });
 
   const requireSignIn: RequestHandler = (req, res, next) => {
     const userId = signedInUser(req);
-    if (!userId) {
+    if (userId === null) {
       res.status(401).json({ error: "Sign in first." });
       return;
     }
@@ -317,7 +317,11 @@ function hash(secret: string): string {
 function readCookie(req: Request, name: string): string | undefined {
   for (const part of req.headers.cookie?.split(";") ?? []) {
     const [key, ...value] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(value.join("="));
+    if (key === name) {
+      const decoded = decodeURIComponent(value.join("="));
+      // A cookie with no value (`session=`) is no cookie.
+      return decoded === "" ? undefined : decoded;
+    }
   }
   return undefined;
 }

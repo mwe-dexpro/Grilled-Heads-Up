@@ -9,7 +9,8 @@ const syncPort = 4175;
 
 // Use a pre-installed Chromium when one is provided (e.g. in containers without `playwright install`).
 const chromiumPath = process.env["CHROMIUM_PATH"];
-const launchOptions = chromiumPath ? { executablePath: chromiumPath } : {};
+const launchOptions = chromiumPath !== undefined && chromiumPath !== "" ? { executablePath: chromiumPath } : {};
+const onCI = (process.env["CI"] ?? "") !== "";
 
 /** Serves the production build, exactly like the Docker image does, with a fresh database each run. */
 const server = (serverPort: number) => ({
@@ -22,9 +23,9 @@ const server = (serverPort: number) => ({
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
-  forbidOnly: !!process.env["CI"],
+  forbidOnly: true,
   retries: 0,
-  reporter: process.env["CI"] ? [["list"], ["html", { open: "never" }]] : "list",
+  reporter: onCI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: `http://localhost:${port}`,
     trace: "retain-on-failure",

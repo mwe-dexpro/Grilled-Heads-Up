@@ -61,7 +61,7 @@ export function SwipeRow({ actions, onMenu, className, children }: SwipeRowProps
     if (!open || dragging) return;
     const close = () => show(0);
     const closeOutside = (event: globalThis.PointerEvent) => {
-      if (!row.current?.contains(event.target as Node)) close();
+      if (row.current?.contains(event.target as Node) !== true) close();
     };
     document.addEventListener("pointerdown", closeOutside, true);
     window.addEventListener("scroll", close, true);

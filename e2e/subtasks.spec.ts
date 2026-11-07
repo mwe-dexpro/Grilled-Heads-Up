@@ -480,7 +480,7 @@ test("a key held down moves a Subtask one place for every press, none is lost an
     around(MessagePort.prototype, "postMessage", (post) =>
       function (this: MessagePort, ...args: [unknown]) {
         const slow = window as { slowScreen?: boolean; delayedPosts?: number };
-        if (slow.slowScreen) {
+        if (slow.slowScreen === true) {
           slow.delayedPosts = (slow.delayedPosts ?? 0) + 1;
           setTimeout(() => post.apply(this, args), 40);
         } else post.apply(this, args);
@@ -533,7 +533,7 @@ test("a drag ends where the row was dropped: when the saved order arrives no row
           const found: Record<string, number> = {};
           for (const row of document.querySelectorAll("li.subtask")) {
             const title = row.querySelector(".subtask-title")?.textContent;
-            if (title) found[title] = Math.round(row.getBoundingClientRect().top);
+            if (title !== undefined && title !== null && title !== "") found[title] = Math.round(row.getBoundingClientRect().top);
           }
           return found;
         };
@@ -800,7 +800,7 @@ test("a dropped row is placed by the layout: past a row that is taller the saved
         new MutationObserver((records) => {
           for (const record of records) if (record.target === boots) last = record.oldValue ?? "";
           const offset = /translateY\((-?[\d.]+)px\)/.exec(last);
-          if (!boots.getAttribute("style") && offset !== null) resolve(Number(offset[1]));
+          if ((boots.getAttribute("style") ?? "") === "" && offset !== null) resolve(Number(offset[1]));
         }).observe(boots, { attributes: true, attributeFilter: ["style"], attributeOldValue: true });
       }),
   );
@@ -899,7 +899,7 @@ test("a tick that fails for a real reason is not remembered: the next tap on the
     };
     around(IDBObjectStore.prototype, "put", (put) =>
       function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
-        if ((window as { failWrites?: boolean }).failWrites) throw new DOMException("The disk is full", "QuotaExceededError");
+        if ((window as { failWrites?: boolean }).failWrites === true) throw new DOMException("The disk is full", "QuotaExceededError");
         return put.apply(this, args);
       },
     );
@@ -1152,8 +1152,8 @@ test("a drop that another reload overlaps never shows the old order again before
     new MutationObserver(() => {
       const rows = [...list.querySelectorAll("li.subtask")];
       const titles = rows.map((row) => row.querySelector(".subtask-title")?.textContent);
-      const displaced = rows.some((row) => row.getAttribute("style"));
-      if (!displaced && seen.mover && titles[titles.length - 1] === seen.mover) snapBack.push(seen.mover);
+      const displaced = rows.some((row) => (row.getAttribute("style") ?? "") !== "");
+      if (!displaced && seen.mover !== undefined && titles[titles.length - 1] === seen.mover) snapBack.push(seen.mover);
     }).observe(list, { subtree: true, attributes: true, childList: true });
   });
 

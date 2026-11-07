@@ -263,6 +263,15 @@ describe("data routes", () => {
     expect((await stranger.post("/api/tasks", { title: "Sneaky" })).status).toBe(401);
   });
 
+  test("reject a session cookie that is empty or names no session", async () => {
+    await becomeOwner();
+
+    for (const cookie of ["session=", "session=made-up", "other=1"]) {
+      const response = await fetch(`${baseUrl}/api/passkeys`, { headers: { cookie } });
+      expect(response.status, cookie).toBe(401);
+    }
+  });
+
   test("answer a signed-in owner", async () => {
     const { phone } = await becomeOwner();
 

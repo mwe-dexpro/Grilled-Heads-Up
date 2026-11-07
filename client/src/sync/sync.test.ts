@@ -97,7 +97,7 @@ async function twoDevices(options: { serverPageSize?: number; bClockOffsetMs?: n
   const world = new World();
   const server = new MemoryServer({ time: () => world.ms, pageSize: options.serverPageSize });
   // `viaHttp` runs the real transport against the server's HTTP answers, so what it makes of each status counts.
-  const transport = options.viaHttp ? createHttpTransport(server.fetch) : undefined;
+  const transport = options.viaHttp === true ? createHttpTransport(server.fetch) : undefined;
   const a = await openDevice(world, server, { transport });
   const b = await openDevice(world, server, { clockOffsetMs: options.bClockOffsetMs, transport });
   return { world, server, a, b };

@@ -11,7 +11,7 @@ interface Drag {
   pointerId: number;
   startY: number;
   /** Let go over another place: `dy` is then the way to that place, and the rows stay so until the move is saved and shown. */
-  dropped?: boolean;
+  dropped?: boolean | undefined;
 }
 
 interface RowDragOptions {
@@ -72,7 +72,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
   }
 
   function dragTo(e: PointerEvent<HTMLButtonElement>) {
-    if (!dragging || e.pointerId !== dragging.pointerId || dragging.dropped) return;
+    if (dragging === null || e.pointerId !== dragging.pointerId || dragging.dropped === true) return;
     const dy = e.clientY - dragging.startY;
     if (Math.abs(dy) > 4) {
       dragMoved.current = true;
@@ -99,7 +99,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
    * moved the row's node, and a cancelled pointer loses it too).
    */
   function endDrag(e: PointerEvent<HTMLButtonElement>, drop: boolean) {
-    if (!dragging || e.pointerId !== dragging.pointerId || dragging.dropped) return;
+    if (dragging === null || e.pointerId !== dragging.pointerId || dragging.dropped === true) return;
     if (drop && dragging.target !== dragFrom) {
       const dropped = { ...dragging, dropped: true, dy: waySlot(dragFrom, dragging.target) };
       setDrag(dropped);
@@ -138,7 +138,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
         style: dragging
           ? {
               transform: `translateY(${dragged ? dragging.dy : shift(index)}px)`,
-              transition: dragged && !dragging.dropped ? "none" : undefined,
+              transition: dragged && dragging.dropped !== true ? "none" : undefined,
             }
           : undefined,
       };

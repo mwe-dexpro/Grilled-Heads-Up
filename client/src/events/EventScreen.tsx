@@ -60,7 +60,7 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
         const completed = task.completedAt !== null;
         const overdue = isOverdue(task, today);
         const subtasks = counts.get(task.id);
-        const meta = [formatOffset(task.offsetDays, t), formatShortDay(task.date, language), task.time && formatTime(task.time, language)]
+        const meta = [formatOffset(task.offsetDays, t), formatShortDay(task.date, language), task.time !== null ? formatTime(task.time, language) : null]
           .filter(Boolean)
           .join(" · ");
         return (
@@ -131,7 +131,7 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
             <RiskBadge risk={risk} />
           </div>
           {countdownLine ? <CountdownLine countdown={countdownLine} eventDay={eventDays(event).first} /> : <SegmentedProgress progress={progress} />}
-          {explanation && <p className="band-note">{explanation}</p>}
+          {explanation !== null && <p className="band-note">{explanation}</p>}
         </section>
       )}
 
@@ -169,7 +169,7 @@ function TaskSection({ id, title, hint, children }: { id: string; title: string;
         <h2 id={id} className="section-title">
           {title}
         </h2>
-        {hint && <span className="section-meta">{hint}</span>}
+        {hint !== undefined && <span className="section-meta">{hint}</span>}
       </div>
       {children}
     </section>

@@ -11,8 +11,10 @@ const databaseFile =
     ? ":memory:"
     : resolve(process.env["DATABASE_FILE"] ?? resolve(here, "../../data/grilled-heads-up.sqlite"));
 // Passkeys are bound to the address the app is opened at. In development the Vite dev server (port 5173) proxies the API here.
-const origins = process.env["ORIGIN"]
-  ? process.env["ORIGIN"].split(",").map((origin) => origin.trim())
+const configuredOrigins = process.env["ORIGIN"];
+const origins =
+  configuredOrigins !== undefined && configuredOrigins !== ""
+  ? configuredOrigins.split(",").map((origin) => origin.trim())
   : [`http://localhost:${port}`, ...(process.env["NODE_ENV"] === "production" ? [] : ["http://localhost:5173"])];
 
 const db = openDatabase(databaseFile);

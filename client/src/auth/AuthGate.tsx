@@ -109,7 +109,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     case "setup":
       return (
         <SetupScreen
-          onRegistered={(recoveryCode) => enter(recoveryCode ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })}
+          onRegistered={(recoveryCode) => enter(recoveryCode !== null ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })}
         />
       );
     case "signIn":

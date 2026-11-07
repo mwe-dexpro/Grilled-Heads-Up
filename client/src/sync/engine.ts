@@ -214,7 +214,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         pushFailure = error;
       }
       await pull(() => (applied = true));
-      if (pushFailure) throw pushFailure;
+      if (pushFailure !== null) throw pushFailure;
       const lastSyncedAt = now().getTime();
       await db.put("syncInfo", lastSyncedAt, "lastSyncedAt");
       const refused = ((await db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined);

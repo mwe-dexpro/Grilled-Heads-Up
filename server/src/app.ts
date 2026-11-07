@@ -41,7 +41,7 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
     res.status(404).json({ error: "Not found." });
   });
 
-  if (clientDir) {
+  if (clientDir !== undefined) {
     app.use(
       express.static(clientDir, {
         setHeaders(res, path) {

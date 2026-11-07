@@ -101,7 +101,7 @@ export function TaskScreen({
   const due =
     task.date === null
       ? t("task.noDate")
-      : t("task.due", { date: [formatShortDay(task.date, language), task.time && formatTime(task.time, language)].filter(Boolean).join(" · ") });
+      : t("task.due", { date: [formatShortDay(task.date, language), task.time !== null ? formatTime(task.time, language) : null].filter(Boolean).join(" · ") });
   const upcoming = events.filter((e) => eventDays(e).last >= today);
   const actions = availableActions(task, new Set(events.map((e) => e.id)));
 

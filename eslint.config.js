@@ -118,7 +118,6 @@ export default tseslint.config(
   // commit deletes its lines from here; this block is empty (and gone) at the end of the issue.
   {
     rules: {
-      "@typescript-eslint/strict-boolean-expressions": "off", // 41
       "security/detect-object-injection": "off", // 25
       "@typescript-eslint/array-type": "off", // 20
       "@typescript-eslint/no-misused-promises": "off", // 19

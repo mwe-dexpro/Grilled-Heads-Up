@@ -42,7 +42,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
   } else if (meta?.kind === "offset") {
     metaText = formatOffset(meta.offsetDays, t);
   } else if (meta?.kind === "date") {
-    metaText = [formatShortDay(meta.date, language), meta.time && formatTime(meta.time, language)].filter(Boolean).join(" · ");
+    metaText = [formatShortDay(meta.date, language), meta.time !== null ? formatTime(meta.time, language) : null].filter(Boolean).join(" · ");
   }
 
   // An Overdue Preparation task says it puts its Event At risk, instead of its age.
@@ -71,7 +71,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
             {afterEvent}
           </Fragment>,
         ]
-      : [place, metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>]),
+      : [place, metaText !== null && <span className={warning ? "warning" : undefined}>{metaText}</span>]),
     subtasks && subtasks.total > 0 && <SubtaskCount progress={subtasks} />,
   ].filter(Boolean);
 

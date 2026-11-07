@@ -104,13 +104,13 @@ const fieldsOf = <T extends Synced>(record: T) => Object.keys(record).filter((fi
 export async function queuePreSyncRecords<T extends Synced>(db: SyncDb, recordType: RecordType<T>, now: () => Date): Promise<void> {
   const { type, storeName, withDefaults } = recordType;
   const done = `queued:${type}`;
-  if (await db.get("syncInfo", done)) return;
+  if ((await db.get("syncInfo", done)) !== undefined) return;
 
   const tx = transactionOver(db, [storeName]);
   // Checked again inside the transaction: another tab may have finished between the two.
-  if (!(await tx.objectStore("syncInfo").get(done))) {
+  if ((await tx.objectStore("syncInfo").get(done)) === undefined) {
     for (const raw of (await tx.objectStore(storeName).getAll()) as Array<Partial<T> & { id: string }>) {
-      if (!(await tx.objectStore("fieldClocks").get([type, raw.id]))) {
+      if ((await tx.objectStore("fieldClocks").get([type, raw.id])) === undefined) {
         const record = withDefaults(raw);
         await writeRecord(tx, recordType, record, fieldsOf(record), now());
       }
@@ -143,7 +143,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
 
     async put(record) {
       const tx = transactionOver(db, [storeName]);
-      if (await tx.objectStore(storeName).get(record.id)) {
+      if ((await tx.objectStore(storeName).get(record.id)) !== undefined) {
         await tx.done;
         throw new Error(`Record ${record.id} exists already; use update to change it`);
       }
@@ -160,7 +160,7 @@ export async function openTable<T extends Synced>(db: SyncDb, recordType: Record
         await tx.done;
         return found;
       }
-      if (await tx.objectStore(storeName).get(record.id)) {
+      if ((await tx.objectStore(storeName).get(record.id)) !== undefined) {
         await tx.done;
         throw new Error(`Record ${record.id} exists already; use update to change it`);
       }
