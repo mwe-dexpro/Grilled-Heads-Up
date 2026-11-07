@@ -18,6 +18,8 @@ export default defineConfig({
       exclude: ["**/*.test.ts", "src/**/testing/**", "src/**/*.d.ts"],
       reporter: ["text-summary", "html", "json-summary"],
       reportsDirectory: "reports/coverage",
+      // The measured values, rounded down. They only go up: raise them when a change lifts the coverage, never lower them.
+      thresholds: { lines: 45, branches: 50, functions: 43, statements: 45 },
     },
   },
 });

@@ -189,10 +189,14 @@ describe("signing in with a passkey", () => {
     prompt.signIn.mockResolvedValue({ id: "credential-5" });
     expect(await problemOf(signInWithPasskey)).toBe("refused");
 
+    prompt.signIn.mockClear();
     for (const options of [null, [], { challenge: 1 }, {}]) {
-      server({ "sign-in/options": { body: options } });
+      const received = server({ "sign-in/options": { body: options }, "sign-in/verify": { status: 204 } });
       expect(await problemOf(signInWithPasskey), JSON.stringify(options)).toBe("refused");
+      // The person is not asked for a passkey, and nothing is sent to verify.
+      expect(received.map((request) => request.path)).toEqual(["sign-in/options"]);
     }
+    expect(prompt.signIn).not.toHaveBeenCalled();
   });
 });
 

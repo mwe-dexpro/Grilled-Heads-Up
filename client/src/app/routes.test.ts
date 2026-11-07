@@ -25,6 +25,7 @@ describe("routes", () => {
   it("does not take /edit after anything but an Event for an Event's edit", () => {
     expect(parseRoute("#/task/t1/edit")).toEqual({ name: "today" });
     expect(parseRoute("#/list/l1/edit")).toEqual({ name: "today" });
+    expect(parseRoute("#/event/e1/change")).toEqual({ name: "today" });
   });
 
   it("falls back to Today for anything it doesn't know", () => {
