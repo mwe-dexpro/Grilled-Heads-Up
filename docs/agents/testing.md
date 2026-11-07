@@ -71,7 +71,7 @@ The gates fail on high and critical findings. The only way past one is an entry 
 ```
 
 - `tool` is `npm-audit`, `trivy`, `codeql` or `gitleaks`; `id` is the advisory (GHSA or CVE) for the first two, the rule id for `codeql`, the finding's fingerprint for `gitleaks`.
-- `reason` says why, `expires` is the last day it holds, **at most 90 days from the day you add it**. After that day CI fails again (`npm run security:allowlist`, and the scanner itself for Trivy). An entry that has run out is renewed with a new reason, or the finding is fixed.
+- `reason` says why, `expires` is the last day it holds, **at most 90 days from the day you add it**. After that day CI fails again (`npm run security:allowlist`, and the scanner itself for Trivy, whose `exp:` is written as the day after `expires`). An entry that has run out is renewed with a new reason, or the finding is fixed.
 - Every entry has a follow-up issue that removes it; name it in the reason.
 - The Trivy and gitleaks entries become `.trivyignore` and `.gitleaksignore` right before those scanners run (`npm run security:ignorefiles`); both files are git-ignored.
 - The file ships empty. Fix the finding first: for the Docker image that means a newer base digest or less in the image, not an exception.

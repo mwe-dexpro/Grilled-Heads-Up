@@ -18,9 +18,9 @@ describe("trivyIgnore", () => {
       [
         "# Generated from .github/security-allowlist.json by `npm run security:ignorefiles`. Do not edit; do not commit.",
         "# Not reachable.",
-        "CVE-2026-0001 exp:2026-12-31",
+        "CVE-2026-0001 exp:2027-01-01",
         "# Fixed in the next base image.",
-        "CVE-2026-0002 exp:2027-01-15",
+        "CVE-2026-0002 exp:2027-01-16",
         "",
       ].join("\n"),
     );
@@ -46,7 +46,7 @@ describe("trivyIgnore", () => {
     const text = trivyIgnore([entry({ reason: "Line one.\nCVE-9999-9999 exp:2099-01-01\r\nLine three." })]);
 
     expect(text.split("\n")).toContain("# Line one. CVE-9999-9999 exp:2099-01-01 Line three.");
-    expect(text.split("\n").filter((line) => !line.startsWith("#") && line !== "")).toEqual(["CVE-2026-0001 exp:2026-12-31"]);
+    expect(text.split("\n").filter((line) => !line.startsWith("#") && line !== "")).toEqual(["CVE-2026-0001 exp:2027-01-01"]);
   });
 
   it("trims a reason, and joins its lines with one space however many line breaks lie between them", () => {
@@ -55,8 +55,16 @@ describe("trivyIgnore", () => {
     expect(trivyIgnore([entry({ reason: "a b  c" })])).toContain("\n# a b  c\n");
   });
 
+  it("writes the day after the last day of the entry: Trivy drops an entry from the start of its exp day, and an entry still holds on its last day", () => {
+    expect(trivyIgnore([entry({ expires: "2026-11-07" })])).toContain("CVE-2026-0001 exp:2026-11-08\n");
+    expect(trivyIgnore([entry({ expires: "2026-11-30" })])).toContain("exp:2026-12-01\n");
+    expect(trivyIgnore([entry({ expires: "2026-12-31" })])).toContain("exp:2027-01-01\n");
+    expect(trivyIgnore([entry({ expires: "2028-02-28" })])).toContain("exp:2028-02-29\n");
+    expect(trivyIgnore([entry({ expires: "2028-02-29" })])).toContain("exp:2028-03-01\n");
+  });
+
   it("still writes an entry that has run out: Trivy drops it by its date, and the allowlist check fails it as well", () => {
-    expect(trivyIgnore([entry({ expires: "2020-01-01" })])).toContain("CVE-2026-0001 exp:2020-01-01");
+    expect(trivyIgnore([entry({ expires: "2020-01-01" })])).toContain("CVE-2026-0001 exp:2020-01-02");
   });
 });
 
