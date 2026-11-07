@@ -81,7 +81,7 @@ describe("security:allowlist (bin/allowlist.js)", () => {
   it("is not moved by SECURITY_TODAY in the environment: an expired exception stays expired", () => {
     const root = repository({ [allowlistFile]: allowlist(entry({ expires: "2020-01-01" })) });
 
-    expect(start("allowlist", root, [], "", { SECURITY_TODAY: "2019-01-01" }).status).toBe(1);
+    expect(start("allowlist", root, [], "", { SECURITY_TODAY: "2019-12-15" }).status).toBe(1);
   });
 
   it("exits 1 with a message, not a stack trace, for a missing file and for a day that is no day", () => {
