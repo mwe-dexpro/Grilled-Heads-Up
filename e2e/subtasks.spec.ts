@@ -1222,3 +1222,22 @@ test("a press that cannot move the row speaks German", async ({ page }) => {
   await page.keyboard.press("ArrowDown");
   await expect(section(page).locator("[aria-live='polite']")).toHaveText("Jacke ist schon an letzter Stelle");
 });
+
+test("a finger drag that the browser cancels ends: no row stays displaced", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const x = grip.x + grip.width / 2;
+  const y = grip.y + grip.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y: atY, id: 1 }] });
+  await send("touchStart", y);
+  for (let step = 1; step <= 5; step++) await send("touchMove", y + step * 12);
+  await expect(page.locator("li.subtask.dragging")).toHaveCount(1);
+  // The browser takes the touch (no `pointerup`): the handle loses the pointer, and that ends the drag.
+  await send("touchCancel", y + 60);
+  await cdp.detach();
+
+  await expect(page.locator("li.subtask.dragging")).toHaveCount(0);
+  await expect(page.locator("li.subtask[style*='transform']")).toHaveCount(0);
+  await expect(titlesOf(page)).toHaveText(["Boots", "Jacket", "Chargers"]);
+});
