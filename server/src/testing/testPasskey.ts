@@ -21,7 +21,10 @@ export class TestPasskey {
   ) {}
 
   /** Answers `navigator.credentials.create()`; `userVerified: false` is a security key that only checks presence. */
-  register(options: { challenge: string; user: { id: string } }, { userVerified = true } = {}) {
+  register(
+    options: { challenge: string; user: { id: string } },
+    { userVerified = true, transports = ["internal"] }: { userVerified?: boolean; transports?: string[] | null } = {},
+  ) {
     this.userHandle = options.user.id;
     const { x, y } = this.keys.publicKey.export({ format: "jwk" });
     if (x === undefined || y === undefined) throw new Error("The test passkey is not an EC key.");
@@ -55,7 +58,7 @@ export class TestPasskey {
       response: {
         clientDataJSON: this.clientData("webauthn.create", options.challenge).toString("base64url"),
         attestationObject: Buffer.from(attestationObject).toString("base64url"),
-        transports: ["internal"],
+        ...(transports === null ? {} : { transports }),
       },
       clientExtensionResults: {},
     };

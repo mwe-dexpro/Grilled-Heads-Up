@@ -159,6 +159,17 @@ describe("sync routes", () => {
       { type: "task", id: "t1", field: "title", hlc: hlc(1) },
       null,
       "text",
+      // A list of one name reads as that name when it is matched or measured, but is not a name.
+      { ...good, type: ["task"] },
+      { ...good, id: ["t1"] },
+      { ...good, field: ["title"] },
+      { ...good, hlc: [hlc(1)] },
+      // Names and clocks are whole: nothing before or after what they allow.
+      { ...good, type: "task-1" },
+      { ...good, type: "a".repeat(41) },
+      { ...good, hlc: `x${hlc(1)}` },
+      { ...good, hlc: `${hlc(1)}!` },
+      { ...good, hlc: `${hlc(1)}-${"n".repeat(65)}` },
     ];
 
     for (const broken of bad) expect((await push(phone, [good, broken])).status).toBe(400);
@@ -185,6 +196,77 @@ describe("sync routes", () => {
         ),
       ),
     ).toBeUndefined();
+  });
+
+  test("say in the refusal what is wrong: which change, or that a list of changes is needed", async () => {
+    const phone = await signedInOwner();
+    const good = change("title", "ok", hlc(1));
+    const errorOf = async (response: Response) => ((await response.json()) as { error: string }).error;
+
+    const malformed = await push(phone, [good, { ...good, field: "id" }]);
+    const notAList = await push(phone, { all: "of them" });
+    const tooMany = await push(
+      phone,
+      Array.from({ length: 501 }, () => good),
+    );
+
+    expect([malformed.status, await errorOf(malformed)]).toEqual([400, "Change 1 is malformed."]);
+    expect([notAList.status, await errorOf(notAList)]).toEqual([400, "Send an array of at most 500 changes."]);
+    expect([tooMany.status, await errorOf(tooMany)]).toEqual([400, "Send an array of at most 500 changes."]);
+  });
+
+  test("refuse a request that is not a JSON object with changes in it", async () => {
+    const phone = await signedInOwner();
+    const send = (contentType: string, body: string) =>
+      fetch(`${baseUrl}/api/sync/push`, { method: "POST", headers: { "content-type": contentType, cookie: phone.cookieHeader() }, body });
+
+    for (const [contentType, body] of [
+      ["text/plain", "changes"],
+      ["application/json", "[]"],
+      ["application/json", "[1]"],
+      ["application/json", '{"changes": {"0": {}}}'],
+      ["application/json", '{"changes": "x"}'],
+      ["application/json", '{"changes": null}'],
+    ] as const) {
+      expect((await send(contentType, body)).status, `${contentType} ${body}`).toBe(400);
+    }
+    expect((await pull(phone)).changes).toEqual([]);
+  });
+
+  test("number the feed by the changes that were taken, not by those that were offered", async () => {
+    const phone = await signedInOwner();
+    await push(phone, [change("title", "new", hlc(20))]);
+
+    // The first of these is older than what is stored and ignored: it takes no place in the feed.
+    await push(phone, [change("title", "older", hlc(10)), change("date", "2026-10-04", hlc(10))]);
+
+    const page = await pull(phone);
+    expect(fieldsOf(page)).toEqual([
+      ["title", "new"],
+      ["date", "2026-10-04"],
+    ]);
+    expect(page.cursor).toBe(2);
+  });
+
+  test("say there is no more when the page ends exactly where the feed does", async () => {
+    const phone = await signedInOwner();
+    await push(
+      phone,
+      ["a", "b", "c"].map((field) => change(field, field, hlc(1))),
+    );
+
+    expect(await pull(phone, "?limit=3")).toMatchObject({ cursor: 3, more: false });
+    expect(await pull(phone, "?limit=2")).toMatchObject({ cursor: 2, more: true });
+    expect(await pull(phone, "?after=1&limit=2")).toMatchObject({ cursor: 3, more: false });
+  });
+
+  test("say what is wrong with a pull: after is a whole number, limit is between 1 and 500", async () => {
+    const phone = await signedInOwner();
+
+    const response = await phone.get("/api/sync/pull?limit=0");
+
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { error: string }).error).toBe("after must be a whole number and limit between 1 and 500.");
   });
 
   test("accept a null value and the longest allowed names", async () => {

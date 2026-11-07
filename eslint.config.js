@@ -117,6 +117,8 @@ export default tseslint.config(
     files: ["**/*.test.ts"],
     plugins: { vitest },
     rules: {
+      // Off in tests: they make and read files in a temporary folder of their own.
+      "security/detect-non-literal-fs-filename": "off",
       "vitest/expect-expect": "error",
       "vitest/no-focused-tests": "error",
       "vitest/no-disabled-tests": "error",

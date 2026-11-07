@@ -309,11 +309,7 @@ function hash(secret: string): string {
 function readCookie(req: Request, name: string): string | undefined {
   for (const part of req.headers.cookie?.split(";") ?? []) {
     const [key, ...value] = part.trim().split("=");
-    if (key === name) {
-      const decoded = decodeURIComponent(value.join("="));
-      // A cookie with no value (`session=`) is no cookie.
-      return decoded === "" ? undefined : decoded;
-    }
+    if (key === name) return decodeURIComponent(value.join("="));
   }
   return undefined;
 }
