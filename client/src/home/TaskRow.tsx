@@ -1,12 +1,14 @@
+import { Fragment } from "react";
 import { hrefOf } from "../app/routes";
 import type { Event } from "../events/event";
 import { formatOffset } from "../events/formatEvent";
 import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
+import { SubtaskCount } from "../subtasks/SubtaskCount";
 import type { Task } from "../tasks/taskStore";
 import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
-import { taskMeta, type BucketKind } from "./buckets";
+import { taskMeta, type BucketKind, type Progress } from "./buckets";
 import { formatShortDay, formatTime } from "./format";
 
 interface TaskRowProps {
@@ -20,9 +22,11 @@ interface TaskRowProps {
   /** Ids of the Events on this device. */
   eventIds: { has(id: string): boolean };
   actions: TaskActions;
+  /** How many of the Task's Subtasks are ticked; undefined when it has none. Ends the second line ("3/5"). */
+  subtasks?: Progress;
 }
 
-export function TaskRow({ task, bucket, now, event, list, eventIds, actions }: TaskRowProps) {
+export function TaskRow({ task, bucket, now, event, list, eventIds, actions, subtasks }: TaskRowProps) {
   const { language, t } = useI18n();
   const completed = task.completedAt !== null;
   const meta = taskMeta(task, bucket, now);
@@ -57,6 +61,20 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions }: T
   const place = eventLink || listLink;
   const [beforeEvent, afterEvent] = t("risk.putsAtRisk").split("{event}");
 
+  // The second line: what the row says about the Task, then " · " and the Subtask count (ALIGNMENT §1).
+  const parts = [
+    ...(atRisk
+      ? [
+          <Fragment key="risk">
+            {beforeEvent}
+            {eventLink}
+            {afterEvent}
+          </Fragment>,
+        ]
+      : [place, metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>]),
+    subtasks && subtasks.total > 0 && <SubtaskCount progress={subtasks} />,
+  ].filter(Boolean);
+
   const classes = ["task", completed && "completed", meta?.kind === "overdue" && "overdue"].filter(Boolean).join(" ");
   return (
     <TaskSwipeRow task={task} eventIds={eventIds} actions={actions} className={classes}>
@@ -72,20 +90,15 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions }: T
         <a className="task-title" href={hrefOf({ name: "task", id: task.id })}>
           {task.title}
         </a>
-        {atRisk ? (
-          <span className="task-meta warning">
-            {beforeEvent}
-            {eventLink}
-            {afterEvent}
+        {parts.length > 0 && (
+          <span className={atRisk ? "task-meta warning" : "task-meta"}>
+            {parts.map((part, index) => (
+              <Fragment key={index}>
+                {index > 0 && " · "}
+                {part}
+              </Fragment>
+            ))}
           </span>
-        ) : (
-          (place || metaText) && (
-            <span className="task-meta">
-              {place}
-              {place && metaText && " · "}
-              {metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>}
-            </span>
-          )
         )}
         {completed && <span className="visually-hidden">{t("task.completed")}</span>}
       </div>

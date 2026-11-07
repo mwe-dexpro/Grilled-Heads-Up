@@ -46,4 +46,57 @@ describe("List reader", () => {
     await reload();
     expect(delivered).toEqual(["lists"]);
   });
+
+  it("ends an older read that was passed over only after the newest one has handed on its result", async () => {
+    const events: string[] = [];
+    const { read, finish } = slowRead<string>();
+    const reload = createListReader(read, (value) => events.push(`delivered ${value}`));
+
+    const first = reload().then(() => events.push("first ended"));
+    const second = reload().then(() => events.push("second ended"));
+    finish(0, "older");
+    // The older read has its result, and the newer one is still reading: the older call must not end yet.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(events).toEqual([]);
+    finish(1, "newer");
+    await Promise.all([first, second]);
+
+    expect(events[0]).toBe("delivered newer");
+    expect(events.sort()).toEqual(["delivered newer", "first ended", "second ended"]);
+  });
+
+  it("does not fail an older read that was passed over when the newest one fails, and fails the newest", async () => {
+    const delivered: string[] = [];
+    const pending: Array<{ resolve(value: string): void; reject(error: Error): void }> = [];
+    const reload = createListReader(
+      () => new Promise<string>((resolve, reject) => pending.push({ resolve, reject })),
+      (value) => delivered.push(value),
+    );
+
+    const first = reload();
+    const second = reload();
+    const secondResult = expect(second).rejects.toThrow("newest failed");
+    pending[0].resolve("older");
+    pending[1].reject(new Error("newest failed"));
+
+    await expect(first).resolves.toBeUndefined();
+    await secondResult;
+    expect(delivered).toEqual([]);
+  });
+
+  it("an older read that finds nothing, passed over by one that finds something, ends after that one", async () => {
+    const delivered: string[] = [];
+    const { read, finish } = slowRead<string>();
+    const reload = createListReader(read, (value) => delivered.push(value));
+
+    const first = reload();
+    const second = reload();
+    finish(1, "newer");
+    finish(0, null);
+    await Promise.all([first, second]);
+
+    expect(delivered).toEqual(["newer"]);
+  });
 });

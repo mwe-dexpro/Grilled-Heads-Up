@@ -142,6 +142,25 @@ describe("Replica table", () => {
     expect(after).toEqual(before);
   });
 
+  it("says whether a delete wrote the tombstone: true for a live record, false when it is missing or deleted already", async () => {
+    const { tasks } = await open();
+    await tasks.put(task());
+
+    expect(await tasks.delete("missing")).toBe(false);
+    expect(await tasks.delete("t1")).toBe(true);
+    expect(await tasks.delete("t1")).toBe(false);
+  });
+
+  it("lets exactly one of two deletes at once say it wrote the tombstone", async () => {
+    const { tasks, db } = await open();
+    await tasks.put(task());
+
+    const answers = await Promise.all([tasks.delete("t1"), tasks.delete("t1")]);
+
+    expect(answers.filter(Boolean)).toHaveLength(1);
+    expect((await db.getAll("outbox")).filter((entry) => entry.field === "deletedAt")).toHaveLength(1);
+  });
+
   it("gets a record and lists live ones", async () => {
     const { tasks } = await open();
     await tasks.put(task());

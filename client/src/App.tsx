@@ -8,6 +8,7 @@ import { useDatabaseOutdated } from "./data/useDatabaseOutdated";
 import { EventForm } from "./events/EventForm";
 import { EventScreen } from "./events/EventScreen";
 import { withEventDates } from "./events/event";
+import type { Progress } from "./home/buckets";
 import { dayOf } from "./home/days";
 import { HomeScreen } from "./home/HomeScreen";
 import { useNow } from "./home/useNow";
@@ -19,6 +20,8 @@ import { earliestRescheduleDay } from "./tasks/reschedule";
 import { RescheduleSheet } from "./tasks/RescheduleSheet";
 import { TaskActionsSheet } from "./tasks/TaskActionsSheet";
 import { TaskScreen } from "./tasks/TaskScreen";
+import { NoSubtaskError, type Subtask } from "./subtasks/subtaskStore";
+import { subtaskCounts } from "./subtasks/subtasks";
 import { NoTaskError, type Task, type TaskWhen } from "./tasks/taskStore";
 import type { TaskActions } from "./tasks/TaskSwipeRow";
 import { TrashScreen } from "./tasks/TrashScreen";
@@ -34,11 +37,11 @@ export function App() {
   const now = useNow();
   const route = useRoute();
   const [adding, setAdding] = useState(false);
-  // The Task whose actions sheet is open, the Tasks the Reschedule sheet is open for, and the Task just deleted
-  // (the undo toast). They live here, not in the screens, so that the toast outlives Task detail.
+  // The Task whose actions sheet is open, the Tasks the Reschedule sheet is open for, and the Task or Subtask just
+  // deleted (the undo toast). They live here, not in the screens, so that the toast outlives Task detail.
   const [menuId, setMenuId] = useState<string | null>(null);
   const [rescheduleIds, setRescheduleIds] = useState<string[]>([]);
-  const [deleted, setDeleted] = useState<{ taskId: string } | null>(null);
+  const [deleted, setDeleted] = useState<{ kind: "task" | "subtask"; id: string } | null>(null);
   // What each Project view shows (Tag filter, "Show completed"): kept here, so that it is still set after a Task of the
   // List was opened and Back was pressed (the screen is gone meanwhile).
   const [projectViews, setProjectViews] = useState<Record<string, ProjectView>>({});
@@ -56,6 +59,8 @@ export function App() {
   // Linked tasks need their Events' dates to be told when they are due (Overdue, earliest day to Reschedule to).
   const datedTasks = useMemo(() => withEventDates(data.tasks, data.events), [data.tasks, data.events]);
   const eventIds = useMemo(() => new Set(data.events.map((event) => event.id)), [data.events]);
+  // "3/5" on a Task's row; a Task without Subtasks has no entry.
+  const counts = useMemo(() => subtaskCounts(data.subtasks), [data.subtasks]);
   const today = dayOf(now);
   // The "+" button adds to the List whose Project view is open.
   const currentList = route.name === "list" ? data.lists.find((list) => list.id === route.id) : undefined;
@@ -70,12 +75,12 @@ export function App() {
     [addTask],
   );
 
-  const { deleteTask, restoreTask, completeTask, rescheduleTasks } = data;
+  const { deleteTask, restoreTask, completeTask, rescheduleTasks, deleteSubtask, restoreSubtask } = data;
   const actions: TaskActions = {
     complete: completeTask,
     reschedule: (tasks) => setRescheduleIds(tasks.map((task) => task.id)),
     // A Task that is gone already (a sync deleted it a moment ago) has nothing to delete and nothing to undo.
-    remove: (task) => ignoreGone(deleteTask(task.id).then(() => setDeleted({ taskId: task.id }))),
+    remove: (task) => ignoreGone(deleteTask(task.id).then(() => setDeleted({ kind: "task", id: task.id }))),
     openMenu: (task) => setMenuId(task.id),
   };
 
@@ -104,6 +109,15 @@ export function App() {
             datedTasks={datedTasks}
             now={now}
             actions={actions}
+            counts={counts}
+            // Only a Subtask this delete removed has an undo: Undo would bring back what another tab or device deleted.
+            onDeleteSubtask={(subtask) =>
+              ignoreGone(
+                deleteSubtask(subtask.id).then((deleted) => {
+                  if (deleted) setDeleted({ kind: "subtask", id: subtask.id });
+                }),
+              )
+            }
             projectViews={projectViews}
             onProjectView={(id, view) => setProjectViews((views) => ({ ...views, [id]: view }))}
           />
@@ -141,11 +155,12 @@ export function App() {
         onClose={() => setRescheduleIds([])}
       />
       <UndoToast
-        deletedTaskId={deleted?.taskId ?? null}
+        deletedId={deleted?.id ?? null}
+        message={deleted?.kind === "subtask" ? "toast.subtaskDeleted" : "toast.taskDeleted"}
         onUndo={() => {
           if (!deleted) return;
           setDeleted(null);
-          void restoreTask(deleted.taskId);
+          void (deleted.kind === "subtask" ? restoreSubtask(deleted.id) : restoreTask(deleted.id));
         }}
         onExpire={closeToast}
       />
@@ -154,12 +169,12 @@ export function App() {
   );
 }
 
-/** A change of a Task that is gone already (deleted in another tab, or by a sync) ends calmly; any other failure is not hidden. */
+/** A change of a Task or Subtask that is gone already (deleted in another tab, or by a sync) ends calmly; any other failure is not hidden. */
 async function ignoreGone(change: Promise<unknown>): Promise<void> {
   try {
     await change;
   } catch (error) {
-    if (!(error instanceof NoTaskError)) throw error;
+    if (!(error instanceof NoTaskError || error instanceof NoSubtaskError)) throw error;
   }
 }
 
@@ -190,6 +205,8 @@ function Screen({
   datedTasks,
   now,
   actions,
+  counts,
+  onDeleteSubtask,
   projectViews,
   onProjectView,
 }: {
@@ -199,6 +216,10 @@ function Screen({
   datedTasks: Task[];
   now: Date;
   actions: TaskActions;
+  /** Each Task's Subtask count (only Tasks that have Subtasks). */
+  counts: Map<string, Progress>;
+  /** Deletes the Subtask and offers to undo it; Task detail stays open. */
+  onDeleteSubtask(subtask: Subtask): Promise<void>;
   projectViews: Record<string, ProjectView>;
   onProjectView(listId: string, view: ProjectView): void;
 }) {
@@ -215,6 +236,7 @@ function Screen({
           sync={data.sync}
           onSyncNow={data.syncNow}
           actions={actions}
+          counts={counts}
         />
       );
     case "calendar":
@@ -240,6 +262,7 @@ function Screen({
           tags={data.tags}
           now={now}
           actions={actions}
+          counts={counts}
           onRename={data.renameList}
           onSetProject={data.setListProject}
           onDelete={data.deleteList}
@@ -258,7 +281,7 @@ function Screen({
       );
     case "editEvent": {
       const event = data.events.find((e) => e.id === route.id);
-      if (!event) return <EventScreen event={undefined} tasks={[]} now={now} actions={actions} onAddTask={() => {}} />;
+      if (!event) return <EventScreen event={undefined} tasks={[]} now={now} actions={actions} counts={counts} onAddTask={() => {}} />;
       return (
         <EventForm
           key={event.id}
@@ -278,6 +301,7 @@ function Screen({
           tasks={data.tasks}
           now={now}
           actions={actions}
+          counts={counts}
           onAddTask={(title, offsetDays) => data.addTask(title, { eventId: route.id, offsetDays })}
         />
       );
@@ -290,6 +314,7 @@ function Screen({
           events={data.events}
           lists={data.lists}
           tags={data.tags}
+          subtasks={data.subtasks}
           now={now}
           onComplete={data.completeTask}
           onReschedule={(id, day) => void data.rescheduleTask(id, day)}
@@ -302,6 +327,12 @@ function Screen({
           onSetList={(id, listId) => void ignoreGone(data.setTaskList(id, listId))}
           onAddTag={(id, name) => void ignoreGone(data.addTaskTag(id, name))}
           onRemoveTag={(id, tagId) => void ignoreGone(data.removeTaskTag(id, tagId))}
+          onAddSubtask={(id, title) => void ignoreGone(data.addSubtask(id, title))}
+          onRenameSubtask={(id, title) => void ignoreGone(data.renameSubtask(id, title))}
+          onSetSubtaskDone={(id, done) => ignoreGone(data.setSubtaskDone(id, done))}
+          onMoveSubtask={(id, toIndex) => ignoreGone(data.moveSubtask(id, toIndex))}
+          onMoveSubtaskBy={(id, by) => ignoreGone(data.moveSubtaskBy(id, by))}
+          onDeleteSubtask={(subtask) => void onDeleteSubtask(subtask)}
         />
       );
     case "trash":
