@@ -13,3 +13,6 @@ export const test = base.extend({
 });
 
 export { expect };
+
+/** The kinds of touch event the tests send through the DevTools protocol (`Input.dispatchTouchEvent`). */
+export type TouchType = "touchStart" | "touchMove" | "touchEnd" | "touchCancel";

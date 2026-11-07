@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, type TouchType } from "./fixtures";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: today is Oct 7. */
@@ -205,7 +205,7 @@ test("a finger drags a Subtask's handle too: the page does not scroll, the row m
   const x = grip.x + grip.width / 2;
   const y = grip.y + grip.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: atY, id: 1 }] });
+  const send = (type: TouchType, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: atY, id: 1 }] });
   await send("touchStart", y);
   const target = last.y + last.height + 10;
   for (let step = 1; step <= 10; step++) await send("touchMove", y + ((target - y) * step) / 10);
@@ -1162,7 +1162,7 @@ test("after a finger drag, which sends no click, Enter on a handle still shows t
   const x = grip.x + grip.width / 2;
   const y = grip.y + grip.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: atY, id: 1 }] });
+  const send = (type: TouchType, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: atY, id: 1 }] });
   await send("touchStart", y);
   const target = last.y + last.height + 10;
   for (let step = 1; step <= 10; step++) await send("touchMove", y + ((target - y) * step) / 10);
@@ -1229,7 +1229,7 @@ test("a finger drag that the browser cancels ends: no row stays displaced", asyn
   const x = grip.x + grip.width / 2;
   const y = grip.y + grip.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y: atY, id: 1 }] });
+  const send = (type: TouchType, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y: atY, id: 1 }] });
   await send("touchStart", y);
   for (let step = 1; step <= 5; step++) await send("touchMove", y + step * 12);
   await expect(page.locator("li.subtask.dragging")).toHaveCount(1);

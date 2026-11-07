@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, type TouchType } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: tomorrow is Thu Oct 8, next Monday is Oct 12. */
@@ -35,7 +35,7 @@ async function touchSwipe(page: Page, title: string, fromX: number, byX: number)
   const box = (await row(page, title).boundingBox())!;
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, x: number) =>
+  const send = (type: TouchType, x: number) =>
     cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
   await send("touchStart", fromX);
   const steps = 8;
