@@ -268,6 +268,44 @@ describe("Subtask store", () => {
       expect(await titles(subtasks, task.id)).toEqual(["B", "C", "A", "D"]);
     });
 
+    it("moves by places from where the Subtask is when the move runs, so key presses made at once each count (a held arrow key)", async () => {
+      const { subtasks, task, a, d } = await four();
+
+      // Five presses, none waiting for the one before: A goes down three places (the end of the list stops it), D up two.
+      await Promise.all([1, 1, 1, 1, 1].map(() => subtasks.moveSubtaskBy(a.id, 1)));
+      expect(await titles(subtasks, task.id)).toEqual(["B", "C", "D", "A"]);
+      await Promise.all([-1, -1].map((by) => subtasks.moveSubtaskBy(d.id, by)));
+
+      expect(await titles(subtasks, task.id)).toEqual(["D", "B", "C", "A"]);
+    });
+
+    it("moves by places after another move that was asked for first, whatever order was read before", async () => {
+      const { subtasks, task, a, b } = await four();
+
+      await Promise.all([subtasks.moveSubtask(a.id, 3), subtasks.moveSubtaskBy(a.id, -1), subtasks.moveSubtaskBy(b.id, 1)]);
+
+      // A to the end (B, C, D, A), A up one (B, C, A, D), B down one (C, B, A, D).
+      expect(await titles(subtasks, task.id)).toEqual(["C", "B", "A", "D"]);
+    });
+
+    it("writes nothing for a move by places that goes nowhere (the first one up, the last one down, zero)", async () => {
+      const { dbName, subtasks, a, d } = await four();
+      const before = await outbox(dbName);
+
+      await subtasks.moveSubtaskBy(a.id, -1);
+      await subtasks.moveSubtaskBy(d.id, 1);
+      await subtasks.moveSubtaskBy(a.id, 0);
+
+      expect(await outbox(dbName)).toEqual(before);
+    });
+
+    it("refuses to move by places a Subtask that is missing or deleted, with a NoSubtaskError", async () => {
+      const { subtasks, b } = await four();
+      await subtasks.deleteSubtask(b.id);
+
+      for (const id of ["missing", b.id]) await expect(subtasks.moveSubtaskBy(id, 1)).rejects.toBeInstanceOf(NoSubtaskError);
+    });
+
     it("refuses to move a Subtask that is not there, and moves no other", async () => {
       const { subtasks, task } = await four();
 
@@ -393,14 +431,17 @@ describe("Subtask store", () => {
     });
   });
 
-  it("deletes a Subtask, which stays gone after a reopen; deleting one that is missing or gone is nothing", async () => {
+  it("deletes a Subtask, which stays gone after a reopen; deleting one that is missing or gone is nothing, and says so", async () => {
     const { dbName, subtasks, task } = await open();
     const keep = await subtasks.addSubtask(task.id, "Keep");
     const drop = await subtasks.addSubtask(task.id, "Drop");
 
-    await subtasks.deleteSubtask(drop.id);
-    await expect(subtasks.deleteSubtask(drop.id)).resolves.toBeUndefined();
-    await expect(subtasks.deleteSubtask("missing")).resolves.toBeUndefined();
+    await expect(subtasks.deleteSubtask(drop.id)).resolves.toBe(true);
+    const deleted = await outbox(dbName);
+    // Nothing was deleted, so there is nothing to offer an undo of (it would bring back what another device deleted).
+    await expect(subtasks.deleteSubtask(drop.id)).resolves.toBe(false);
+    await expect(subtasks.deleteSubtask("missing")).resolves.toBe(false);
+    expect(await outbox(dbName)).toEqual(deleted);
     subtasks.close();
 
     expect(await (await openSubtaskStore(dbName)).listSubtasks()).toEqual([keep]);

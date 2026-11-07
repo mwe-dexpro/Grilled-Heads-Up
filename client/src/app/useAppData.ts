@@ -80,16 +80,19 @@ export function useAppData() {
   }, [reload]);
 
   // Each change is saved first and shown after, so a reload right after never loses what the screen showed.
+  // It hands on what the change returned (undefined while the stores are not open).
   const changeStores = useCallback(
-    async (change: (stores: Stores) => Promise<unknown>) => {
-      if (!stores.current) return;
+    async <T>(change: (stores: Stores) => Promise<T>): Promise<T | undefined> => {
+      if (!stores.current) return undefined;
+      let result: T;
       try {
-        await change(stores.current);
+        result = await change(stores.current);
       } finally {
         // Also when the change failed: what the screen shows may be stale, say, a Task a sync has just deleted.
         await reload();
       }
       syncSoon();
+      return result;
     },
     [reload, syncSoon],
   );
@@ -153,7 +156,9 @@ export function useAppData() {
   const renameSubtask = useCallback((id: string, title: string) => changeStores((s) => s.subtasks.renameSubtask(id, title)), [changeStores]);
   const setSubtaskDone = useCallback((id: string, done: boolean) => changeStores((s) => s.subtasks.setSubtaskDone(id, done)), [changeStores]);
   const moveSubtask = useCallback((id: string, toIndex: number) => changeStores((s) => s.subtasks.moveSubtask(id, toIndex)), [changeStores]);
-  const deleteSubtask = useCallback((id: string) => changeStores((s) => s.subtasks.deleteSubtask(id)), [changeStores]);
+  const moveSubtaskBy = useCallback((id: string, by: number) => changeStores((s) => s.subtasks.moveSubtaskBy(id, by)), [changeStores]);
+  /** Whether it deleted the Subtask (false: it was gone already, so there is nothing to undo). */
+  const deleteSubtask = useCallback(async (id: string) => (await changeStores((s) => s.subtasks.deleteSubtask(id))) === true, [changeStores]);
   const restoreSubtask = useCallback((id: string) => changeStores((s) => s.subtasks.restoreSubtask(id)), [changeStores]);
 
   const addEvent = useCallback(
@@ -205,6 +210,7 @@ export function useAppData() {
     renameSubtask,
     setSubtaskDone,
     moveSubtask,
+    moveSubtaskBy,
     deleteSubtask,
     restoreSubtask,
     addEvent,

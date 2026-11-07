@@ -8,9 +8,11 @@ import {
   offersCompletion,
   orderSubtasks,
   positionAt,
+  stillPending,
   subtaskCounts,
   subtaskProgress,
   subtasksOf,
+  withPendingTicks,
 } from "./subtasks";
 import type { Subtask } from "./subtaskStore";
 
@@ -323,5 +325,71 @@ describe("dropIndex", () => {
 
   it("is 0 for a lone row", () => {
     expect(dropIndex([125], 0, 900)).toBe(0);
+  });
+});
+
+describe("withPendingTicks", () => {
+  const list = () => [subtask({ id: "a", completedAt: done }), subtask({ id: "b" }), subtask({ id: "c" })];
+
+  it("shows a Subtask as ticked or open as it was asked to be, and the others as they are", () => {
+    const shown = withPendingTicks(list(), new Map([["b", true], ["a", false]]));
+
+    expect(shown.map((s) => s.completedAt !== null)).toEqual([false, true, false]);
+  });
+
+  it("returns a Subtask that already is as asked unchanged, with its real time", () => {
+    const [a, b] = list();
+
+    const shown = withPendingTicks([a, b], new Map([["a", true], ["b", false]]));
+
+    expect(shown[0]).toBe(a);
+    expect(shown[1]).toBe(b);
+    expect(shown[0].completedAt).toBe(done);
+  });
+
+  it("changes nothing without pending ticks, and does not change the Subtasks it was given", () => {
+    const given = list();
+
+    expect(withPendingTicks(given, new Map())).toEqual(given);
+    withPendingTicks(given, new Map([["b", true]]));
+    expect(given[1].completedAt).toBeNull();
+  });
+
+  it("makes the decisions of a second tick that comes before the first is shown: the last open one then offers the Task", () => {
+    const task: Task = {
+      id: "t1", title: "Pack", date: null, time: null, eventId: null, offsetDays: null, listId: null, tagIds: [],
+      createdAt: "2026-10-01T09:00:00.000Z", completedAt: null, rescheduleCount: 0, deletedAt: null,
+    };
+    const shown = [subtask({ id: "x" }), subtask({ id: "y" })];
+
+    // Neither tick is shown yet; "x" was asked for, so "y" is the last open one.
+    expect(offersCompletion(task, shown, "y")).toBe(false);
+    expect(offersCompletion(task, withPendingTicks(shown, new Map([["x", true]])), "y")).toBe(true);
+  });
+});
+
+describe("stillPending", () => {
+  it("keeps the ticks that are not shown yet", () => {
+    const shown = [subtask({ id: "a" }), subtask({ id: "b", completedAt: done })];
+
+    const left = stillPending(shown, new Map([["a", true], ["b", false]]));
+
+    expect([...left]).toEqual([["a", true], ["b", false]]);
+  });
+
+  it("drops a tick that is shown, and one whose Subtask is gone", () => {
+    const shown = [subtask({ id: "a", completedAt: done }), subtask({ id: "b" })];
+
+    const left = stillPending(shown, new Map([["a", true], ["b", false], ["gone", true]]));
+
+    expect(left.size).toBe(0);
+  });
+
+  it("does not change the map it was given", () => {
+    const pending = new Map([["a", true]]);
+
+    stillPending([subtask({ id: "a", completedAt: done })], pending);
+
+    expect([...pending]).toEqual([["a", true]]);
   });
 });

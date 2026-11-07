@@ -44,6 +44,7 @@ interface TaskScreenProps {
   onRenameSubtask(id: string, title: string): void;
   onSetSubtaskDone(id: string, done: boolean): void;
   onMoveSubtask(id: string, toIndex: number): Promise<void> | void;
+  onMoveSubtaskBy(id: string, by: number): Promise<void> | void;
   /** Deletes the Subtask and offers to undo it; the screen stays. */
   onDeleteSubtask(subtask: Subtask): void;
 }
@@ -69,6 +70,7 @@ export function TaskScreen({
   onRenameSubtask,
   onSetSubtaskDone,
   onMoveSubtask,
+  onMoveSubtaskBy,
   onDeleteSubtask,
 }: TaskScreenProps) {
   const { language, t } = useI18n();
@@ -79,6 +81,8 @@ export function TaskScreen({
   const ownSubtasks = useMemo(() => subtasksOf(rawTask?.id ?? "", subtasks), [rawTask?.id, subtasks]);
   // Delete goes back, and a second tap before the screen has gone would go back once more (and delete again).
   const leaving = useRef(false);
+  // Completing the Task from the Subtasks' offer takes the offer away, and the sticky button with it: the heading gets the focus.
+  const heading = useRef<HTMLHeadingElement>(null);
 
   if (!rawTask) {
     return (
@@ -128,7 +132,9 @@ export function TaskScreen({
           aria-label={t("task.completeNamed", { title: task.title })}
         />
         <div>
-          <h1 className={completed ? "large-title completed" : "large-title"}>{task.title}</h1>
+          <h1 ref={heading} tabIndex={-1} className={completed ? "large-title completed" : "large-title"}>
+            {task.title}
+          </h1>
           <p className="eyebrow">{due}</p>
         </div>
       </header>
@@ -194,8 +200,12 @@ export function TaskScreen({
         onRename={onRenameSubtask}
         onSetDone={onSetSubtaskDone}
         onMove={onMoveSubtask}
+        onMoveBy={onMoveSubtaskBy}
         onDelete={onDeleteSubtask}
-        onCompleteTask={onComplete}
+        onCompleteTask={(id) => {
+          heading.current?.focus();
+          onComplete(id);
+        }}
       />
 
       <section className="bucket" aria-labelledby="task-list-heading">

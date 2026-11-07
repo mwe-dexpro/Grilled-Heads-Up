@@ -87,3 +87,30 @@ export function offersCompletion(task: Task, subtasks: Subtask[], tickedId: stri
 export function dropIndex(centres: number[], from: number, pointerY: number): number {
   return centres.filter((centre, index) => index !== from && centre < pointerY).length;
 }
+
+/** Ticks that were asked for and are not shown yet: a Subtask's id, and the state it was asked to have (true: ticked). */
+export type PendingTicks = ReadonlyMap<string, boolean>;
+
+/**
+ * The Subtasks as they will be once the ticks still being saved are in. A person can tick again before the screen shows
+ * the last tick (two checks in a row, a double tap), so the decisions ("what does this tick do", "is this the last open
+ * one") are made on this, not on what is shown. Where a tick is pending, `completedAt` is not the real time (it is not
+ * known yet): it only tells ticked from open.
+ */
+export function withPendingTicks(subtasks: Subtask[], pending: PendingTicks): Subtask[] {
+  return subtasks.map((subtask) => {
+    const ticked = pending.get(subtask.id);
+    if (ticked === undefined || ticked === (subtask.completedAt !== null)) return subtask;
+    return { ...subtask, completedAt: ticked ? "" : null };
+  });
+}
+
+/** The pending ticks that `subtasks` do not show yet. One that is shown, or whose Subtask is gone, is done with. */
+export function stillPending(subtasks: Subtask[], pending: PendingTicks): Map<string, boolean> {
+  return new Map(
+    [...pending].filter(([id, ticked]) => {
+      const subtask = subtasks.find((s) => s.id === id);
+      return subtask !== undefined && ticked !== (subtask.completedAt !== null);
+    }),
+  );
+}

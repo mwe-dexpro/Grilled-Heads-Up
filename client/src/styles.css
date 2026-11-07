@@ -1391,6 +1391,10 @@ ul.chips {
   min-height: 48px;
   padding: 0 4px 0 16px;
   background: var(--white);
+}
+
+/* The rows slide to make room only while a drag is under way: when the saved order replaces it they must not slide to where they are. */
+.subtask.reordering {
   transition: transform 150ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
@@ -1457,16 +1461,13 @@ ul.chips {
   color: var(--ink-meta);
 }
 
+/* The "Add subtask" row is the card's own, below the list of Subtasks. */
 .subtask-add {
   padding-right: 16px;
 }
 
-.subtask-add form {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
+.subtask-list + .subtask-add {
+  border-top: 1px solid var(--divider);
 }
 
 .subtask-add svg {

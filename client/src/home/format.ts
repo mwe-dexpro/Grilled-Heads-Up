@@ -40,5 +40,5 @@ export function formatTime(time: TimeOfDay, language: Language): string {
  */
 export function formatSubtaskCount({ done, total }: Progress, t: Translate): { short: string; long: string } {
   const params = { done: String(done), total: String(total) };
-  return { short: t("subtask.countShort", params), long: t("subtask.countLong", params) };
+  return { short: t("subtask.countShort", params), long: t(total === 1 ? "subtask.countLongOne" : "subtask.countLong", params) };
 }

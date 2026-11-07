@@ -110,7 +110,14 @@ export function App() {
             now={now}
             actions={actions}
             counts={counts}
-            onDeleteSubtask={(subtask) => ignoreGone(deleteSubtask(subtask.id).then(() => setDeleted({ kind: "subtask", id: subtask.id })))}
+            // Only a Subtask this delete removed has an undo: Undo would bring back what another tab or device deleted.
+            onDeleteSubtask={(subtask) =>
+              ignoreGone(
+                deleteSubtask(subtask.id).then((deleted) => {
+                  if (deleted) setDeleted({ kind: "subtask", id: subtask.id });
+                }),
+              )
+            }
             projectViews={projectViews}
             onProjectView={(id, view) => setProjectViews((views) => ({ ...views, [id]: view }))}
           />
@@ -324,6 +331,7 @@ function Screen({
           onRenameSubtask={(id, title) => void ignoreGone(data.renameSubtask(id, title))}
           onSetSubtaskDone={(id, done) => void ignoreGone(data.setSubtaskDone(id, done))}
           onMoveSubtask={(id, toIndex) => ignoreGone(data.moveSubtask(id, toIndex))}
+          onMoveSubtaskBy={(id, by) => ignoreGone(data.moveSubtaskBy(id, by))}
           onDeleteSubtask={(subtask) => void onDeleteSubtask(subtask)}
         />
       );

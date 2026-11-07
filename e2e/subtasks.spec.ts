@@ -424,7 +424,7 @@ test("Subtasks speak German: the section, the offer, the toast and the count", a
   await expect(page.getByText("Unteraufgabe gelöscht")).toBeVisible();
   await page.getByRole("button", { name: "Rückgängig" }).click();
   await page.getByRole("button", { name: "Zurück" }).click();
-  await expect(page.getByText("1 von 1 Unteraufgaben erledigt")).toBeAttached();
+  await expect(page.getByText("1 von 1 Unteraufgabe erledigt")).toBeAttached();
 });
 
 test("deleting a Task leaves its Subtasks, which are there again, as they were, when it is restored from the Trash", async ({ page }) => {
@@ -448,6 +448,268 @@ test("deleting a Task leaves its Subtasks, which are there again, as they were, 
   await expect(titlesOf(page)).toHaveText(["Boots", "Jacket"]);
   await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Boots" })).not.toBeChecked();
+});
+
+/** A Task "Pack for the weekend" with these Subtasks, open in Task detail. */
+async function packWith(page: Page, ...titles: string[]) {
+  await page.goto("/");
+  await addTask(page, "Pack for the weekend");
+  await openTask(page, "Pack for the weekend");
+  await addSubtasks(page, ...titles);
+}
+
+const handleOf = (page: Page, title: string) => page.getByRole("button", { name: `Reorder ${title}` });
+
+test("a key held down moves a Subtask one place for every press, none is lost and none goes back, also when the screen is slow to show the order", async ({ page }) => {
+  // The screen shows what a save left a moment after the save is done: React renders it in a later task. Here that
+  // task is held back by 40 ms (React's scheduler posts a message to itself), so a key that repeats while the screen
+  // is behind is certain to meet it, not only now and then.
+  await page.addInitScript(() => {
+    const post = MessagePort.prototype.postMessage;
+    MessagePort.prototype.postMessage = function (this: MessagePort, ...args: [unknown]) {
+      if ((window as { slowScreen?: boolean }).slowScreen) setTimeout(() => post.apply(this, args), 40);
+      else post.apply(this, args);
+    };
+  });
+  await packWith(page, "A", "B", "C", "D", "E", "F");
+  await page.evaluate(() => ((window as { slowScreen?: boolean }).slowScreen = true));
+
+  /** A key held down: the first press, then one more every 20 ms (a repeat rate of 50 per second). */
+  async function hold(key: string, presses: number) {
+    for (let press = 0; press < presses; press++) {
+      if (press > 0) await page.waitForTimeout(20);
+      await page.keyboard.down(key);
+    }
+    await page.keyboard.up(key);
+  }
+
+  for (let round = 0; round < 3; round++) {
+    await handleOf(page, "A").focus();
+    await hold("ArrowDown", 5);
+    await expect(titlesOf(page)).toHaveText(["B", "C", "D", "E", "F", "A"]);
+    await expect(handleOf(page, "A")).toBeFocused();
+    await hold("ArrowUp", 5);
+    await expect(titlesOf(page)).toHaveText(["A", "B", "C", "D", "E", "F"]);
+  }
+  // Presses with no wait at all, and past the end: it stops there.
+  for (let press = 0; press < 9; press++) await page.keyboard.down("ArrowDown");
+  await page.keyboard.up("ArrowDown");
+  await expect(titlesOf(page)).toHaveText(["B", "C", "D", "E", "F", "A"]);
+
+  await page.reload();
+  await expect(titlesOf(page)).toHaveText(["B", "C", "D", "E", "F", "A"]);
+});
+
+test("a drag ends where the row was dropped: when the saved order arrives no row jumps or slides to its place", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  const grip = (await handleOf(page, "Swimwear").boundingBox())!;
+  const first = (await titlesOf(page).first().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, first.y - 10, { steps: 12 });
+
+  // Watch every frame from now on: once the first row is "Swimwear" (the saved order is shown), take 20 more frames.
+  const frames = page.evaluate(
+    () =>
+      new Promise<Array<Record<string, number>>>((resolve) => {
+        const tops = () => {
+          const found: Record<string, number> = {};
+          for (const row of document.querySelectorAll("li.subtask")) {
+            const title = row.querySelector(".subtask-title")?.textContent;
+            if (title) found[title] = Math.round(row.getBoundingClientRect().top);
+          }
+          return found;
+        };
+        const settled: Array<Record<string, number>> = [];
+        let arrived = false;
+        const frame = () => {
+          const now = tops();
+          if (Object.keys(now)[0] === "Swimwear") arrived = true;
+          if (arrived) settled.push(now);
+          if (settled.length >= 20) resolve(settled);
+          else requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+  await page.mouse.up();
+  const shown = await frames;
+
+  // Nothing moves from the frame the order shows, other than the dropped row finishing its way into place (less than a row).
+  const final = shown[shown.length - 1];
+  const rowHeight = final.Jacket - final.Swimwear;
+  for (const frame of shown) {
+    for (const title of ["Boots", "Jacket", "Chargers"]) expect(frame[title], title).toBe(final[title]);
+    expect(Math.abs(frame.Swimwear - final.Swimwear)).toBeLessThan(rowHeight / 2);
+  }
+  await expect(titlesOf(page)).toHaveText(["Swimwear", "Boots", "Jacket", "Chargers"]);
+});
+
+test("a reload while a row is dragged, or while it waits to be saved, does not drop the move", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  const grip = (await handleOf(page, "Swimwear").boundingBox())!;
+  const first = (await titlesOf(page).first().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, first.y + 5, { steps: 8 });
+
+  // A tick that is saved and shown reloads the Subtasks, with the drag under way. (`click()` of the element keeps the
+  // pointer and the focus where they are, as a change that arrives from another device would.)
+  await page.evaluate(() => (document.querySelector('input[aria-label="Chargers"]') as HTMLInputElement).click());
+  await expect(page.getByRole("checkbox", { name: "Chargers" })).toBeChecked();
+  await page.mouse.move(grip.x + grip.width / 2, first.y - 10, { steps: 4 });
+  await page.mouse.up();
+
+  await expect(titlesOf(page)).toHaveText(["Swimwear", "Boots", "Jacket", "Chargers"]);
+  await page.reload();
+  await expect(titlesOf(page)).toHaveText(["Swimwear", "Boots", "Jacket", "Chargers"]);
+  await expect(page.getByRole("checkbox", { name: "Chargers" })).toBeChecked();
+});
+
+test("the keyboard focus stays in the Subtasks after a rename, a delete and the offer's buttons", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+
+  // A rename ended with Enter, or with Escape, gives the focus back to the row's title.
+  await page.getByRole("button", { name: "Rename Chargers" }).click();
+  await page.getByRole("textbox", { name: "Rename Chargers" }).fill("Power bank");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Rename Power bank" })).toBeFocused();
+  await page.getByRole("button", { name: "Rename Boots" }).click();
+  await page.getByRole("textbox", { name: "Rename Boots" }).fill("Sandals");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Rename Boots" })).toBeFocused();
+
+  // A delete moves it to the next row, to the previous one for the last row, to "Add subtask" for the only one.
+  await page.getByRole("button", { name: "Delete subtask Jacket" }).click();
+  await expect(page.getByRole("button", { name: "Rename Jacket" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Rename Power bank" })).toBeFocused();
+  await page.getByRole("button", { name: "Delete subtask Power bank" }).click();
+  await expect(page.getByRole("button", { name: "Rename Power bank" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Rename Boots" })).toBeFocused();
+  await page.getByRole("button", { name: "Delete subtask Boots" }).click();
+  await expect(page.getByRole("button", { name: "Rename Boots" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Add subtask" })).toBeFocused();
+
+  // The offer: "Not now" gives it to the Subtask that was ticked, "Complete" to the Task's heading.
+  await addSubtasks(page, "Hat");
+  const offer = page.getByRole("group", { name: "All subtasks are done. Complete the task?" });
+  await toggle(page, "Hat");
+  await expect(offer.getByRole("button", { name: "Complete" })).toBeFocused();
+  await offer.getByRole("button", { name: "Not now" }).click();
+  await expect(offer).toBeHidden();
+  await expect(page.getByRole("checkbox", { name: "Hat" })).toBeFocused();
+  await toggle(page, "Hat");
+  await toggle(page, "Hat");
+  await offer.getByRole("button", { name: "Complete" }).click();
+  await expect(offer).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Pack for the weekend", level: 1 })).toBeFocused();
+});
+
+test("two Subtasks ticked in quick succession offer to Complete the Task", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket");
+  const offer = page.getByRole("group", { name: "All subtasks are done. Complete the task?" });
+
+  // Both ticks come before the screen has shown the first.
+  await page.evaluate(() => document.querySelectorAll<HTMLInputElement>(".subtask .check").forEach((check) => check.click()));
+
+  await expect(section(page).getByText("2 of 2", { exact: true })).toBeVisible();
+  await expect(offer).toBeVisible();
+  await offer.getByRole("button", { name: "Not now" }).click();
+  await expect(offer).toBeHidden();
+});
+
+test("a double tap on a Subtask's check is a tick and an untick: it ends as it was", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket");
+
+  await page.getByRole("checkbox", { name: "Boots" }).dblclick();
+  // A change saved after it: when the screen shows that, the double tap's two changes are in (they were made first).
+  await toggle(page, "Jacket");
+
+  await expect(section(page).getByText("1 of 2", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Boots" })).not.toBeChecked();
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Boots" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeChecked();
+});
+
+test("leaving a rename input that was not typed in does not write the old title over a rename made elsewhere", async ({ page, context }) => {
+  await packWith(page, "Boots", "Jacket");
+  await page.getByRole("button", { name: "Rename Boots" }).click();
+  await expect(page.getByRole("textbox", { name: "Rename Boots" })).toBeFocused();
+
+  // Another tab renames "Boots" while the input is open here.
+  const other = await context.newPage();
+  await other.goto("/");
+  await other.getByRole("link", { name: "Pack for the weekend", exact: true }).click();
+  await other.getByRole("button", { name: "Rename Boots" }).click();
+  await other.getByRole("textbox", { name: "Rename Boots" }).fill("Sandals");
+  await other.keyboard.press("Enter");
+  await expect(other.getByRole("button", { name: "Rename Sandals" })).toBeVisible();
+  await other.close();
+
+  // A change here reloads the Subtasks, so the input is open with the title it began with while "Sandals" is stored.
+  await page.evaluate(() => (document.querySelector('input[aria-label="Jacket"]') as HTMLInputElement).click());
+  await expect(page.getByRole("checkbox", { name: "Jacket" })).toBeChecked();
+  // The input is still open, and still holds "Boots": it began with that.
+  await expect(page.locator(".subtask-title-input")).toHaveValue("Boots");
+  await expect(page.locator(".subtask-title-input")).toBeFocused();
+  // Leave the input without typing.
+  await page.getByRole("heading", { name: "Subtasks" }).click();
+  await expect(page.locator(".subtask-title-input")).toHaveCount(0);
+
+  // A saved change after it: the screen has read what was stored by then (a write of the old title would be in it).
+  await toggle(page, "Jacket");
+  await expect(titlesOf(page)).toHaveText(["Sandals", "Jacket"]);
+  await page.reload();
+  await expect(titlesOf(page)).toHaveText(["Sandals", "Jacket"]);
+});
+
+test("an arrow-key move is described to a screen reader before and announced after: where the Subtask went", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const handle = handleOf(page, "Boots");
+  await expect(handle).toHaveAccessibleDescription("Use the up and down arrow keys to move it");
+  const announcement = section(page).locator("[aria-live='polite']");
+
+  await handle.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(announcement).toHaveText("Boots moved to 2 of 3");
+  await page.keyboard.press("ArrowDown");
+  await expect(announcement).toHaveText("Boots moved to 3 of 3");
+  // At the end nothing moves, and nothing is announced again.
+  await page.keyboard.press("ArrowDown");
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
+  await expect(announcement).toHaveText("Boots moved to 3 of 3");
+});
+
+test("the Subtasks are a list of their own: the 'Add subtask' row is not counted as one", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+
+  const list = section(page).getByRole("list");
+  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(section(page).getByRole("listitem").filter({ has: page.getByRole("textbox", { name: "Add subtask" }) })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Add subtask" })).toBeVisible();
+});
+
+test("Subtasks speak German when moved: the hint and the announcement", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "Language" }).selectOption({ label: "Deutsch" });
+  await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+  await page.getByLabel("Titel").fill("Packen");
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.getByRole("link", { name: "Packen", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "Unteraufgabe hinzufügen" });
+  for (const title of ["Schuhe", "Jacke"]) {
+    await input.fill(title);
+    await input.press("Enter");
+    await expect(page.getByRole("button", { name: `${title} umbenennen` })).toBeVisible();
+  }
+
+  const handle = page.getByRole("button", { name: "Schuhe verschieben" });
+  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben und unten verschieben");
+  await handle.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe verschoben auf Platz 2 von 2");
 });
 
 test.describe("a Task or Subtask that another tab deleted meanwhile", () => {
@@ -506,6 +768,33 @@ test.describe("a Task or Subtask that another tab deleted meanwhile", () => {
     await page.getByRole("button", { name: "Delete subtask Boots" }).click();
 
     await expect(page.getByRole("button", { name: "Rename Boots" })).toHaveCount(0);
+    // Nothing was deleted here, so there is nothing to undo: Undo would bring back what the other tab deleted.
+    await expect(page.getByText("Subtask deleted")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test("a tick that fails because the Subtask is gone leaves no offer behind, when the Subtasks that are left are all done", async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto("/");
+    await addTask(page, "Pack");
+    await openTask(page, "Pack");
+    await addSubtasks(page, "Boots", "Jacket");
+    await toggle(page, "Boots");
+    const other = await context.newPage();
+    await other.goto("/");
+    await other.getByRole("link", { name: "Pack", exact: true }).click();
+    await other.getByRole("button", { name: "Delete subtask Jacket" }).click();
+    await expect(other.getByRole("button", { name: "Undo" })).toBeVisible();
+    await other.close();
+
+    // "Jacket" was the last open one here, so the tick was to offer Completing the Task; it is gone, and nothing was ticked.
+    await page.getByRole("checkbox", { name: "Jacket" }).click();
+
+    await expect(page.getByRole("button", { name: "Rename Jacket" })).toHaveCount(0);
+    await expect(section(page).getByText("1 of 1", { exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "All subtasks are done. Complete the task?" })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 });

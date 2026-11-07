@@ -29,7 +29,8 @@ describe("the count of a Task's Subtasks", () => {
     [{ done: 3, total: 5 }, "3/5", "3 of 5 subtasks done", "3 von 5 Unteraufgaben erledigt"],
     [{ done: 0, total: 3 }, "0/3", "0 of 3 subtasks done", "0 von 3 Unteraufgaben erledigt"],
     [{ done: 5, total: 5 }, "5/5", "5 of 5 subtasks done", "5 von 5 Unteraufgaben erledigt"],
-    [{ done: 1, total: 1 }, "1/1", "1 of 1 subtasks done", "1 von 1 Unteraufgaben erledigt"],
+    [{ done: 1, total: 1 }, "1/1", "1 of 1 subtask done", "1 von 1 Unteraufgabe erledigt"],
+    [{ done: 0, total: 1 }, "0/1", "0 of 1 subtask done", "0 von 1 Unteraufgabe erledigt"],
   ])("says %j as '%s' with the words '%s' / '%s'", (progress, short, long, german) => {
     expect(formatSubtaskCount(progress, en)).toEqual({ short, long });
     expect(formatSubtaskCount(progress, de)).toEqual({ short, long: german });

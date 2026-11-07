@@ -47,8 +47,17 @@ export interface SubtaskStore {
    * new order. A move that changes nothing writes nothing. Missing or deleted: `NoSubtaskError`.
    */
   moveSubtask(id: string, toIndex: number): Promise<void>;
-  /** Deletes a Subtask (it leaves the lists and syncs as deleted); one that is missing is ignored. */
-  deleteSubtask(id: string): Promise<void>;
+  /**
+   * Moves a Subtask `by` places (negative: up) from where it is when the move runs, clamped like `moveSubtask`. A
+   * key press means this: it does not depend on the order the screen shows, which a held key outruns. Moves asked
+   * for at once run one after the other, so each counts. Missing or deleted: `NoSubtaskError`.
+   */
+  moveSubtaskBy(id: string, by: number): Promise<void>;
+  /**
+   * Deletes a Subtask (it leaves the lists and syncs as deleted) and says it did. One that is missing or deleted
+   * already is ignored, and says false: there is nothing to offer an undo of.
+   */
+  deleteSubtask(id: string): Promise<boolean>;
   /** Takes a Subtask back after a delete (the undo toast), exactly as it was; one that is live or missing is left alone. */
   restoreSubtask(id: string): Promise<void>;
   /** Live Subtasks that have a Task and a title, in order; the caller groups them by Task. */
@@ -118,11 +127,13 @@ export async function openSubtaskStore(
     return subtask;
   }
 
-  async function move(id: string, toIndex: number): Promise<void> {
+  /** Moves the Subtask to the index that `target` names, given the index it has now among its Task's Subtasks. */
+  async function move(id: string, target: (from: number) => number): Promise<void> {
     const all = await listed();
     const moving = all.find((subtask) => subtask.id === id);
     if (!moving) throw new NoSubtaskError(id);
     const siblings = subtasksOf(moving.taskId, all);
+    const toIndex = target(siblings.findIndex((subtask) => subtask.id === id));
     const order = movedOrder(siblings, id, toIndex);
     if (order.every((subtask, index) => subtask.id === siblings[index].id)) return;
 
@@ -156,10 +167,14 @@ export async function openSubtaskStore(
       if (!changed) throw new NoSubtaskError(id);
     },
 
-    moveSubtask: (id, toIndex) => inOrder(() => move(id, toIndex)),
+    moveSubtask: (id, toIndex) => inOrder(() => move(id, () => toIndex)),
+
+    moveSubtaskBy: (id, by) => inOrder(() => move(id, (from) => from + by)),
 
     async deleteSubtask(id) {
+      if (!(await subtasks.get(id))) return false;
       await subtasks.delete(id);
+      return true;
     },
 
     async restoreSubtask(id) {
