@@ -11,7 +11,7 @@ Work as a reviewer of your own change. A test that passes proves nothing until y
 - [ ] **Tests assert results and states that can be seen**, not only calls on mocks. No snapshot-only tests, no tautologies (the expected value worked out by the code's own logic), no `.only`, no `.skip`, `skipIf`, `runIf`, `todo` or `fixme` without an issue.
 - [ ] **New source files are covered automatically** by the mutation and coverage globs: no config edit was needed. No threshold was lowered.
 - [ ] **`npm run typecheck` and `npm run lint` pass with zero warnings.** Violations were fixed in the code. No new `any`, `as` cast, `!` assertion, `eslint-disable` or baseline entry; if one is truly the last resort it names its rule, says why, and has a follow-up issue.
-- [ ] **No dependency with a high or critical advisory, or a copyleft licence, was added**, and every new dependency is justified in the pull request.
+- [ ] **No dependency with a high or critical advisory, or a GPL or AGPL licence, was added**, and every new dependency is justified in the pull request.
 - [ ] **The same checks that CI runs were run locally** (the commands below).
 - [ ] **CI was never made green by weakening** a test, a threshold or a security check.
 
@@ -88,4 +88,17 @@ Switch on in the repository settings:
   `typecheck`, `lint`, `unit`, `e2e`, `mutation (client)`, `mutation (server)`, `mutation (tools)`, `docker`, `npm audit`, `dependency review`, `codeql`, `secrets`
 
 - The workflow also runs every night (03:17 UTC) and on demand. A CVE published for code that has not changed turns the nightly run on `main` red; GitHub's own notification of a failed scheduled run (an email to the person who last changed the schedule) is how the maintainer hears of it. Watch the repository's Actions notifications if more people should.
+- GitHub switches a scheduled workflow off after 60 days without any activity in a public repository (it sends a warning email first). After a quiet spell, push something or re-enable the workflow in the Actions tab, or the nightly CVE check silently stops.
 - The repository is public, so CodeQL and dependency review need no GitHub Advanced Security licence.
+
+## Pins that nobody updates for you
+
+Dependabot bumps the `uses:` lines of the workflow, the Docker base image and the npm packages, and nothing else. Three versions in `.github/workflows/ci.yml` are bumped by hand, with a pull request, about once a quarter:
+
+| Pin | Where | How to bump |
+| --- | --- | --- |
+| Trivy (version, download URL and its SHA-256) | `docker` job, step "Install Trivy" | Take the newest release, copy the checksum of `trivy_<version>_Linux-64bit.tar.gz` from the release's `checksums.txt`, run both Trivy steps locally. Trivy logs `Module will be skipped as current version of Trivy is older than minimum trivy version required` when its check bundle needs a newer Trivy: that is the sign that the pin is too old, because those checks are not run. |
+| gitleaks image (digest) | `secrets` job | Take the digest of the newest `ghcr.io/gitleaks/gitleaks` release tag and put the version in the comment. |
+| npm 11 for `npm audit signatures` | `audit` job | Take the newest npm 11; drop the pin when Node 22's own npm can verify the tree. |
+
+The workflow's own comment says the same. The licence gate (`deny-licenses`) names GPL and AGPL only (the exact SPDX ids in `ci.yml`); LGPL, MPL and other licences pass it.
