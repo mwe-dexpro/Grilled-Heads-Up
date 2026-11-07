@@ -680,10 +680,12 @@ test("an arrow-key move is described to a screen reader before and announced aft
   await expect(announcement).toHaveText("Boots moved to 2 of 3");
   await page.keyboard.press("ArrowDown");
   await expect(announcement).toHaveText("Boots moved to 3 of 3");
-  // At the end nothing moves, and nothing is announced again.
+  // At the end nothing moves, and a press that cannot move it says so (it is no dead press).
   await page.keyboard.press("ArrowDown");
   await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
-  await expect(announcement).toHaveText("Boots moved to 3 of 3");
+  await expect(announcement).toHaveText("Boots is already last");
+  await page.keyboard.press("ArrowUp");
+  await expect(announcement).toHaveText("Boots moved to 2 of 3");
 });
 
 test("the Subtasks are a list of their own: the 'Add subtask' row is not counted as one", async ({ page }) => {
@@ -711,10 +713,10 @@ test("Subtasks speak German when moved: the hint and the announcement", async ({
   }
 
   const handle = page.getByRole("button", { name: "Schuhe verschieben" });
-  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben und unten verschieben, oder aktivieren für Schaltflächen zum Verschieben");
+  await expect(handle).toHaveAccessibleDescription("Mit den Pfeiltasten nach oben oder unten verschieben, oder aktivieren, um Schaltflächen zum Verschieben anzuzeigen");
   await handle.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe verschoben auf Platz 2 von 2");
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe auf Platz 2 von 2 verschoben");
 });
 
 test("a drag whose row is moved in the page by a change that arrives meanwhile ends, and leaves no row displaced", async ({ page }) => {
@@ -866,7 +868,7 @@ test("the Move buttons speak German", async ({ page }) => {
   await page.getByRole("button", { name: "Schuhe nach unten verschieben" }).click();
   await expect(titlesOf(page)).toHaveText(["Jacke", "Schuhe"]);
   await expect(page.getByRole("button", { name: "Schuhe nach unten verschieben" })).toBeFocused();
-  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe verschoben auf Platz 2 von 2");
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe auf Platz 2 von 2 verschoben");
 });
 
 test("a tick that fails for a real reason is not remembered: the next tap on the check ticks it", async ({ page }) => {
@@ -1044,4 +1046,179 @@ test.describe("a Task or Subtask that another tab deleted meanwhile", () => {
     await expect(page.getByRole("group", { name: "All subtasks are done. Complete the task?" })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
+});
+
+/**
+ * Holds a readwrite transaction on one of the database's stores from a second connection, so that every save and read
+ * of that store waits, until `release()` is called. Resolves once the transaction is open.
+ */
+async function holdStore(page: Page, store: string) {
+  await page.evaluate(
+    (store) =>
+      new Promise<void>((resolve) => {
+        const open = indexedDB.open("grilled-heads-up");
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(store, "readwrite");
+          const objects = tx.objectStore(store);
+          let held = true;
+          (window as { releaseStore?: () => void }).releaseStore = () => (held = false);
+          // A request after the other keeps the transaction open (a transaction with no request left commits).
+          const keep = () => {
+            if (held) objects.get("nothing").onsuccess = keep;
+          };
+          keep();
+          tx.oncomplete = () => db.close();
+          resolve();
+        };
+      }),
+    store,
+  );
+  return () => page.evaluate(() => (window as { releaseStore?: () => void }).releaseStore?.());
+}
+
+test("a second drag, started while the first drop is still being saved, is not ended when the first move settles", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  const release = await holdStore(page, "subtasks");
+
+  // Drop "Boots" below the last row: its move waits for the held store. (React moves the node of "Boots" only when the
+  // order arrives, so the browser keeps the pointer on the handle of the row grabbed next.)
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, last.y + last.height + 10, { steps: 8 });
+  await page.mouse.up();
+  // Grab "Chargers" before that is saved and shown.
+  const second = (await handleOf(page, "Chargers").boundingBox())!;
+  await page.mouse.move(second.x + second.width / 2, second.y + second.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(second.x + second.width / 2, second.y + second.height / 2 + 15, { steps: 3 });
+  await expect(page.locator("li.subtask.dragging .subtask-title")).toHaveText("Chargers");
+
+  // The first move is saved and shown; the second drag, the mouse still down, goes on.
+  await release();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Swimwear", "Boots"]);
+  await expect(page.locator("li.subtask.dragging .subtask-title")).toHaveText("Chargers");
+  const top = (await titlesOf(page).first().boundingBox())!;
+  await page.mouse.move(second.x + second.width / 2, top.y - 30, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(titlesOf(page)).toHaveText(["Chargers", "Jacket", "Swimwear", "Boots"]);
+  await expect(page.locator("li.subtask.dragging")).toHaveCount(0);
+  await page.reload();
+  await expect(titlesOf(page)).toHaveText(["Chargers", "Jacket", "Swimwear", "Boots"]);
+});
+
+test("a drop that another reload overlaps never shows the old order again before the new one: no row snaps back", async ({ page }) => {
+  // A tick of another Subtask reloads the Subtasks too. When it starts while the drop's reload is under way, the drop's
+  // reload is passed over and hands nothing on: the screen must not be told the move is over before the newer reload shows it.
+  // The gap between the two is a few milliseconds, so the tick comes at several delays after the drop.
+  await packWith(page, "Boots", "Jacket", "Chargers", "Swimwear");
+  await page.evaluate(() => {
+    const list = document.querySelector("ul.subtask-list")!;
+    const seen = window as { snapBack?: string[]; mover?: string };
+    seen.snapBack = [];
+    // A state with no row displaced and the dropped row still last is the old order shown for a moment (a row snapping
+    // back), whichever frame it would have been painted in.
+    new MutationObserver(() => {
+      const rows = [...list.querySelectorAll("li.subtask")];
+      const titles = rows.map((row) => row.querySelector(".subtask-title")?.textContent);
+      const displaced = rows.some((row) => row.getAttribute("style"));
+      if (!displaced && seen.mover && titles[titles.length - 1] === seen.mover) seen.snapBack!.push(seen.mover);
+    }).observe(list, { subtree: true, attributes: true, childList: true });
+  });
+
+  for (const delay of [0, 1, 2, 3, 5, 8, 12, 16, 20, 30]) {
+    const mover = (await titlesOf(page).last().textContent())!;
+    const grip = (await handleOf(page, mover).boundingBox())!;
+    const first = (await titlesOf(page).first().boundingBox())!;
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, first.y - 10, { steps: 8 });
+    await page.evaluate(
+      ({ mover, delay }) => {
+        (window as { mover?: string }).mover = mover;
+        document.addEventListener(
+          "pointerup",
+          () => setTimeout(() => document.querySelector<HTMLInputElement>('input[aria-label="Boots"]')!.click(), delay),
+          { once: true, capture: true },
+        );
+      },
+      { mover, delay },
+    );
+    await page.mouse.up();
+    await expect(titlesOf(page).first()).toHaveText(mover);
+    await expect(page.locator("li.subtask[style*='transform']")).toHaveCount(0);
+    await page.evaluate(() => ((window as { mover?: string }).mover = undefined));
+  }
+  expect(await page.evaluate(() => (window as { snapBack?: string[] }).snapBack), "the order before the drop was shown for a moment").toEqual([]);
+});
+
+test("after a finger drag, which sends no click, Enter on a handle still shows the Move buttons", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const grip = (await handleOf(page, "Boots").boundingBox())!;
+  const last = (await titlesOf(page).last().boundingBox())!;
+  const x = grip.x + grip.width / 2;
+  const y = grip.y + grip.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const send = (type: string, atY: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y: atY, id: 1 }] });
+  await send("touchStart", y);
+  const target = last.y + last.height + 10;
+  for (let step = 1; step <= 10; step++) await send("touchMove", y + ((target - y) * step) / 10);
+  await send("touchEnd", target);
+  await cdp.detach();
+  await expect(titlesOf(page)).toHaveText(["Jacket", "Chargers", "Boots"]);
+  await expect(page.locator(".subtask-moves")).toHaveCount(0);
+
+  // The first activation from the keyboard counts: it is no click that ends a drag.
+  await handleOf(page, "Jacket").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Move Jacket down" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".subtask-moves")).toHaveCount(0);
+});
+
+test("a press that cannot move the row says so: the first Subtask up, the last one down, each time", async ({ page }) => {
+  await packWith(page, "Boots", "Jacket", "Chargers");
+  const announcement = section(page).locator("[aria-live='polite']");
+  await handleOf(page, "Boots").focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(announcement).toHaveText("Boots is already first");
+  // The live region's content is replaced by every announcement, so a screen reader reads a repeated one again:
+  // mark the node, press again, and the marked node is gone.
+  await announcement.locator("span").evaluate((node) => node.setAttribute("data-read", ""));
+  await page.keyboard.press("ArrowUp");
+  await expect(announcement.locator("span")).toHaveText("Boots is already first");
+  await expect(announcement.locator("span[data-read]")).toHaveCount(0);
+
+  // With the Move buttons (what a screen reader on a phone uses) too.
+  await handleOf(page, "Chargers").click();
+  await page.getByRole("button", { name: "Move Chargers down" }).click();
+  await expect(announcement).toHaveText("Chargers is already last");
+  await expect(titlesOf(page)).toHaveText(["Boots", "Jacket", "Chargers"]);
+  await expect(page.getByRole("button", { name: "Move Chargers down" })).toBeFocused();
+});
+
+test("a press that cannot move the row speaks German", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "Language" }).selectOption({ label: "Deutsch" });
+  await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+  await page.getByLabel("Titel").fill("Packen");
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.getByRole("link", { name: "Packen", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "Unteraufgabe hinzufügen" });
+  for (const title of ["Schuhe", "Jacke"]) {
+    await input.fill(title);
+    await input.press("Enter");
+    await expect(page.getByRole("button", { name: `${title} umbenennen` })).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Schuhe verschieben" }).focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Schuhe ist schon an erster Stelle");
+  await page.getByRole("button", { name: "Jacke verschieben" }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(section(page).locator("[aria-live='polite']")).toHaveText("Jacke ist schon an letzter Stelle");
 });

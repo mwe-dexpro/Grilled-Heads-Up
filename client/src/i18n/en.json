@@ -225,6 +225,8 @@
   "subtask.moveUp": "Move {title} up",
   "subtask.moveDown": "Move {title} down",
   "subtask.moved": "{title} moved to {position} of {total}",
+  "subtask.first": "{title} is already first",
+  "subtask.last": "{title} is already last",
   "subtask.delete": "Delete subtask {title}",
   "subtask.allDone": "All subtasks are done. Complete the task?",
   "subtask.completeTask": "Complete",

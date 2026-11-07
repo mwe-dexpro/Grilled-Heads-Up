@@ -47,7 +47,8 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
   const [drag, setDrag] = useState<Drag | null>(null);
   // The Subtask whose tick made the offer (it is the last open one); the offer holds while that tick is shown.
   const [offered, setOffered] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState("");
+  // What a screen reader is told (a live region). `n` makes the same words new again: pressing at the end twice says it twice.
+  const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
   // The Subtask whose "Move up" and "Move down" buttons are shown (a way to move it with a tap, for a screen reader on a phone).
   const [movingId, setMovingId] = useState<string | null>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -55,9 +56,10 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
   const addInput = useRef<HTMLInputElement>(null);
   const completeButton = useRef<HTMLButtonElement>(null);
   // The control that moved a row (its handle, or one of its Move buttons) keeps the keyboard focus, however the row was
-  // moved in the page; `from` is where the announcement of the move starts from.
-  const refocus = useRef<{ id: string; control: string; from: number } | null>(null);
-  // A drag moved the handle's pointer: the click that follows it is no tap on the handle.
+  // moved in the page; `from` is where the announcement of the move starts from, `at` where the row will be once the
+  // presses made so far have run (the order shown may be behind a key held down).
+  const refocus = useRef<{ id: string; control: string; from: number; at: number } | null>(null);
+  // A drag moved the handle's pointer: the click that follows it (a mouse sends one; a finger does not) is no tap on the handle.
   const dragMoved = useRef(false);
   // After a rename ended with a key, the row's title button gets the focus back (the input that had it is gone).
   const refocusTitle = useRef<string | null>(null);
@@ -104,7 +106,7 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     if (moved !== null) {
       rows.current.get(moved.id)?.querySelector<HTMLElement>(moved.control)?.focus();
       const to = subtasks.findIndex((s) => s.id === moved.id);
-      if (to !== -1 && to !== moved.from) setAnnouncement(t("subtask.moved", { title: subtasks[to].title, position: String(to + 1), total: String(subtasks.length) }));
+      if (to !== -1 && to !== moved.from) announce(t("subtask.moved", { title: subtasks[to].title, position: String(to + 1), total: String(subtasks.length) }));
     }
     refocus.current = null;
   }, [subtasks]);
@@ -112,6 +114,10 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     if (editingId === null && refocusTitle.current !== null) rows.current.get(refocusTitle.current)?.querySelector<HTMLElement>(".subtask-title")?.focus();
     refocusTitle.current = null;
   }, [editingId]);
+
+  function announce(text: string) {
+    setAnnouncement((current) => ({ text, n: current.n + 1 }));
+  }
 
   function tick(subtask: Subtask) {
     // What the tick does, and whether it is the last open one, is decided on the Subtasks with the ticks still being saved.
@@ -148,8 +154,14 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
 
   /** One place up or down, from where the Subtask is when the move runs: the order shown may be behind a held key or a quick tap. */
   function moveBy(subtask: Subtask, index: number, by: number, control: string) {
-    const from = refocus.current?.id === subtask.id ? refocus.current.from : index;
-    refocus.current = { id: subtask.id, control, from };
+    const pending = refocus.current?.id === subtask.id ? refocus.current : null;
+    const from = pending?.from ?? index;
+    const at = pending?.at ?? index;
+    const to = Math.min(Math.max(at + by, 0), subtasks.length - 1);
+    refocus.current = { id: subtask.id, control, from, at: to };
+    // A press that cannot move the row (the first one up, the last one down) says so: it is not a dead press.
+    if (to === at) announce(t(by < 0 ? "subtask.first" : "subtask.last", { title: subtask.title }));
+    // The store clamps by itself, from where the Subtask is when the move runs.
     void onMoveBy(subtask.id, by);
   }
 
@@ -212,11 +224,13 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
   function endDrag(e: PointerEvent<HTMLButtonElement>, drop: boolean) {
     if (!dragging || e.pointerId !== dragging.pointerId || dragging.dropped) return;
     if (drop && dragging.target !== dragFrom) {
-      setDrag({ ...dragging, dropped: true, dy: waySlot(dragFrom, dragging.target) });
+      const dropped = { ...dragging, dropped: true, dy: waySlot(dragFrom, dragging.target) };
+      setDrag(dropped);
       // The drag ends when the move settles, whatever order was saved (another device may have moved or deleted
-      // meanwhile) and also when it failed (the row then goes back). The move resolves after the reload has set the new
-      // order, so React shows that order and the end of the drag in one render: no row jumps.
-      void Promise.resolve(onMove(dragging.id, dragging.target)).finally(() => setDrag(null));
+      // meanwhile) and also when it failed (the row then goes back). The move resolves after the reload has handed the
+      // new order on (see `createListReader`), so React shows that order and the end of the drag in one render: no row
+      // jumps. Only this drop's drag ends: the person may have grabbed another row while the move was being saved.
+      void Promise.resolve(onMove(dragging.id, dragging.target)).finally(() => setDrag((current) => (current === dropped ? null : current)));
     } else {
       setDrag(null);
     }
@@ -305,9 +319,11 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
                     aria-expanded={movingId === subtask.id}
                     aria-controls={movingId === subtask.id ? `subtask-moves-${subtask.id}` : undefined}
                     onKeyDown={(e) => moveWithKeys(e, subtask, index, ".subtask-handle")}
-                    // A tap (or Enter, or Space) shows the Move buttons; the click that ends a drag is none.
-                    onClick={() => {
-                      if (dragMoved.current) dragMoved.current = false;
+                    // A tap (or Enter, or Space) shows the Move buttons; the click that ends a mouse drag is none. A click
+                    // from the keyboard or a screen reader (`detail` 0) never ends a drag: after a finger drag, which
+                    // sends no click, the flag is still set, and that click must open the buttons.
+                    onClick={(e) => {
+                      if (dragMoved.current && e.detail > 0) dragMoved.current = false;
                       else setMovingId(movingId === subtask.id ? null : subtask.id);
                     }}
                     onPointerDown={(e) => startDrag(e, subtask, index)}
@@ -366,9 +382,9 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
       <span id="subtask-reorder-hint" className="visually-hidden">
         {t("subtask.reorderHint")}
       </span>
-      {/* Says where a Subtask went after an arrow key moved it; a live region, not role="status": the sync line is the page's one status. */}
+      {/* Says where a Subtask went after an arrow key or a Move button moved it, or that it is at the end already; a live region, not role="status": the sync line is the page's one status. */}
       <span className="visually-hidden" aria-live="polite" aria-atomic="true">
-        {announcement}
+        <span key={announcement.n}>{announcement.text}</span>
       </span>
 
       {offering && (
