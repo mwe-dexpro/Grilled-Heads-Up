@@ -1,4 +1,4 @@
-import { expect, test as base } from "@playwright/test";
+import { expect, test as base, type Locator } from "@playwright/test";
 
 /**
  * `test` for the app's tests: sync is blocked, so the tests that share one server and owner don't pass
@@ -13,3 +13,32 @@ export const test = base.extend({
 });
 
 export { expect };
+
+/** The kinds of touch event the tests send through the DevTools protocol (`Input.dispatchTouchEvent`). */
+export type TouchType = "touchStart" | "touchMove" | "touchEnd" | "touchCancel";
+
+/** Where an element is on the page; fails the test, saying so, when it is not shown (`boundingBox()` is then null). */
+export async function boxOf(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error(`${locator.toString()} is not shown, so it has no box.`);
+  return box;
+}
+
+/** What an element says; fails the test, saying so, when it has no text content (a text node or the document). */
+export async function textOf(locator: Locator): Promise<string> {
+  const text = await locator.textContent();
+  if (text === null) throw new Error(`${locator.toString()} has no text content.`);
+  return text;
+}
+
+/** The base URL of the project a test runs in; every project of this suite has one. */
+export function siteUrl(baseURL: string | undefined): string {
+  if (baseURL === undefined) throw new Error("The Playwright project has no baseURL.");
+  return baseURL;
+}
+
+/** The value, failing the test, saying what was missing, when there is none. */
+export function present<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`Expected ${what}, but there was none.`);
+  return value;
+}

@@ -3,6 +3,7 @@ import type { Event } from "../events/event";
 import type { Task } from "../tasks/taskStore";
 import { arrangeHome, bucketOf, isLate, isOverdueEmphasised, taskMeta, type BucketKind } from "./buckets";
 import { addDays, daysBetween, dayOf } from "./days";
+import { defined } from "../testing/defined";
 
 /** Sunday 4 October 2026, 13:05 local time. */
 const now = new Date(2026, 9, 4, 13, 5);
@@ -97,16 +98,20 @@ describe("isLate", () => {
   });
 });
 
+describe("the order of Tasks in a Bucket", () => {
+  it("orders Tasks of one day by time, then by when they were made", () => {
+    const late = task({ date: today, time: "18:00" });
+    const early = task({ date: today, time: "08:00" });
+    const first = task({ date: today });
+    const second = task({ date: today });
+
+    expect(bucket("today", [second, late, early, first]).tasks.map((t) => t.id)).toEqual([first.id, second.id, early.id, late.id]);
+  });
+});
+
 describe("arrangeHome", () => {
   it("returns every Bucket in home-screen order", () => {
-    expect(arrangeHome([], now).map((b) => b.kind)).toEqual([
-      "overdue",
-      "today",
-      "tomorrow",
-      "nextDays",
-      "later",
-      "inbox",
-    ]);
+    expect(arrangeHome([], now).map((b) => b.kind)).toEqual(["overdue", "today", "tomorrow", "nextDays", "later", "inbox"]);
   });
 
   it("gives each Bucket its first and last day", () => {
@@ -129,15 +134,18 @@ describe("arrangeHome", () => {
 
     const home = arrangeHome([completedToday, completedYesterday, overdueCompletedToday, inboxCompletedLastWeek], now);
 
-    expect(home.find((b) => b.kind === "today")!.tasks).toEqual([completedToday]);
-    expect(home.find((b) => b.kind === "overdue")!.tasks).toEqual([overdueCompletedToday]);
-    expect(home.find((b) => b.kind === "inbox")!.tasks).toEqual([]);
+    expect(defined(home.find((b) => b.kind === "today")).tasks).toEqual([completedToday]);
+    expect(defined(home.find((b) => b.kind === "overdue")).tasks).toEqual([overdueCompletedToday]);
+    expect(defined(home.find((b) => b.kind === "inbox")).tasks).toEqual([]);
   });
 
   it("keeps a Task Completed today crossed out until 23:59 and drops it from its Bucket at midnight", () => {
     const completed = task({ date: today, completedAt: new Date(2026, 9, 4, 8, 0).toISOString() });
     const openOne = task({ date: today });
-    const shownAt = (moment: Date) => arrangeHome([completed, openOne], moment).flatMap((b) => b.tasks).map((t) => [t.id, t.completedAt !== null]);
+    const shownAt = (moment: Date) =>
+      arrangeHome([completed, openOne], moment)
+        .flatMap((b) => b.tasks)
+        .map((t) => [t.id, t.completedAt !== null]);
 
     expect(shownAt(new Date(2026, 9, 4, 23, 59, 59))).toEqual([
       [completed.id, true],
@@ -168,13 +176,7 @@ describe("arrangeHome", () => {
     const older = task({ date: "2026-09-20", time: "23:00" });
     const untimedFirst = task({ date: "2026-10-03", createdAt: new Date(2026, 0, 1).toISOString() });
 
-    expect(bucket("overdue", [later, early, untimedSecond, older, untimedFirst]).tasks).toEqual([
-      older,
-      untimedFirst,
-      untimedSecond,
-      early,
-      later,
-    ]);
+    expect(bucket("overdue", [later, early, untimedSecond, older, untimedFirst]).tasks).toEqual([older, untimedFirst, untimedSecond, early, later]);
   });
 
   it("puts an untimed Task before a timed one on the same day, whichever was created first", () => {
@@ -206,7 +208,7 @@ describe("Overdue badge emphasis", () => {
 
   it("does not count Overdue Tasks Completed today", () => {
     const tasks = overdueTasks(5);
-    tasks[0] = { ...tasks[0], completedAt: now.toISOString() };
+    tasks[0] = { ...defined(tasks[0]), completedAt: now.toISOString() };
 
     expect(isOverdueEmphasised(bucket("overdue", tasks))).toBe(false);
   });
@@ -260,8 +262,7 @@ function event(fields: Partial<Event> = {}): Event {
 }
 
 describe("Events on the home screen", () => {
-  const eventsIn = (kind: BucketKind, events: Event[]) =>
-    arrangeHome([], now, events).find((b) => b.kind === kind)!.events.map((e) => e.title);
+  const eventsIn = (kind: BucketKind, events: Event[]) => defined(arrangeHome([], now, events).find((b) => b.kind === kind)).events.map((e) => e.title);
 
   it("puts an Event into the Bucket of the day it starts", () => {
     const events = [
@@ -285,7 +286,11 @@ describe("Events on the home screen", () => {
     ];
 
     expect(eventsIn("today", events)).toEqual(["Ongoing", "Ends today"]);
-    expect(arrangeHome([], now, events).flatMap((b) => b.events).map((e) => e.title)).not.toContain("Passed");
+    expect(
+      arrangeHome([], now, events)
+        .flatMap((b) => b.events)
+        .map((e) => e.title),
+    ).not.toContain("Passed");
   });
 
   it("orders a Bucket's Events by when they start", () => {
@@ -305,8 +310,8 @@ describe("Events on the home screen", () => {
 
     const home = arrangeHome([gift, cake], now, [birthday]);
 
-    expect(home.find((b) => b.kind === "today")!.tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
-    expect(home.find((b) => b.kind === "tomorrow")!.tasks.map((t) => t.id)).toEqual([gift.id]);
+    expect(defined(home.find((b) => b.kind === "today")).tasks.map((t) => [t.id, t.date])).toEqual([[cake.id, today]]);
+    expect(defined(home.find((b) => b.kind === "tomorrow")).tasks.map((t) => t.id)).toEqual([gift.id]);
   });
 
   it("treats a Linked task whose Event hasn't arrived on this device (yet) as undated", () => {
@@ -315,8 +320,8 @@ describe("Events on the home screen", () => {
 
     const home = arrangeHome([orphan], now, [other]);
 
-    expect(home.find((b) => b.kind === "inbox")!.tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
-    expect(taskMeta(home.find((b) => b.kind === "inbox")!.tasks[0], "inbox", now)).toBeNull();
+    expect(defined(home.find((b) => b.kind === "inbox")).tasks.map((t) => [t.id, t.date])).toEqual([[orphan.id, null]]);
+    expect(taskMeta(defined(defined(home.find((b) => b.kind === "inbox")).tasks[0]), "inbox", now)).toBeNull();
   });
 });
 

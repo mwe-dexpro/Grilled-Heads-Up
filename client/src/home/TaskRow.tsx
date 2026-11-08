@@ -6,7 +6,7 @@ import { putsEventAtRisk } from "../events/risk";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
 import { SubtaskCount } from "../subtasks/SubtaskCount";
-import type { Task } from "../tasks/taskStore";
+import { isDated, type Task } from "../tasks/taskStore";
 import { TaskSwipeRow, type TaskActions } from "../tasks/TaskSwipeRow";
 import { taskMeta, type BucketKind, type Progress } from "./buckets";
 import { formatShortDay, formatTime } from "./format";
@@ -16,14 +16,14 @@ interface TaskRowProps {
   bucket: BucketKind;
   now: Date;
   /** The Event of a Linked task; its name opens the Event view. */
-  event?: Event;
+  event?: Event | undefined;
   /** The Task's List; its name opens the Project view, in place of an Event name. Left out where the List is the screen. */
-  list?: List;
+  list?: List | undefined;
   /** Ids of the Events on this device. */
   eventIds: { has(id: string): boolean };
   actions: TaskActions;
   /** How many of the Task's Subtasks are ticked; undefined when it has none. Ends the second line ("3/5"). */
-  subtasks?: Progress;
+  subtasks?: Progress | undefined;
 }
 
 export function TaskRow({ task, bucket, now, event, list, eventIds, actions, subtasks }: TaskRowProps) {
@@ -42,11 +42,11 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
   } else if (meta?.kind === "offset") {
     metaText = formatOffset(meta.offsetDays, t);
   } else if (meta?.kind === "date") {
-    metaText = [formatShortDay(meta.date, language), meta.time && formatTime(meta.time, language)].filter(Boolean).join(" · ");
+    metaText = [formatShortDay(meta.date, language), meta.time !== null ? formatTime(meta.time, language) : null].filter(Boolean).join(" · ");
   }
 
   // An Overdue Preparation task says it puts its Event At risk, instead of its age.
-  const atRisk = event !== undefined && meta?.kind === "overdue" && putsEventAtRisk(task, event, now);
+  const atRisk = event !== undefined && meta?.kind === "overdue" && isDated(task) && putsEventAtRisk(task, event, now);
   const eventLink = event && (
     <a className={atRisk ? "event-link at-risk" : "event-link"} href={hrefOf({ name: "event", id: event.id })}>
       {event.title}
@@ -58,7 +58,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
       {list.name}
     </a>
   );
-  const place = eventLink || listLink;
+  const place = eventLink ?? listLink;
   const [beforeEvent, afterEvent] = t("risk.putsAtRisk").split("{event}");
 
   // The second line: what the row says about the Task, then " · " and the Subtask count (ALIGNMENT §1).
@@ -71,7 +71,7 @@ export function TaskRow({ task, bucket, now, event, list, eventIds, actions, sub
             {afterEvent}
           </Fragment>,
         ]
-      : [place, metaText && <span className={warning ? "warning" : undefined}>{metaText}</span>]),
+      : [place, metaText !== null && <span className={warning ? "warning" : undefined}>{metaText}</span>]),
     subtasks && subtasks.total > 0 && <SubtaskCount progress={subtasks} />,
   ].filter(Boolean);
 

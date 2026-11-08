@@ -10,18 +10,12 @@ const tabs: { tab: Tab; icon: LucideIcon }[] = [
 ];
 
 /** `current` is undefined on screens below a tab, such as the Event view. */
-export function TabBar({ current, onSelect }: { current: Tab | undefined; onSelect(tab: Tab): void }) {
+export function TabBar({ current, onSelect }: { current: Tab | undefined; onSelect: (tab: Tab) => void }) {
   const { t } = useI18n();
   return (
     <nav className="tab-bar" aria-label={t("tabs.label")}>
       {tabs.map(({ tab, icon: Icon }) => (
-        <button
-          key={tab}
-          type="button"
-          className="tab"
-          aria-current={tab === current ? "page" : undefined}
-          onClick={() => onSelect(tab)}
-        >
+        <button key={tab} type="button" className="tab" aria-current={tab === current ? "page" : undefined} onClick={() => onSelect(tab)}>
           <Icon size={22} strokeWidth={1.5} aria-hidden="true" />
           <span>{t(`tabs.${tab}`)}</span>
         </button>

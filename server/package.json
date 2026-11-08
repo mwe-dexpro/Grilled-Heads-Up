@@ -2,19 +2,26 @@
   "name": "@grilled-heads-up/server",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "start": "node --disable-warning=ExperimentalWarning dist/server.js"
+    "test": "vitest run --coverage --reporter=default --reporter=json --outputFile.json=reports/test-results.json",
+    "start": "node --disable-warning=ExperimentalWarning dist/server.js",
+    "test:mutation": "stryker run"
   },
   "dependencies": {
     "@simplewebauthn/server": "^14.0.3",
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.4",
+    "@vitest/coverage-v8": "^4.1.12",
     "vitest": "^4.1.11"
   }
 }

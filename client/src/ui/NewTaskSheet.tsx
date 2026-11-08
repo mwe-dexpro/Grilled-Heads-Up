@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { List } from "../lists/listStore";
@@ -7,10 +7,10 @@ import type { TaskWhen } from "../tasks/taskStore";
 interface NewTaskSheetProps {
   open: boolean;
   /** The List the Project view is showing: the Task is added to it. Elsewhere there is none. */
-  list?: List;
-  onAdd(title: string, when: TaskWhen, listId: string | null): void;
-  onNewEvent(): void;
-  onClose(): void;
+  list?: List | undefined;
+  onAdd: (title: string, when: TaskWhen, listId: string | null) => void;
+  onNewEvent: () => void;
+  onClose: () => void;
 }
 
 /** Quick add: a title, and optionally a date and time. Without a date the Task goes to the Inbox. */
@@ -28,7 +28,7 @@ export function NewTaskSheet({ open, list, onAdd, onNewEvent, onClose }: NewTask
     if (!open && element.open) element.close();
   }, [open]);
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SyntheticEvent) {
     event.preventDefault();
     if (title.trim() === "") return;
     onAdd(title, { date: date || null, time: date && time ? time : null }, list?.id ?? null);

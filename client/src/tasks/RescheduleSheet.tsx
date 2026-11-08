@@ -13,8 +13,8 @@ interface RescheduleSheetProps {
   today: Day;
   /** The earliest day every Task in the sheet can go to. */
   earliest: Day;
-  onChoose(day: Day): void;
-  onClose(): void;
+  onChoose: (day: Day) => void;
+  onClose: () => void;
 }
 
 /**
@@ -31,8 +31,9 @@ export function RescheduleSheet({ open, title, today, earliest, onChoose, onClos
     if (!element) return;
     if (open && !element.open) element.showModal();
     if (!open && element.open) element.close();
-    if (!open) setPicking(false);
   }, [open]);
+  // Closed, the sheet starts at its options again (state adjusted while rendering, not in an effect).
+  if (!open && picking) setPicking(false);
 
   return (
     <dialog ref={dialog} className="sheet" aria-labelledby="reschedule-heading" onClose={onClose}>

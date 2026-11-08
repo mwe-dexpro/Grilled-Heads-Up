@@ -2,23 +2,50 @@
   "name": "grilled-heads-up",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "workspaces": [
     "client",
-    "server"
+    "server",
+    "tools"
   ],
   "scripts": {
     "dev": "npm run dev -w client",
     "build": "npm run build -w client && npm run build -w server",
     "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server && npm run typecheck -w tools && tsc -p tsconfig.json",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "npm run test -w client && npm run test -w server",
-    "test:e2e": "npm run build && playwright test",
-    "test:mutation": "npm run test:mutation -w client"
+    "test:unit": "npm run test -w client && npm run test -w server && npm run test -w tools && npm run check:left-out -- vitest=client/reports/test-results.json vitest=server/reports/test-results.json vitest=tools/reports/test-results.json",
+    "test:e2e": "npm run build && playwright test && npm run check:left-out -- playwright=reports/e2e-results.json",
+    "test:mutation": "npm run test:mutation -w client && npm run test:mutation -w server && npm run test:mutation -w tools",
+    "lint:eslint": "eslint . --max-warnings 0",
+    "lint:format": "prettier --check .",
+    "format": "prettier --write .",
+    "lint:knip": "knip",
+    "lint": "npm run lint:eslint && npm run lint:knip && npm run lint:format && npm run lint:skips",
+    "check:left-out": "npm run build -w tools && node tools/dist/bin/leftOutTests.js",
+    "lint:skips": "npm run build -w tools && node tools/dist/bin/checkSkips.js",
+    "security:allowlist": "npm run build -w tools && node tools/dist/bin/allowlist.js",
+    "security:audit": "npm run build -w tools && npm audit --json | node tools/dist/bin/npmAudit.js",
+    "security:ignorefiles": "npm run build -w tools && node tools/dist/bin/ignoreFiles.js"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.63.0",
-    "typescript": "~6.0.3"
+    "@vitest/eslint-plugin": "^1.6.28",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-n": "^18.5.0",
+    "eslint-plugin-playwright": "^2.12.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-security": "^4.2.1",
+    "globals": "^17.14.0",
+    "knip": "^6.44.2",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1"
   },
   "overrides": {
     "qs": "^6.16.0",

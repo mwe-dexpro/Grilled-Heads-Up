@@ -7,13 +7,13 @@ import type { Task } from "./taskStore";
 
 /** What a Task row can start; the app decides what each does (sheets, the undo toast, the stores). */
 export interface TaskActions {
-  complete(id: string): void;
+  complete: (id: string) => void;
   /** Opens the Reschedule sheet for these Tasks. */
-  reschedule(tasks: Task[]): void;
+  reschedule: (tasks: Task[]) => void;
   /** Deletes the Task (to the Trash) and offers to undo it. */
-  remove(task: Task): void;
+  remove: (task: Task) => void;
   /** Opens the Task actions sheet: the way to the actions without swiping. */
-  openMenu(task: Task): void;
+  openMenu: (task: Task) => void;
 }
 
 interface TaskSwipeRowProps {

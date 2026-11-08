@@ -5,9 +5,9 @@ import { receive, tick, type Timestamp } from "./hlc";
  * The sync code works on any IndexedDB that has the stores of its record types plus the ones below, so it
  * is typed loosely: which stores hold which record types is the registry's business, not the database's.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- idb cannot name "a database of any schema": IDBPDatabase<AppDb> and a test's own schema are not assignable to a common type (#36 removes it)
 export type SyncDb = IDBPDatabase<any>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- same as SyncDb (#36)
 export type SyncTransaction = IDBPTransaction<any, string[], "readwrite">;
 
 /** When each field of a record was last set, kept apart from the record so Tasks and Events stay clean. */
@@ -32,7 +32,7 @@ export interface OutboxEntry {
   rejectedAt?: number;
 }
 
-export const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;
+const syncStoreNames = ["fieldClocks", "outbox", "syncInfo"] as const;
 
 /** Adds the stores sync needs; call it from the database upgrade that introduces sync. */
 export function createSyncStores(db: SyncDb): void {
@@ -69,7 +69,7 @@ export async function stampLocalChange(tx: SyncTransaction, now: Date): Promise<
 }
 
 /** Moves the clock past timestamps seen elsewhere (other devices' changes, the server's time). */
-export async function receiveTimestamps(tx: SyncTransaction, seen: Array<Pick<Timestamp, "wall" | "counter">>, now: Date): Promise<void> {
+export async function receiveTimestamps(tx: SyncTransaction, seen: Pick<Timestamp, "wall" | "counter">[], now: Date): Promise<void> {
   const info = tx.objectStore("syncInfo");
   let clock = await loadClock(tx);
   for (const remote of seen) clock = receive(clock, remote, now.getTime());

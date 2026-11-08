@@ -66,6 +66,7 @@ describe("formatEventWhen", () => {
     expect(inOtherTimeZone(timed)).toBe(false);
     expect(inOtherTimeZone({ ...timed, timeZone: "America/New_York" })).toBe(true);
     expect(inOtherTimeZone({ ...timed, allDay: true, timeZone: null })).toBe(false);
+    expect(inOtherTimeZone({ ...timed, timeZone: null })).toBe(false);
   });
 });
 

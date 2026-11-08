@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 
 interface NewListSheetProps {
   open: boolean;
-  onCreate(name: string, isProject: boolean): void;
-  onClose(): void;
+  onCreate: (name: string, isProject: boolean) => void;
+  onClose: () => void;
 }
 
 /** A name, and whether the List is a Project. The new List shows on the Projects tab. */
@@ -22,7 +22,7 @@ export function NewListSheet({ open, onCreate, onClose }: NewListSheetProps) {
     if (!open && element.open) element.close();
   }, [open]);
 
-  function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: SyntheticEvent) {
     event.preventDefault();
     if (name.trim() === "") return;
     onCreate(name, isProject);

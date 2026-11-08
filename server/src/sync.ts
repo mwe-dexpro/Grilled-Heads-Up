@@ -14,7 +14,7 @@ interface Change {
   hlc: string;
 }
 
-export const maxChangesPerRequest = 500;
+const maxChangesPerRequest = 500;
 
 // The client checks every registered record type against copies of these two patterns
 // (`client/src/sync/recordTypes.test.ts`); change them in both places.
@@ -38,8 +38,13 @@ function isChange(value: unknown): value is Change {
     typeof hlc === "string" &&
     hlcPattern.test(hlc) &&
     "value" in value &&
-    (value as Record<string, unknown>).value !== undefined
+    (value as Record<string, unknown>)["value"] !== undefined
   );
+}
+
+/** Stored values are JSON text the server wrote itself; what they hold is the clients' business. */
+function parseJson(text: string): unknown {
+  return JSON.parse(text);
 }
 
 /** A non-negative whole number from a query string, or the fallback when absent; null when it isn't one. */
@@ -68,7 +73,8 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
   );
 
   routes.post("/push", (req, res) => {
-    const changes: unknown = req.body?.changes;
+    const body: unknown = req.body;
+    const changes: unknown = typeof body === "object" && body !== null && "changes" in body ? body.changes : undefined;
     if (!Array.isArray(changes) || changes.length > maxChangesPerRequest) {
       res.status(400).json({ error: `Send an array of at most ${maxChangesPerRequest} changes.` });
       return;
@@ -80,10 +86,10 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
       res.status(400).json({ error: `Change ${index} is malformed.`, index });
       return;
     }
-    const ownerId = res.locals.userId as string;
+    const ownerId = res.locals["userId"] as string;
     transaction(db, () => {
       let seq = (lastSeq.get(ownerId) as { seq: number }).seq;
-      for (const { type, id, field, value, hlc } of changes) {
+      for (const { type, id, field, value, hlc } of changes.filter(isChange)) {
         const { changes: written } = upsert.run(ownerId, type, id, field, JSON.stringify(value), hlc, seq + 1);
         if (written > 0) seq += 1;
       }
@@ -92,17 +98,17 @@ export function createSyncRoutes(db: DatabaseSync): express.Router {
   });
 
   routes.get("/pull", (req, res) => {
-    const after = wholeNumber(req.query.after, 0);
-    const limit = wholeNumber(req.query.limit, maxChangesPerRequest);
+    const after = wholeNumber(req.query["after"], 0);
+    const limit = wholeNumber(req.query["limit"], maxChangesPerRequest);
     if (after === null || limit === null || limit < 1 || limit > maxChangesPerRequest) {
       res.status(400).json({ error: "after must be a whole number and limit between 1 and 500." });
       return;
     }
-    const rows = feed.all(res.locals.userId as string, after, limit + 1) as unknown as Array<Change & { value: string; seq: number }>;
+    const rows = feed.all(res.locals["userId"] as string, after, limit + 1) as unknown as (Change & { value: string; seq: number })[];
     const page = rows.slice(0, limit);
     res.json({
-      changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: JSON.parse(value), hlc })),
-      cursor: page.length > 0 ? page[page.length - 1].seq : after,
+      changes: page.map(({ type, id, field, value, hlc }) => ({ type, id, field, value: parseJson(value), hlc })),
+      cursor: page.at(-1)?.seq ?? after,
       more: rows.length > limit,
       serverTime: Date.now(),
     });

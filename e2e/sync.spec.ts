@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { devices, expect, test, type Browser, type Page } from "@playwright/test";
+import { siteUrl, textOf } from "./fixtures";
 import { syncOwnerState } from "./passkeys";
 
 // These tests run on a server and an owner of their own (see playwright.config.ts); every test uses titles
@@ -35,8 +36,8 @@ async function syncUntil(page: Page, done: (timeout: number) => Promise<void>) {
 }
 
 test("a Task added offline on one device shows on the other after it is back online and both sync", async ({ browser, baseURL }) => {
-  const phone = await device(browser, baseURL!);
-  const desktop = await device(browser, baseURL!);
+  const phone = await device(browser, siteUrl(baseURL));
+  const desktop = await device(browser, siteUrl(baseURL));
   const title = uniqueTitle("Added in airplane mode");
   // The desktop is up to date before the phone adds anything, so that not seeing the Task later means something.
   await desktop.page.getByRole("button", { name: "Sync now" }).click();
@@ -64,8 +65,8 @@ test("a Task added offline on one device shows on the other after it is back onl
 });
 
 test("Completing a Task on one device reaches the other", async ({ browser, baseURL }) => {
-  const phone = await device(browser, baseURL!);
-  const desktop = await device(browser, baseURL!);
+  const phone = await device(browser, siteUrl(baseURL));
+  const desktop = await device(browser, siteUrl(baseURL));
   const title = uniqueTitle("Book the table");
   await addTask(phone.page, title);
   await phone.page.getByRole("button", { name: "Sync now" }).click();
@@ -83,7 +84,7 @@ test("the footer shows when the last sync happened, also after a reload", async 
 
   await page.getByRole("button", { name: "Sync now" }).click();
   await expect(syncStatus(page)).toHaveText(/^Synced \d{1,2}:\d{2}/);
-  const synced = (await syncStatus(page).textContent())!.replace("Synced ", "");
+  const synced = (await textOf(syncStatus(page))).replace("Synced ", "");
 
   // Reload with sync blocked, so the line can only show what the device remembered.
   await page.route("**/api/sync/**", (route) => route.abort());
@@ -103,7 +104,7 @@ test("a screen reader hears the sync line when it means something new, not at ev
 });
 
 test("when the session has expired, the next sync leads to the sign-in screen and keeps the data", async ({ browser, baseURL }) => {
-  const phone = await device(browser, baseURL!);
+  const phone = await device(browser, siteUrl(baseURL));
   const title = uniqueTitle("Kept while signed out");
   await addTask(phone.page, title);
   const session = await phone.context.cookies();
@@ -118,13 +119,13 @@ test("when the session has expired, the next sync leads to the sign-in screen an
     () =>
       new Promise<string[]>((resolve, reject) => {
         const open = indexedDB.open("grilled-heads-up");
-        open.onerror = () => reject(open.error);
+        open.onerror = () => reject(open.error ?? new Error("indexedDB.open failed"));
         open.onsuccess = () => {
           const request = open.result.transaction("tasks").objectStore("tasks").getAll();
-          request.onerror = () => reject(request.error);
+          request.onerror = () => reject(request.error ?? new Error("the IndexedDB request failed"));
           request.onsuccess = () => {
             open.result.close();
-            resolve((request.result as Array<{ title: string }>).map((task) => task.title));
+            resolve((request.result as { title: string }[]).map((task) => task.title));
           };
         };
       }),
@@ -137,12 +138,12 @@ test("when the session has expired, the next sync leads to the sign-in screen an
   await expect(phone.page.getByText(title)).toBeVisible();
   await phone.page.getByRole("button", { name: "Sync now" }).click();
   await expect(syncStatus(phone.page)).toHaveText(/^Synced/);
-  const other = await device(browser, baseURL!);
+  const other = await device(browser, siteUrl(baseURL));
   await syncUntil(other.page, (timeout) => expect(other.page.getByText(title)).toBeVisible({ timeout }));
 });
 
 test("a tab that another tab's database upgrade waits for lets go and asks to be reloaded", async ({ browser, baseURL }) => {
-  const phone = await device(browser, baseURL!);
+  const phone = await device(browser, siteUrl(baseURL));
   const other = await phone.context.newPage();
   await other.goto("/");
 
@@ -156,7 +157,7 @@ test("a tab that another tab's database upgrade waits for lets go and asks to be
           resolve();
         };
         request.onblocked = () => reject(new Error("blocked by the other tab"));
-        request.onerror = () => reject(request.error);
+        request.onerror = () => reject(request.error ?? new Error("the IndexedDB request failed"));
       }),
   );
 
@@ -165,7 +166,7 @@ test("a tab that another tab's database upgrade waits for lets go and asks to be
 });
 
 test("the sync routes refuse requests without a session", async ({ playwright, baseURL }) => {
-  const stranger = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+  const stranger = await playwright.request.newContext({ ...(baseURL === undefined ? {} : { baseURL }), storageState: { cookies: [], origins: [] } });
 
   expect((await stranger.get("/api/sync/pull")).status()).toBe(401);
   expect((await stranger.post("/api/sync/push", { data: { changes: [] } })).status()).toBe(401);

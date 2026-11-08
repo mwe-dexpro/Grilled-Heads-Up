@@ -39,6 +39,8 @@ describe("remembering sign-in", () => {
 
     saveSignedIn(fake, true);
     expect(loadSignedIn(fake)).toBe(true);
+    // The key and value are what this device has stored: renaming them would sign every device out of the offline app.
+    expect(storage.get("signedIn")).toBe("yes");
 
     saveSignedIn(fake, false);
     expect(loadSignedIn(fake)).toBe(false);

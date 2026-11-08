@@ -11,20 +11,24 @@ const fieldPattern = /^[a-zA-Z][a-zA-Z0-9]{0,63}$/;
 /** What the server would refuse about a record type's name and the fields of its records. */
 function namesTheServerRefuses({ type, withDefaults }: RecordType<Synced>): string[] {
   const fields = Object.keys(withDefaults({ id: "x" })).filter((field) => field !== "id");
-  return [
-    ...(typePattern.test(type) ? [] : [`type ${type}`]),
-    ...fields.filter((field) => !fieldPattern.test(field)).map((field) => `field ${field}`),
-  ];
+  return [...(typePattern.test(type) ? [] : [`type ${type}`]), ...fields.filter((field) => !fieldPattern.test(field)).map((field) => `field ${field}`)];
 }
 
 const fakeType = (type: string, fields: string[]) =>
-  ({ type, storeName: "tasks", withDefaults: (record) => ({ deletedAt: null, ...Object.fromEntries(fields.map((field) => [field, ""])), ...record }) }) as RecordType<Synced>;
+  ({
+    type,
+    storeName: "tasks",
+    withDefaults: (record) => ({ deletedAt: null, ...Object.fromEntries(fields.map((field) => [field, ""])), ...record }),
+  }) as RecordType<Synced>;
 
 describe("the registered record types", () => {
-  it.each(recordTypes.map((recordType) => [recordType.type, recordType] as const))("%s: the type and every field are names the server takes", (_type, recordType) => {
-    expect(namesTheServerRefuses(recordType)).toEqual([]);
-    expect(Object.keys(recordType.withDefaults({ id: "x" }))).toContain("deletedAt");
-  });
+  it.each(recordTypes.map((recordType) => [recordType.type, recordType] as const))(
+    "%s: the type and every field are names the server takes",
+    (_type, recordType) => {
+      expect(namesTheServerRefuses(recordType)).toEqual([]);
+      expect(Object.keys(recordType.withDefaults({ id: "x" }))).toContain("deletedAt");
+    },
+  );
 
   it("each have a name and a store of their own", () => {
     expect(new Set(recordTypes.map(({ type }) => type)).size).toBe(recordTypes.length);

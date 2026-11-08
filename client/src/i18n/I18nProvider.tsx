@@ -1,17 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import {
-  defaultLanguage,
-  loadLanguage,
-  saveLanguage,
-  translate,
-  type Language,
-  type TranslationKey,
-} from "./i18n";
+import { defaultLanguage, loadLanguage, saveLanguage, translate, type Language, type TranslationKey } from "./i18n";
 
 interface I18n {
   language: Language;
-  setLanguage(language: Language): void;
-  t(key: TranslationKey, params?: Record<string, string>): string;
+  setLanguage: (language: Language) => void;
+  t: (key: TranslationKey, params?: Record<string, string>) => string;
 }
 
 const I18nContext = createContext<I18n | null>(null);

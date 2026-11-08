@@ -26,7 +26,7 @@ export interface Bucket {
 const nextDaysCount = 3;
 
 /** The Overdue badge gets stronger emphasis from this many open Tasks. */
-export const overdueEmphasisFrom = 5;
+const overdueEmphasisFrom = 5;
 
 export function isOverdueEmphasised(overdue: Pick<Bucket, "open">): boolean {
   return overdue.open >= overdueEmphasisFrom;
@@ -68,9 +68,7 @@ export function bucketOf(task: Pick<Task, "date">, today: Day): BucketKind {
 
 /** Due today, its time has passed, and still open. A Late Task stays in Today; it is not Overdue. */
 export function isLate(task: Task, now: Date): boolean {
-  return (
-    task.completedAt === null && task.date === dayOf(now) && task.time !== null && task.time < timeOf(now)
-  );
+  return task.completedAt === null && task.date === dayOf(now) && task.time !== null && task.time < timeOf(now);
 }
 
 function isShown(task: Task, today: Day): boolean {
@@ -79,15 +77,11 @@ function isShown(task: Task, today: Day): boolean {
 
 /** Date, then untimed before timed, then time, then creation. Never completion, so Completing keeps a Task in place. */
 function compareTasks(a: Task, b: Task): number {
-  return (
-    (a.date ?? "").localeCompare(b.date ?? "") ||
-    (a.time ?? "").localeCompare(b.time ?? "") ||
-    a.createdAt.localeCompare(b.createdAt)
-  );
+  return (a.date ?? "").localeCompare(b.date ?? "") || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt);
 }
 
 /** The Bucket an Event shows in: the day it starts, or Today while it is going on; null once it has passed. */
-export function bucketOfEvent(event: Event, today: Day): BucketKind | null {
+function bucketOfEvent(event: Event, today: Day): BucketKind | null {
   const { first, last } = eventDays(event);
   if (last < today) return null;
   return first <= today ? "today" : bucketOf({ date: first }, today);
@@ -97,7 +91,7 @@ export function bucketOfEvent(event: Event, today: Day): BucketKind | null {
  * Groups Tasks and Events into the home screen's Buckets, in display order, as seen at `now`.
  * Linked tasks get their dates from their Events first.
  */
-export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): Bucket[] {
+export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): [Bucket, Bucket, ...Bucket[]] {
   const tasks = withEventDates(rawTasks, events);
   const today = dayOf(now);
   const tomorrow = addDays(today, 1);
@@ -112,12 +106,10 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
 
   const shown = tasks.filter((task) => isShown(task, today)).sort(compareTasks);
 
-  return (Object.keys(ranges) as BucketKind[]).map((kind) => {
+  const bucketOfKind = (kind: BucketKind): Bucket => {
     const inBucket = shown.filter((task) => bucketOf(task, today) === kind);
     const done = inBucket.filter((task) => task.completedAt !== null).length;
-    const bucketEvents = events
-      .filter((event) => bucketOfEvent(event, today) === kind)
-      .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
+    const bucketEvents = events.filter((event) => bucketOfEvent(event, today) === kind).sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime());
     return {
       kind,
       firstDay: ranges[kind][0],
@@ -127,5 +119,8 @@ export function arrangeHome(rawTasks: Task[], now: Date, events: Event[] = []): 
       progress: { done, total: inBucket.length },
       open: inBucket.length - done,
     };
-  });
+  };
+
+  // The order the home screen shows them in: Overdue and Today have a place of their own, the rest follow.
+  return [bucketOfKind("overdue"), bucketOfKind("today"), bucketOfKind("tomorrow"), bucketOfKind("nextDays"), bucketOfKind("later"), bucketOfKind("inbox")];
 }

@@ -7,7 +7,7 @@ import { openSubtaskStore, type Subtask, type SubtaskStore } from "../subtasks/s
 import { openTagStore, type Tag, type TagStore } from "../tags/tagStore";
 import { useSync } from "../sync/useSync";
 import { createListReader } from "./listReader";
-import { NoTaskError, openTaskStore, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
+import { NoTaskError, openTaskStore, type DeletedTask, type Task, type TaskStore, type TaskWhen } from "../tasks/taskStore";
 
 interface Stores {
   tasks: TaskStore;
@@ -25,7 +25,7 @@ export function useAppData() {
   const stores = useRef<Stores | null>(null);
   const [ready, setReady] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [trash, setTrash] = useState<Task[]>([]);
+  const [trash, setTrash] = useState<DeletedTask[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [lists, setLists] = useState<List[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -34,44 +34,47 @@ export function useAppData() {
   // Reads from the stores as they are when it runs, so a sync that reports changes while the stores are still
   // opening is not lost: the stores are set before the first read. Screens stay mounted, so an open form
   // keeps what was typed.
-  const reload = useMemo(
-    () =>
-      createListReader(
-        async () =>
-          stores.current
-            ? {
-                tasks: await stores.current.tasks.listTasks(),
-                trash: await stores.current.tasks.listTrash(),
-                events: await stores.current.events.listEvents(),
-                lists: await stores.current.lists.listLists(),
-                tags: await stores.current.tags.listTags(),
-                subtasks: await stores.current.subtasks.listSubtasks(),
-              }
-            : null,
-        (read) => {
-          setTasks(read.tasks);
-          setTrash(read.trash);
-          setEvents(read.events);
-          setLists(read.lists);
-          setTags(read.tags);
-          setSubtasks(read.subtasks);
-        },
-      ),
+  const readAll = useCallback(
+    async () =>
+      stores.current
+        ? {
+            tasks: await stores.current.tasks.listTasks(),
+            trash: await stores.current.tasks.listTrash(),
+            events: await stores.current.events.listEvents(),
+            lists: await stores.current.lists.listLists(),
+            tags: await stores.current.tags.listTags(),
+            subtasks: await stores.current.subtasks.listSubtasks(),
+          }
+        : null,
     [],
   );
-  const sync = useSync(reload);
+  const deliver = useCallback((read: NonNullable<Awaited<ReturnType<typeof readAll>>>) => {
+    setTasks(read.tasks);
+    setTrash(read.trash);
+    setEvents(read.events);
+    setLists(read.lists);
+    setTags(read.tags);
+    setSubtasks(read.subtasks);
+  }, []);
+  const reload = useMemo(() => createListReader(readAll, deliver), [readAll, deliver]);
+  const sync = useSync(() => void reload());
   const { syncSoon } = sync;
 
   useEffect(() => {
     let opened: Stores | null = null;
     let cancelled = false;
-    Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
-      opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
-      if (cancelled) return close(opened);
-      stores.current = opened;
-      await reload();
-      setReady(true);
-    });
+    void Promise.all([openTaskStore(), openEventStore(), openListStore(), openTagStore(), openSubtaskStore()]).then(
+      async ([taskStore, eventStore, listStore, tagStore, subtaskStore]) => {
+        opened = { tasks: taskStore, events: eventStore, lists: listStore, tags: tagStore, subtasks: subtaskStore };
+        if (cancelled) {
+          close(opened);
+          return;
+        }
+        stores.current = opened;
+        await reload();
+        setReady(true);
+      },
+    );
     return () => {
       cancelled = true;
       stores.current = null;
@@ -98,15 +101,9 @@ export function useAppData() {
   );
   const changeTasks = useCallback((change: (store: TaskStore) => Promise<unknown>) => changeStores((s) => change(s.tasks)), [changeStores]);
 
-  const addTask = useCallback(
-    (title: string, when?: TaskWhen, listId?: string | null) => changeTasks((s) => s.addTask(title, when, listId)),
-    [changeTasks],
-  );
+  const addTask = useCallback((title: string, when?: TaskWhen, listId?: string | null) => changeTasks((s) => s.addTask(title, when, listId)), [changeTasks]);
   const completeTask = useCallback((id: string) => changeTasks((s) => s.completeTask(id)), [changeTasks]);
-  const linkTask = useCallback(
-    (id: string, eventId: string, offsetDays: number) => changeTasks((s) => s.linkTask(id, eventId, offsetDays)),
-    [changeTasks],
-  );
+  const linkTask = useCallback((id: string, eventId: string, offsetDays: number) => changeTasks((s) => s.linkTask(id, eventId, offsetDays)), [changeTasks]);
   const unlinkTask = useCallback((id: string, date: Day | null) => changeTasks((s) => s.unlinkTask(id, date)), [changeTasks]);
   const deleteTask = useCallback((id: string) => changeTasks((s) => s.deleteTask(id)), [changeTasks]);
   const restoreTask = useCallback((id: string) => changeTasks((s) => s.restoreTask(id)), [changeTasks]);
@@ -217,8 +214,6 @@ export function useAppData() {
     updateEvent,
   };
 }
-
-export type AppData = ReturnType<typeof useAppData>;
 
 function close(stores: Stores) {
   stores.tasks.close();

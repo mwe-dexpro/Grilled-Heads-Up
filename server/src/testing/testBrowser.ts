@@ -6,6 +6,11 @@ export class TestBrowser {
 
   constructor(private readonly baseUrl: string) {}
 
+  /** The Cookie header this browser sends now: what a stolen copy of its cookies would carry. */
+  cookieHeader() {
+    return [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+
   get(path: string) {
     return this.request("GET", path);
   }
@@ -19,13 +24,13 @@ export class TestBrowser {
       method,
       headers: {
         "content-type": "application/json",
-        cookie: [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; "),
+        cookie: this.cookieHeader(),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     for (const cookie of response.headers.getSetCookie()) {
-      const [pair, ...attributes] = cookie.split(";");
-      const [name, value] = pair.split("=");
+      const [pair = "", ...attributes] = cookie.split(";");
+      const [name = "", value = ""] = pair.split("=");
       const cleared = value === "" || attributes.some((a) => /expires=Thu, 01 Jan 1970/i.test(a));
       if (cleared) this.cookies.delete(name);
       else this.cookies.set(name, value);

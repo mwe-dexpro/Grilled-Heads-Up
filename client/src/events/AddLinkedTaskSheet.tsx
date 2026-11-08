@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { formatShortDay } from "../home/format";
 import { useI18n } from "../i18n/I18nProvider";
@@ -9,8 +9,8 @@ type Direction = "before" | "onTheDay" | "after";
 interface AddLinkedTaskSheetProps {
   event: Event;
   open: boolean;
-  onAdd(title: string, offsetDays: number): void;
-  onClose(): void;
+  onAdd: (title: string, offsetDays: number) => void;
+  onClose: () => void;
 }
 
 /** Adds a Task to an Event at an Offset: a number of days before or after it, or on the day. */
@@ -32,7 +32,7 @@ export function AddLinkedTaskSheet({ event, open, onAdd, onClose }: AddLinkedTas
   // `|| 0` turns "0 days before" (-0) into a plain 0.
   const offsetDays = (direction === "onTheDay" ? 0 : direction === "before" ? -count : count) || 0;
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (title.trim() === "") return;
     onAdd(title, offsetDays);

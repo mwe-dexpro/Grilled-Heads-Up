@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { maxTitleLength } from "../data/limits";
 import { useI18n } from "../i18n/I18nProvider";
 import type { Task } from "../tasks/taskStore";
@@ -13,18 +13,18 @@ interface SubtasksSectionProps {
   task: Task;
   /** The Task's live Subtasks, in order. */
   subtasks: Subtask[];
-  onAdd(taskId: string, title: string): void;
-  onRename(id: string, title: string): void;
+  onAdd: (taskId: string, title: string) => void;
+  onRename: (id: string, title: string) => void;
   /** Saves the tick; a promise that fails tells the section that it did not happen. */
-  onSetDone(id: string, done: boolean): Promise<void> | void;
+  onSetDone: (id: string, done: boolean) => Promise<void> | void;
   /** Moves the Subtask to that index (a drop). */
-  onMove(id: string, toIndex: number): Promise<void> | void;
+  onMove: (id: string, toIndex: number) => Promise<void> | void;
   /** Moves the Subtask that many places from where it is when the move runs (an arrow key: it must not depend on the order shown). */
-  onMoveBy(id: string, by: number): Promise<void> | void;
+  onMoveBy: (id: string, by: number) => Promise<void> | void;
   /** Deletes the Subtask and offers to undo it. */
-  onDelete(subtask: Subtask): void;
+  onDelete: (subtask: Subtask) => void;
   /** Completes the Task, like the sticky button of Task detail. */
-  onCompleteTask(taskId: string): void;
+  onCompleteTask: (taskId: string) => void;
 }
 
 /**
@@ -50,21 +50,26 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
   const offer = useCompletionOffer({ task, subtasks, onSetDone, rows, addInput });
   const drag = useRowDrag({ subtasks, list, rows, onMove, onDragged: () => setMovingId(null) });
 
+  const announce = useCallback((text: string) => {
+    setAnnouncement((current) => ({ text, n: current.n + 1 }));
+  }, []);
+  // (An Effect Event: the words are made with the language as it is when a move has landed, not a reason to run the effect again.)
+  const announceMove = useEffectEvent((title: string, to: number) =>
+    announce(t("subtask.moved", { title, position: String(to + 1), total: String(subtasks.length) })),
+  );
+
   useLayoutEffect(() => {
     const moved = refocus.current;
     if (moved !== null) {
       rows.current.get(moved.id)?.querySelector<HTMLElement>(moved.control)?.focus();
       const to = subtasks.findIndex((s) => s.id === moved.id);
-      if (to !== -1 && to !== moved.from) announce(t("subtask.moved", { title: subtasks[to].title, position: String(to + 1), total: String(subtasks.length) }));
+      const landed = subtasks[to];
+      if (landed !== undefined && to !== moved.from) announceMove(landed.title, to);
     }
     refocus.current = null;
   }, [subtasks]);
 
-  function announce(text: string) {
-    setAnnouncement((current) => ({ text, n: current.n + 1 }));
-  }
-
-  function add(e: FormEvent) {
+  function add(e: SyntheticEvent) {
     e.preventDefault();
     const title = newTitle.trim();
     if (title === "") return;
@@ -76,7 +81,7 @@ export function SubtasksSection({ task, subtasks, onAdd, onRename, onSetDone, on
     // The row goes when the deletion is saved; the focus moves to a row that stays, else to "Add subtask".
     const next = subtasks[index + 1] ?? subtasks[index - 1];
     const title = next && rows.current.get(next.id)?.querySelector<HTMLElement>(".subtask-title");
-    (title || addInput.current)?.focus();
+    (title ?? addInput.current)?.focus();
     onDelete(subtask);
   }
 

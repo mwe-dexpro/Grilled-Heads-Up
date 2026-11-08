@@ -18,7 +18,7 @@ const retrySetAsideAfterMs = 60 * 60 * 1000;
 const byteLength = (text: string) => new TextEncoder().encode(text).length;
 
 /** "rejected": the last sync went through, but some changes were set aside as certainly bad; they stay on this device for now. */
-export type SyncStatus = "idle" | "syncing" | FailureKind;
+type SyncStatus = "idle" | "syncing" | FailureKind;
 
 export interface SyncState {
   status: SyncStatus;
@@ -33,12 +33,12 @@ export interface SyncEngine {
    * the outcome shows in `state()`. The status is "syncing" only for a run someone asked to see
    * (`showProgress`, for the Sync now button); background runs change it only to report how they ended.
    */
-  syncNow(options?: { showProgress?: boolean }): Promise<void>;
-  state(): SyncState;
+  syncNow: (options?: { showProgress?: boolean }) => Promise<void>;
+  state: () => SyncState;
   /** Called whenever the status or the time of the last sync changes. Returns how to stop listening. */
-  subscribe(listener: (state: SyncState) => void): () => void;
+  subscribe: (listener: (state: SyncState) => void) => () => void;
   /** Called after a run that changed records on this device, so screens can reload. */
-  onRemoteChanges(listener: () => void): () => void;
+  onRemoteChanges: (listener: () => void) => () => void;
 }
 
 const toChange = ({ type, id, field, value, hlc }: OutboxEntry): Change => ({ type, id, field, value, hlc });
@@ -46,7 +46,7 @@ const toChange = ({ type, id, field, value, hlc }: OutboxEntry): Change => ({ ty
 export interface SyncEngineOptions {
   db: SyncDb;
   /** Everything that syncs. A Change of a type missing here (from a newer version elsewhere) is skipped. */
-  types: Array<RecordType<Synced>>;
+  types: RecordType<Synced>[];
   transport: Transport;
   now?: () => Date;
 }
@@ -130,8 +130,9 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
         return;
       }
       // `batchesOf` keeps a batch far below the server's limit, so only one value alone can be too big for it.
-      if (batch.length !== 1 || sizeOf(batch[0]) <= tooBigForAnyServer) throw new TransportError("failed");
-      await setAside(batch[0]);
+      const only = batch.length === 1 ? batch[0] : undefined;
+      if (only === undefined || sizeOf(only) <= tooBigForAnyServer) throw new TransportError("failed");
+      await setAside(only);
     }
   }
 
@@ -147,7 +148,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   async function apply(changes: Change[], cursor: number, serverTime: number): Promise<boolean> {
     const tx = transactionOver(db, storeNames);
     const clocksOf = new Map<string, FieldClocks>();
-    const touched = new Set<string>();
+    const touched = new Set<FieldClocks>();
     let applied = false;
 
     for (const change of changes) {
@@ -156,7 +157,11 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       const key = `${change.type}/${change.id}`;
       let clocks = clocksOf.get(key);
       if (!clocks) {
-        clocks = ((await tx.objectStore("fieldClocks").get([change.type, change.id])) as FieldClocks | undefined) ?? { type: change.type, id: change.id, clocks: {} };
+        clocks = ((await tx.objectStore("fieldClocks").get([change.type, change.id])) as FieldClocks | undefined) ?? {
+          type: change.type,
+          id: change.id,
+          clocks: {},
+        };
         clocksOf.set(key, clocks);
       }
       // Equal means our own change coming back; older means we already know better. A clock text is never empty.
@@ -166,7 +171,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       const base = ((await store.get(change.id)) as Partial<Synced> | undefined) ?? {};
       await store.put(recordType.withDefaults({ ...base, id: change.id, [change.field]: change.value }));
       clocks.clocks[change.field] = change.hlc;
-      touched.add(key);
+      touched.add(clocks);
       applied = true;
 
       // A pending edit of this field is older than the change that just won, so the server would drop it anyway.
@@ -174,7 +179,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
       if (pending && pending.hlc < change.hlc) await tx.objectStore("outbox").delete([change.type, change.id, change.field]);
     }
 
-    for (const key of touched) await tx.objectStore("fieldClocks").put(clocksOf.get(key)!);
+    for (const clocks of touched) await tx.objectStore("fieldClocks").put(clocks);
     await receiveTimestamps(tx, [...changes.map(({ hlc }) => decode(hlc)), { wall: serverTime, counter: 0 }], now());
     // Another tab may have read further meanwhile; never move the position back.
     const saved = ((await tx.objectStore("syncInfo").get("cursor")) as number | undefined) ?? 0;
@@ -186,7 +191,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   /** Reads the feed page by page from the saved cursor; `onApplied` hears of each page that changed a record. */
   async function pull(onApplied: () => void) {
     let cursor = ((await db.get("syncInfo", "cursor")) as number | undefined) ?? 0;
-    for (let more = true; more; ) {
+    for (let more = true; more;) {
       const page = await transport.pull(cursor, batchSize);
       if (await apply(page.changes, page.cursor, page.serverTime)) onApplied();
       cursor = page.cursor;
@@ -200,20 +205,20 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
   async function run() {
     if (progressWanted) setState({ status: "syncing" });
     progressWanted = false;
-    let applied = false;
+    const applied = { remote: false };
     try {
       // A push that fails for another reason than the connection or the session doesn't keep the pull from running.
-      let pushFailure: unknown = null;
+      let pushFailure: { error: unknown } | null = null;
       try {
         // The stores do this when they open; here too, since the first run can come before they are done.
         for (const recordType of types) await queuePreSyncRecords(db, recordType, now);
         await push();
       } catch (error) {
         if (error instanceof TransportError && (error.kind === "offline" || error.kind === "signedOut")) throw error;
-        pushFailure = error;
+        pushFailure = { error };
       }
-      await pull(() => (applied = true));
-      if (pushFailure) throw pushFailure;
+      await pull(() => (applied.remote = true));
+      if (pushFailure !== null) throw pushFailure.error;
       const lastSyncedAt = now().getTime();
       await db.put("syncInfo", lastSyncedAt, "lastSyncedAt");
       const refused = ((await db.getAll("outbox")) as OutboxEntry[]).some((entry) => entry.rejectedAt !== undefined);
@@ -221,7 +226,7 @@ export async function createSyncEngine({ db, types, transport, now = () => new D
     } catch (error) {
       setState({ status: error instanceof TransportError && error.kind !== "rejected" ? error.kind : "failed" });
     }
-    if (applied) for (const listener of remoteListeners) listener();
+    if (applied.remote) for (const listener of remoteListeners) listener();
   }
 
   let current: Promise<void> | null = null;

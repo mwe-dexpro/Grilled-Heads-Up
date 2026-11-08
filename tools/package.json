@@ -1,0 +1,23 @@
+{
+  "name": "@grilled-heads-up/tools",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --coverage --reporter=default --reporter=json --outputFile.json=reports/test-results.json",
+    "test:mutation": "stryker run"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@types/node": "^22.20.4",
+    "@vitest/coverage-v8": "^4.1.12",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

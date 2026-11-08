@@ -17,10 +17,10 @@ export interface TagStore {
    * The live Tag with this name (spaces around it and case ignored), or a new one. Throws for an empty or too long
    * name. Two devices adding the same name while apart each make a Tag; both then show, and each Task keeps its own.
    */
-  findOrAddTag(name: string): Promise<Tag>;
+  findOrAddTag: (name: string) => Promise<Tag>;
   /** Live Tags by name; one whose name has not arrived from another device yet is left out. */
-  listTags(): Promise<Tag[]>;
-  close(): void;
+  listTags: () => Promise<Tag[]>;
+  close: () => void;
 }
 
 export interface TagStoreOptions {
@@ -39,10 +39,7 @@ export const tagRecordType: RecordType<Tag> = {
   }),
 };
 
-export async function openTagStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: TagStoreOptions = {},
-): Promise<TagStore> {
+export async function openTagStore(dbName = defaultDatabaseName, { now = () => new Date() }: TagStoreOptions = {}): Promise<TagStore> {
   const db = await openAppDb(dbName);
   const tags = await openTable(db, tagRecordType, now);
 

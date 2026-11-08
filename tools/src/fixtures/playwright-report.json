@@ -1,0 +1,188 @@
+{
+  "suites": [
+    {
+      "title": "mixed.spec.mjs",
+      "file": "mixed.spec.mjs",
+      "specs": [
+        {
+          "title": "fails",
+          "ok": false,
+          "tests": [
+            {
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectName": "",
+              "results": [
+                {
+                  "status": "failed"
+                }
+              ],
+              "status": "unexpected"
+            }
+          ]
+        }
+      ],
+      "suites": [
+        {
+          "title": "a group",
+          "file": "mixed.spec.mjs",
+          "specs": [
+            {
+              "title": "passes",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "passed"
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ]
+            },
+            {
+              "title": "is left out in its body",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "later"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            },
+            {
+              "title": "is left out by an annotation",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "skip"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            },
+            {
+              "title": "is left out by an annotation for #123",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "fixme",
+                      "description": "until #123 is fixed"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            },
+            {
+              "title": "is left out with a described annotation",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "https://github.com/example/repo/issues/7"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            },
+            {
+              "title": "is skipped",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "skip"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            },
+            {
+              "title": "is a fixme for #5",
+              "ok": true,
+              "tests": [
+                {
+                  "annotations": [
+                    {
+                      "type": "fixme"
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "status": "skipped"
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "expected": 1,
+    "skipped": 6,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

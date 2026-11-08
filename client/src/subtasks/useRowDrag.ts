@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type RefObject } from "react";
+import { useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import type { Subtask } from "./subtaskStore";
 import { dropIndex } from "./subtasks";
 
@@ -11,7 +11,7 @@ interface Drag {
   pointerId: number;
   startY: number;
   /** Let go over another place: `dy` is then the way to that place, and the rows stay so until the move is saved and shown. */
-  dropped?: boolean;
+  dropped?: boolean | undefined;
 }
 
 interface RowDragOptions {
@@ -21,9 +21,9 @@ interface RowDragOptions {
   list: RefObject<HTMLUListElement | null>;
   rows: RefObject<Map<string, HTMLLIElement>>;
   /** Moves the Subtask to that index (a drop); the drag ends when what this returns settles. */
-  onMove(id: string, toIndex: number): Promise<void> | void;
+  onMove: (id: string, toIndex: number) => Promise<void> | void;
   /** The pointer moved a good way from where it went down: this is a drag, no tap. */
-  onDragged(): void;
+  onDragged: () => void;
 }
 
 /** What a row shows of a drag in progress. */
@@ -49,9 +49,8 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
   const dragFrom = drag ? subtasks.findIndex((s) => s.id === drag.id) : -1;
   const dragging = drag !== null && dragFrom !== -1 ? drag : null;
 
-  useLayoutEffect(() => {
-    if (drag && !dragging) setDrag(null);
-  }, [drag, dragging]);
+  // A drag whose Subtask is gone ends in the render that finds it gone (state adjusted while rendering, not in an effect).
+  if (drag !== null && dragging === null) setDrag(null);
 
   function startDrag(e: PointerEvent<HTMLButtonElement>, subtask: Subtask, index: number) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -72,7 +71,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
   }
 
   function dragTo(e: PointerEvent<HTMLButtonElement>) {
-    if (!dragging || e.pointerId !== dragging.pointerId || dragging.dropped) return;
+    if (dragging?.pointerId !== e.pointerId || dragging.dropped === true) return;
     const dy = e.clientY - dragging.startY;
     if (Math.abs(dy) > 4) {
       dragMoved.current = true;
@@ -83,8 +82,12 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
 
   /** How far the row at `from` has to go to sit in the place of the row at `target`, as the layout has it (rows can be of different heights). */
   function waySlot(from: number, target: number): number {
-    const here = rows.current.get(subtasks[from].id);
-    const there = rows.current.get(subtasks[target].id);
+    const rowAt = (index: number) => {
+      const subtask = subtasks[index];
+      return subtask === undefined ? undefined : rows.current.get(subtask.id);
+    };
+    const here = rowAt(from);
+    const there = rowAt(target);
     if (!here || !there) return 0;
     // Down: the bottom edges meet. Up: the top edges do.
     return target > from ? there.offsetTop + there.offsetHeight - (here.offsetTop + here.offsetHeight) : there.offsetTop - here.offsetTop;
@@ -95,7 +98,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
    * moved the row's node, and a cancelled pointer loses it too).
    */
   function endDrag(e: PointerEvent<HTMLButtonElement>, drop: boolean) {
-    if (!dragging || e.pointerId !== dragging.pointerId || dragging.dropped) return;
+    if (dragging?.pointerId !== e.pointerId || dragging.dropped === true) return;
     if (drop && dragging.target !== dragFrom) {
       const dropped = { ...dragging, dropped: true, dy: waySlot(dragFrom, dragging.target) };
       setDrag(dropped);
@@ -126,7 +129,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
       onLostPointerCapture: (e: PointerEvent<HTMLButtonElement>) => endDrag(e, false),
     }),
     /** How a row looks now. The rows slide only while a drag is under way: when it ends they must not slide to where they are. */
-    rowState(subtask: Subtask, index: number): RowDragState {
+    rowState: (subtask: Subtask, index: number): RowDragState => {
       const dragged = dragging?.id === subtask.id;
       return {
         reordering: dragging !== null,
@@ -134,7 +137,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
         style: dragging
           ? {
               transform: `translateY(${dragged ? dragging.dy : shift(index)}px)`,
-              transition: dragged && !dragging.dropped ? "none" : undefined,
+              transition: dragged && dragging.dropped !== true ? "none" : undefined,
             }
           : undefined,
       };
@@ -144,7 +147,7 @@ export function useRowDrag({ subtasks, list, rows, onMove, onDragged }: RowDragO
      * a screen reader (`detail` 0) never is: after a finger drag, which sends no click, the flag is still set, and
      * that click must still do what it says.
      */
-    endsDrag(e: MouseEvent): boolean {
+    endsDrag: (e: MouseEvent): boolean => {
       if (!dragMoved.current || e.detail === 0) return false;
       dragMoved.current = false;
       return true;

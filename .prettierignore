@@ -1,0 +1,12 @@
+# Markdown tables in the docs would churn; the lock file is npm's.
+**/*.md
+package-lock.json
+docs/design/prototype/**
+.claude/**
+dist
+reports
+.stryker-tmp
+playwright-report
+test-results
+client/public/**
+node_modules

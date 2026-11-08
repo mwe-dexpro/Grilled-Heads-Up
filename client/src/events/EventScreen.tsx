@@ -12,7 +12,7 @@ import { NavBar } from "../ui/NavBar";
 import { SegmentedProgress } from "../ui/SegmentedProgress";
 import { AddLinkedTaskSheet } from "./AddLinkedTaskSheet";
 import { CountdownLine } from "./CountdownLine";
-import { eventDays, eventProgress, withEventDates, type Event } from "./event";
+import { eventDays, eventProgress, linkedTasksOf, type Event, type LinkedTask } from "./event";
 import { formatEventWhen, formatOffset, formatRelativeDay, inOtherTimeZone } from "./formatEvent";
 import { formatRiskExplanation } from "./formatRisk";
 import { RiskBadge } from "./RiskBadge";
@@ -25,7 +25,7 @@ interface EventScreenProps {
   actions: TaskActions;
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;
-  onAddTask(title: string, offsetDays: number): void;
+  onAddTask: (title: string, offsetDays: number) => void;
 }
 
 /** The Event view: when and where, its Progress and risk, and its Preparation and Follow-up tasks with their Offsets. */
@@ -43,10 +43,9 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
   }
 
   const today = dayOf(now);
-  const linked = withEventDates(
-    tasks.filter((task) => task.eventId === event.id),
-    [event],
-  ).sort((a, b) => a.offsetDays! - b.offsetDays! || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt));
+  const linked = linkedTasksOf(event, tasks).sort(
+    (a, b) => a.offsetDays - b.offsetDays || (a.time ?? "").localeCompare(b.time ?? "") || a.createdAt.localeCompare(b.createdAt),
+  );
   const progress = eventProgress(event.id, tasks);
   const risk = eventRisk(event, tasks, now);
   const countdownLine = countdown(event, tasks, now);
@@ -57,13 +56,13 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
 
   // Only this Event is known here, and the Tasks listed belong to it.
   const eventIds = new Set([event.id]);
-  const taskList = (list: Task[]) => (
+  const taskList = (list: LinkedTask[]) => (
     <ul className="card task-list">
       {list.map((task) => {
         const completed = task.completedAt !== null;
         const overdue = isOverdue(task, today);
         const subtasks = counts.get(task.id);
-        const meta = [formatOffset(task.offsetDays!, t), formatShortDay(task.date!, language), task.time && formatTime(task.time, language)]
+        const meta = [formatOffset(task.offsetDays, t), formatShortDay(task.date, language), task.time !== null ? formatTime(task.time, language) : null]
           .filter(Boolean)
           .join(" · ");
         return (
@@ -104,11 +103,17 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
 
   return (
     <div className="screen">
-      <NavBar right={<a className="nav-action" href={hrefOf({ name: "editEvent", id: event.id })}>{t("nav.edit")}</a>} />
+      <NavBar
+        right={
+          <a className="nav-action" href={hrefOf({ name: "editEvent", id: event.id })}>
+            {t("nav.edit")}
+          </a>
+        }
+      />
       <header className="detail-header">
         <p className="eyebrow">{when}</p>
         <h1 className="large-title">{event.title}</h1>
-        {inOtherTimeZone(event) && <p className="eyebrow">{t("event.timeZone", { zone: event.timeZone! })}</p>}
+        {inOtherTimeZone(event) && <p className="eyebrow">{t("event.timeZone", { zone: event.timeZone })}</p>}
         {event.location && (
           <a
             className="location"
@@ -134,7 +139,7 @@ export function EventScreen({ event, tasks, now, actions, counts, onAddTask }: E
             <RiskBadge risk={risk} />
           </div>
           {countdownLine ? <CountdownLine countdown={countdownLine} eventDay={eventDays(event).first} /> : <SegmentedProgress progress={progress} />}
-          {explanation && <p className="band-note">{explanation}</p>}
+          {explanation !== null && <p className="band-note">{explanation}</p>}
         </section>
       )}
 
@@ -172,7 +177,7 @@ function TaskSection({ id, title, hint, children }: { id: string; title: string;
         <h2 id={id} className="section-title">
           {title}
         </h2>
-        {hint && <span className="section-meta">{hint}</span>}
+        {hint !== undefined && <span className="section-meta">{hint}</span>}
       </div>
       {children}
     </section>

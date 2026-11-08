@@ -5,16 +5,12 @@ import { dateAtNoon, type Day, type TimeOfDay } from "./days";
 
 /** "Saturday, Oct 4" / "Samstag, 4. Okt." */
 export function formatLongDay(day: Day, language: Language): string {
-  return new Intl.DateTimeFormat(language, { weekday: "long", month: "short", day: "numeric" }).format(
-    dateAtNoon(day),
-  );
+  return new Intl.DateTimeFormat(language, { weekday: "long", month: "short", day: "numeric" }).format(dateAtNoon(day));
 }
 
 /** "Sun, Oct 5" / "So., 5. Okt." */
 export function formatShortDay(day: Day, language: Language): string {
-  return new Intl.DateTimeFormat(language, { weekday: "short", month: "short", day: "numeric" }).format(
-    dateAtNoon(day),
-  );
+  return new Intl.DateTimeFormat(language, { weekday: "short", month: "short", day: "numeric" }).format(dateAtNoon(day));
 }
 
 /** "Oct 12" / "12. Okt." */

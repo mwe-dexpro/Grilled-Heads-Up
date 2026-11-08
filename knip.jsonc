@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Entry files are named here, so a file nothing imports is reported. The client's own entry, src/main.tsx, is not named: the
+  // Vite plugin finds it from index.html (knip calls an explicit entry for it redundant), and a file nothing imports is still reported.
+  "workspaces": {
+    ".": {
+      "entry": ["e2e/**/*.ts"],
+      "project": ["e2e/**/*.ts", "*.ts", "*.js"],
+    },
+    "client": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,tsx}", "*.ts"],
+    },
+    "tools": {
+      "entry": ["src/bin/*.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts", "*.ts"],
+    },
+    "server": {
+      "entry": ["src/server.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts", "*.ts"],
+    },
+  },
+}

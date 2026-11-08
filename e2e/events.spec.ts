@@ -43,9 +43,7 @@ test("an Event with Linked tasks: Offsets, home screen, moving the Event, unlink
   // Tasks up to the Event's day prepare for it; those after it are Follow-up tasks.
   const tasks = page.getByRole("region", { name: "Preparation" }).getByRole("listitem");
   await expect(tasks).toHaveText([/Order cake.*8 days before · Sun, Oct 4/, /Buy gift.*7 days before · Mon, Oct 5/]);
-  await expect(page.getByRole("region", { name: "Follow-up" }).getByRole("listitem")).toHaveText([
-    /Thank-you card.*2 days after · Wed, Oct 14/,
-  ]);
+  await expect(page.getByRole("region", { name: "Follow-up" }).getByRole("listitem")).toHaveText([/Thank-you card.*2 days after · Wed, Oct 14/]);
   await expect(page.getByRole("heading", { name: "Progress: 0 of 3 done" })).toBeVisible();
   await page.getByRole("checkbox", { name: "Complete Order cake" }).click();
   await expect(page.getByRole("heading", { name: "Progress: 1 of 3 done" })).toBeVisible();

@@ -109,7 +109,7 @@ export function projectViewTasks(
   today: Day,
 ): Task[] {
   return listTasks(tasks, listId)
-    .filter((task) => isOpen(task) || showCompleted || dayOf(new Date(task.completedAt!)) === today)
+    .filter((task) => task.completedAt === null || showCompleted || dayOf(new Date(task.completedAt)) === today)
     .filter((task) => tagId === null || task.tagIds.includes(tagId))
     .sort(compareTasks);
 }

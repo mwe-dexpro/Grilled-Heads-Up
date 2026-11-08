@@ -2,7 +2,7 @@ import { addDays, dateAtNoon, daysBetween, type Day } from "../home/days";
 import type { Patch } from "../sync/replica";
 import type { Task } from "./taskStore";
 
-export type RescheduleChoice = "tomorrow" | "dayAfter" | "nextWeek";
+type RescheduleChoice = "tomorrow" | "dayAfter" | "nextWeek";
 
 export interface RescheduleOption {
   choice: RescheduleChoice;
@@ -35,7 +35,7 @@ export function earliestRescheduleDay(task: Pick<Task, "date" | "completedAt">, 
 }
 
 /** "Reschedule without a chosen date means tomorrow." */
-export function chosenDay(day: Day | undefined | "", today: Day): Day {
+export function chosenDay(day: Day | undefined, today: Day): Day {
   return day === undefined || day === "" ? addDays(today, 1) : day;
 }
 
@@ -76,20 +76,16 @@ export function atEarliest(
  * The count goes up by one for a Task that had a date (dated, or Linked). An Inbox Task getting its first date is
  * being scheduled, not rescheduled, so its count stays.
  */
-export function reschedulePatch(
-  task: Task,
-  day: Day,
-  eventStart: (eventId: string) => Day | undefined,
-  today: Day,
-): Patch<Task> | null {
+export function reschedulePatch(task: Task, day: Day, eventStart: (eventId: string) => Day | undefined, today: Day): Patch<Task> | null {
   if (day < today) throw new Error(`Cannot reschedule to ${day}: it is in the past`);
 
   const link = linkOf(task);
   let current: Day | null = task.date;
-  let start: Day | undefined;
+  let linked: { eventId: string; start: Day } | null = null;
   if (link) {
-    start = eventStart(link.eventId);
+    const start = eventStart(link.eventId);
     if (start === undefined) return null;
+    linked = { eventId: link.eventId, start };
     current = addDays(start, link.offsetDays);
   }
   if (day < earliestRescheduleDay({ date: current, completedAt: task.completedAt }, today)) {
@@ -98,6 +94,6 @@ export function reschedulePatch(
   if (day === current) return null;
 
   const rescheduleCount = current === null ? task.rescheduleCount : task.rescheduleCount + 1;
-  if (start === undefined) return { date: day, rescheduleCount };
-  return { eventId: link!.eventId, offsetDays: daysBetween(start, day), date: null, rescheduleCount };
+  if (linked === null) return { date: day, rescheduleCount };
+  return { eventId: linked.eventId, offsetDays: daysBetween(linked.start, day), date: null, rescheduleCount };
 }

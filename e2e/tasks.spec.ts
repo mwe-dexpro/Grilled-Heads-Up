@@ -35,7 +35,7 @@ test("add a Task and Complete it; both survive a reload", async ({ page }) => {
   await completeTask(page, "Buy birthday present");
   await page.reload();
 
-  await expect(page.getByRole("listitem")).toHaveText(["Buy birthday present", "Book restaurant"].map((t) => new RegExp(t)));
+  await expect(page.getByRole("listitem")).toHaveText([/Buy birthday present/, /Book restaurant/]);
   await expect(page.getByRole("checkbox", { name: "Complete Buy birthday present" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Complete Book restaurant" })).not.toBeChecked();
 });
@@ -57,14 +57,16 @@ test("is installable as a full-screen app", async ({ page, request }) => {
   await page.goto("/");
   await waitForOfflineReady(page);
 
-  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
-  const manifest = await (await request.get(manifestHref!)).json();
+  const manifestUrl = await page.locator('link[rel="manifest"]').evaluate((link: HTMLLinkElement) => link.href);
+  const manifest: unknown = await (await request.get(manifestUrl)).json();
 
-  expect(manifest).toMatchObject({ name: "Grilled Heads-Up", start_url: "/", display: "standalone" });
-  expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes)).toEqual(
-    expect.arrayContaining(["192x192", "512x512"]),
-  );
-  for (const icon of manifest.icons) expect((await request.get(icon.src)).ok()).toBe(true);
+  const icons = [
+    { src: "/icons/icon-192.png", sizes: "192x192" },
+    { src: "/icons/icon-512.png", sizes: "512x512" },
+    { src: "/icons/icon-maskable-512.png", sizes: "512x512", purpose: "maskable" },
+  ];
+  expect(manifest).toMatchObject({ name: "Grilled Heads-Up", start_url: "/", display: "standalone", icons });
+  for (const icon of icons) expect((await request.get(icon.src)).ok(), icon.src).toBe(true);
 });
 
 test("starts in English and remembers a switch to German", async ({ page }) => {

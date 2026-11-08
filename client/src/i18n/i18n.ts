@@ -10,14 +10,8 @@ export const defaultLanguage: Language = "en";
 
 const storageKey = "language";
 
-export function translate(
-  language: Language,
-  key: TranslationKey,
-  params: Record<string, string> = {},
-): string {
-  return translations[language][key].replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-    name in params ? params[name] : placeholder,
-  );
+export function translate(language: Language, key: TranslationKey, params: Record<string, string> = {}): string {
+  return translations[language][key].replace(/\{(\w+)\}/g, (placeholder, name: string) => params[name] ?? placeholder);
 }
 
 export function loadLanguage(storage: Pick<Storage, "getItem">): Language {

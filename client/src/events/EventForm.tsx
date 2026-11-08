@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { goBack } from "../app/navigation";
 import { maxLocationLength, maxNotesLength, maxTitleLength } from "../data/limits";
 import { dayOf } from "../home/days";
@@ -12,7 +12,7 @@ interface EventFormProps {
   event?: Event;
   now: Date;
   /** `base` is what the form was opened with (editing only); the fields that differ from it are what the person changed. */
-  onSave(fields: EventFields, base?: EventFields): Promise<void>;
+  onSave: (fields: EventFields, base?: EventFields) => Promise<void>;
 }
 
 function newEventFields(now: Date): EventFields {
@@ -60,7 +60,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
     update({ startDate, endDate: fields.endDate < startDate ? startDate : fields.endDate });
   }
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (problem) {
       setShowProblem(true);
@@ -70,7 +70,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
   }
 
   return (
-    <form className="screen" onSubmit={handleSubmit} noValidate>
+    <form className="screen" onSubmit={(e) => void handleSubmit(e)} noValidate>
       <NavBar
         left={
           <button type="button" className="nav-action" onClick={goBack}>
@@ -137,7 +137,7 @@ export function EventForm({ event, now, onSave }: EventFormProps) {
           </span>
         </div>
       </div>
-      {inOtherTimeZone(fields) && <p className="hint">{t("event.timeZone", { zone: fields.timeZone! })}</p>}
+      {inOtherTimeZone(fields) && <p className="hint">{t("event.timeZone", { zone: fields.timeZone })}</p>}
 
       <div className="card form-card spaced">
         <label className="field">

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { boxOf, expect, test, type TouchType } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 /** Wednesday 7 October 2026, 13:05: tomorrow is Thu Oct 8, next Monday is Oct 12. */
@@ -19,7 +19,7 @@ const row = (page: Page, title: string) => page.getByRole("listitem").filter({ h
 
 /** Drags a row with the mouse (pointer events, like a finger), from `fromX` pixels from the left of the window. */
 async function drag(page: Page, title: string, fromX: number, byX: number) {
-  const box = (await row(page, title).boundingBox())!;
+  const box = await boxOf(row(page, title));
   const y = box.y + box.height / 2;
   await page.mouse.move(fromX, y);
   await page.mouse.down();
@@ -32,11 +32,10 @@ async function drag(page: Page, title: string, fromX: number, byX: number) {
  * the browser's own handling (the touch is captured by the row it started on, `touch-action`, `pointercancel`).
  */
 async function touchSwipe(page: Page, title: string, fromX: number, byX: number) {
-  const box = (await row(page, title).boundingBox())!;
+  const box = await boxOf(row(page, title));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, x: number) =>
-    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
+  const send = (type: TouchType, x: number) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1 }] });
   await send("touchStart", fromX);
   const steps = 8;
   for (let step = 1; step <= steps; step++) await send("touchMove", fromX + (byX * step) / steps);
@@ -58,7 +57,7 @@ async function swipeLeft(page: Page, title: string) {
   await drag(page, title, 330, -230);
 }
 
-const rectOf = async (locator: Locator) => (await locator.boundingBox())!;
+const rectOf = async (locator: Locator) => await boxOf(locator);
 const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -76,7 +75,8 @@ test("swiping a row left reveals Reschedule, Complete and Delete; Complete works
 
   await swipeLeft(page, "Pay dentist invoice");
 
-  for (const name of ["Reschedule", "Complete", "Delete"]) await expect(row(page, "Pay dentist invoice").getByRole("button", { name, exact: true })).toBeVisible();
+  for (const name of ["Reschedule", "Complete", "Delete"])
+    await expect(row(page, "Pay dentist invoice").getByRole("button", { name, exact: true })).toBeVisible();
   await row(page, "Pay dentist invoice").getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: "Complete Pay dentist invoice" })).toBeChecked();
   // A Task in Today works the same, and only one row is open at a time.
@@ -112,7 +112,7 @@ test("opening a row closes the one that was open, and scrolling the page closes 
 test("a swipe that starts at either screen edge opens nothing, and changes nothing on an open row", async ({ page }) => {
   await page.goto("/");
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
-  const width = page.viewportSize()!.width;
+  const width = await page.evaluate(() => window.innerWidth);
   const content = row(page, "Pay dentist invoice").locator(".swipe-content");
 
   // Right edge: a leftward swipe would open the row.
@@ -150,7 +150,8 @@ test("a finger swipe opens the row, and a short one that snaps back doesn't swal
   // presses on the focused check circle a moment later is a click of its own, and Completes the Task.
   await touchSwipe(page, "Pay dentist invoice", 330, -40);
   await expect(content).toHaveCSS("transform", "none");
-  await page.waitForTimeout(300);
+  // Past the moment the app stops expecting the click of the swipe (the page's clock is faked, so this takes no real time).
+  await page.clock.fastForward(300);
   const check = page.getByRole("checkbox", { name: "Complete Pay dentist invoice" });
   await check.focus();
   await page.keyboard.press("Space");
@@ -162,8 +163,8 @@ test("a press that goes down and is let go outside the row leaves nothing armed:
   await addTask(page, "Pay dentist invoice", { date: "2026-10-05" });
   await addTask(page, "Order cake", { date: "2026-10-07" });
   const content = row(page, "Pay dentist invoice").locator(".swipe-content");
-  const box = (await row(page, "Pay dentist invoice").boundingBox())!;
-  const other = (await row(page, "Order cake").boundingBox())!;
+  const box = await boxOf(row(page, "Pay dentist invoice"));
+  const other = await boxOf(row(page, "Order cake"));
 
   await page.mouse.move(330, box.y + 10);
   await page.mouse.down();
@@ -187,7 +188,7 @@ test("a short swipe snaps back, and a vertical drag moves nothing", async ({ pag
   await drag(page, "Pay dentist invoice", 330, -40);
   await expect(content).toHaveCSS("transform", "none");
 
-  const box = (await row(page, "Pay dentist invoice").boundingBox())!;
+  const box = await boxOf(row(page, "Pay dentist invoice"));
   await page.mouse.move(330, box.y + 10);
   await page.mouse.down();
   await page.mouse.move(300, box.y + 60, { steps: 6 });
@@ -205,7 +206,13 @@ test("an Overdue Task can't be rescheduled to today: no Today in the sheet, and 
 
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: "Pay dentist invoice" })).toBeVisible();
-  await expect(sheet.getByRole("button")).toHaveText([/Tomorrow.*Thu, Oct 8/, /Day after tomorrow.*Fri, Oct 9/, /Next week.*Mon, Oct 12/, "Pick a date", "Cancel"]);
+  await expect(sheet.getByRole("button")).toHaveText([
+    /Tomorrow.*Thu, Oct 8/,
+    /Day after tomorrow.*Fri, Oct 9/,
+    /Next week.*Mon, Oct 12/,
+    "Pick a date",
+    "Cancel",
+  ]);
   await expect(sheet.getByRole("button", { name: "Today" })).toHaveCount(0);
   await sheet.getByRole("button", { name: "Pick a date" }).click();
   await expect(sheet.getByLabel("Date")).toHaveAttribute("min", "2026-10-08");
@@ -270,7 +277,10 @@ test("Reschedule all… after midnight, with the sheet's day gone stale, still m
 
   // Midnight passes while the sheet is open; the screen does not know yet (it looks at the clock every 30 seconds).
   await page.clock.setSystemTime(new Date(2026, 9, 8, 0, 0, 5));
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   // The Tasks went to the real tomorrow, the 9th, which the stale screen shows as the day after tomorrow.
   await expect(page.getByText("Nothing overdue.")).toBeVisible();
@@ -289,7 +299,10 @@ test("a Reschedule that fails in the store is not hidden: the page reports it an
 
   await swipeLeft(page, "Pay dentist invoice");
   await row(page, "Pay dentist invoice").getByRole("button", { name: "Reschedule", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   // Like a failed Complete or a failed add, the failure is not swallowed.
   await expect.poll(() => errors).toEqual([expect.stringContaining("disk full")]);
@@ -319,7 +332,10 @@ test("Next week is the next Monday", async ({ page }) => {
 
   await row(page, "Pay dentist invoice").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Reschedule" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Next week/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Next week/ })
+    .click();
 
   await expect(bucket(page, "Later")).toContainText(/Pay dentist invoice.*Mon, Oct 12/);
 });
@@ -383,14 +399,14 @@ test("the undo toast is announced: its live region is in the page before it, and
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
 
   await expect(region).toContainText("Task deleted");
-  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await regionHandle.evaluate((element) => element.isConnected)).toBe(true);
   const firstToast = await region.locator(".undo-toast").elementHandle();
   await row(page, "Call the plumber").dispatchEvent("contextmenu");
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   // The second toast is a new element in the same region, which is what a screen reader reads out.
-  await expect.poll(() => firstToast!.evaluate((element) => element.isConnected)).toBe(false);
+  await expect.poll(() => firstToast.evaluate((element) => element.isConnected)).toBe(false);
   await expect(region.locator(".undo-toast")).toHaveCount(1);
-  expect(await regionHandle!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await regionHandle.evaluate((element) => element.isConnected)).toBe(true);
   // It is not a second status line: the page's one `status` is the sync line, which the sync tests listen to.
   await expect(page.getByRole("status")).toHaveCount(1);
 });
@@ -645,7 +661,10 @@ test("Rescheduling a Linked task in the Event view changes its Offset, so it kee
 
   await swipeLeft(page, "Buy gift");
   await row(page, "Buy gift").getByRole("button", { name: "Reschedule", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: /^Tomorrow/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Tomorrow/ })
+    .click();
 
   await expect(row(page, "Buy gift")).toContainText("6 days before · Thu, Oct 8");
   // Moving the Event moves the Task with it: it still has its Offset.
@@ -665,7 +684,13 @@ test("the Reschedule sheet speaks German", async ({ page }) => {
   await page.getByRole("dialog").getByRole("button", { name: "Verschieben" }).click();
 
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByRole("button")).toHaveText([/Morgen.*Do\., 8\. Okt\./, /Übermorgen.*Fr\., 9\. Okt\./, /Nächste Woche.*Mo\., 12\. Okt\./, "Datum wählen", "Abbrechen"]);
+  await expect(sheet.getByRole("button")).toHaveText([
+    /Morgen.*Do\., 8\. Okt\./,
+    /Übermorgen.*Fr\., 9\. Okt\./,
+    /Nächste Woche.*Mo\., 12\. Okt\./,
+    "Datum wählen",
+    "Abbrechen",
+  ]);
   await sheet.getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByRole("button", { name: "Alle verschieben…" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Papierkorb" })).toBeVisible();

@@ -1,26 +1,98 @@
 name: CI
 
+# Every job is independent and runs in parallel. A pull request, a push to main and the nightly run all run the whole file:
+# the nightly run is what turns main red when an advisory is published for code that has not changed.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# Jobs get read access to the code and nothing else; a job that needs more says so itself.
+permissions:
+  contents: read
+
+# A newer push to a pull request makes the older run pointless, so a pull request's runs share a group and the older is cancelled.
+# Every other run (a push to main, the nightly run, a manual run) has a group of its own: GitHub keeps one pending run per group
+# and cancels the older one, so a shared group would drop the run of a commit (or the nightly run) that waited behind another.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: Typecheck, unit and end-to-end tests
+  typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # With coverage: a run below a workspace's thresholds fails.
       - run: npm run test:unit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: coverage
+          path: |
+            client/reports/coverage/
+            server/reports/coverage/
+            tools/reports/coverage/
+          retention-days: 14
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report
@@ -29,31 +101,162 @@ jobs:
             test-results/
           retention-days: 7
 
+  # Full runs on pull requests too: client, server and tools take 3m26, about 2 minutes and half a minute on 4 cores,
+  # all far below the 10 minutes after which a pull request would be better served by an incremental run.
   mutation:
-    name: Mutation tests
+    name: mutation (${{ matrix.workspace }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [client, server, tools]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run test:mutation
-      - uses: actions/upload-artifact@v4
+      - run: npm run test:mutation -w ${{ matrix.workspace }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: mutation-report
-          path: client/reports/mutation/
+          name: mutation-report-${{ matrix.workspace }}
+          path: ${{ matrix.workspace }}/reports/mutation/
           retention-days: 14
 
   docker:
-    name: Docker image builds and serves the app
+    name: docker
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: docker build --tag grilled-heads-up:ci .
       - run: docker compose up -d --build --wait
       - run: curl --fail --silent http://localhost:3000/api/health
       - run: curl --fail --silent http://localhost:3000/ | grep -q '<div id="root">'
       - if: always()
         run: docker compose logs && docker compose down -v
+      # Trivy 0.69.3, from its release page, checked against the checksum of that release. Dependabot does not update this: it is
+      # bumped by hand (docs/agents/testing.md, "Pins that nobody updates for you").
+      - name: Install Trivy
+        run: |
+          curl --fail --silent --show-error --location --output trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.69.3/trivy_0.69.3_Linux-64bit.tar.gz
+          echo "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75  trivy.tar.gz" | sha256sum --check
+          tar --extract --gzip --file trivy.tar.gz trivy
+          sudo install trivy /usr/local/bin/trivy
+      # The allowlist's Trivy entries become `.trivyignore` (each with the day it runs out).
+      - run: npm ci
+      - run: npm run security:ignorefiles
+      - name: Scan the image for high and critical vulnerabilities
+        run: trivy image --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed=false --ignorefile .trivyignore --skip-version-check grilled-heads-up:ci
+      - name: Scan the Dockerfile and the compose file for misconfiguration
+        run: trivy config --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore --skip-version-check --skip-dirs node_modules --skip-dirs docs --skip-dirs .claude .
+
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run security:allowlist
+      - run: npm run security:audit
+      # With npm 11: the npm 10 that comes with Node 22 cannot find the key for the attestation of @peculiar/x509 2.2.0
+      # (EMISSINGSIGNATUREKEY, with the same tree, on the commit before this check existed); npm 11.21.2 verifies all of them.
+      - run: npx --yes npm@11.21.2 audit signatures
+
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later
+          # The summary stays in the run; posting it as a comment would need `pull-requests: write`.
+          comment-summary-in-pr: never
+
+  codeql:
+    name: codeql
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:javascript-typescript
+          output: sarif-results
+          upload: always
+      # CodeQL reports its results to the Security tab but does not fail the run by itself: this does, for every result of
+      # a rule with a security severity of 7.0 or more that the allowlist does not allow.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w tools
+      - run: node tools/dist/bin/sarifGate.js sarif-results
+      # Kept for 14 days, also when the gate fails: the real CodeQL output, to look at and to make a test fixture from.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: sarif-results
+          path: sarif-results/
+          retention-days: 14
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # The allowlist's gitleaks entries become `.gitleaksignore` (entries that have run out are left out).
+      - run: npm ci
+      - run: npm run security:ignorefiles
+      # gitleaks 8.29.1 over the whole history, from its official image (not its action, which has licence requirements). The digest
+      # is bumped by hand, like Trivy's version (docs/agents/testing.md, "Pins that nobody updates for you").
+      - name: Scan the history for secrets
+        run: |
+          docker run --rm \
+            --volume "$PWD:/repo" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks@sha256:aa036a2f4bdfe3cc3c55fa4326308efabb4a6be498c883c864fd1d0d5585438a \
+            git /repo --redact --exit-code 1 --no-banner

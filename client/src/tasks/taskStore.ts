@@ -28,6 +28,14 @@ export interface Task {
   deletedAt: string | null;
 }
 
+/** A Task that has a date (a Linked task has one once its Event's date is applied; see `withEventDates`). */
+export type DatedTask = Task & { date: Day };
+
+/** A Task in the Trash: it has the time it was deleted. */
+export type DeletedTask = Task & { deletedAt: string };
+
+export const isDated = <T extends Pick<Task, "date">>(task: T): task is T & { date: Day } => task.date !== null;
+
 /** A change was asked for a Task that is not there (never was, or a sync has deleted it). Other failures are not this. */
 export class NoTaskError extends Error {
   constructor(id: string) {
@@ -45,13 +53,13 @@ export interface TaskWhen {
 }
 
 export interface TaskStore {
-  addTask(title: string, when?: TaskWhen, listId?: string | null): Promise<Task>;
+  addTask: (title: string, when?: TaskWhen, listId?: string | null) => Promise<Task>;
   /** Completes a Task; one that is missing or deleted (say, by a sync a moment ago) is ignored. */
-  completeTask(id: string): Promise<void>;
+  completeTask: (id: string) => Promise<void>;
   /** Attaches a Task to an Event at an Offset; from then on its date comes from the Event. */
-  linkTask(id: string, eventId: string, offsetDays: number): Promise<void>;
+  linkTask: (id: string, eventId: string, offsetDays: number) => Promise<void>;
   /** Detaches a Task from its Event; it keeps `date`, the date it had while linked. */
-  unlinkTask(id: string, date: Day | null): Promise<void>;
+  unlinkTask: (id: string, date: Day | null) => Promise<void>;
   /**
    * The strict single-Task Reschedule: the day is taken as given, so one that is no longer allowed is refused. The
    * app does not use it (its screens go through `rescheduleTasks`, which takes a stale day to the earliest allowed
@@ -62,34 +70,34 @@ export interface TaskStore {
    * and counts the Reschedule; see `reschedulePatch`. Throws for a day that is not allowed (never today for an
    * Overdue Task, never a day in the past). A Task that is missing or deleted is ignored, like in `completeTask`.
    */
-  rescheduleTask(id: string, day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  rescheduleTask: (id: string, day: Day, eventStart: (eventId: string) => Day | undefined) => Promise<void>;
   /**
    * Reschedules several Tasks to `day`, one after the other (the Reschedule sheet, and "Reschedule all…"). The day
    * was chosen on a screen that may be a little behind (midnight passed since): for a Task it is no longer allowed
    * on, it is taken to the earliest day the Task may have (see `atEarliest`), so no Task stops the others. Tasks
    * that are missing or deleted are ignored.
    */
-  rescheduleTasks(ids: string[], day: Day, eventStart: (eventId: string) => Day | undefined): Promise<void>;
+  rescheduleTasks: (ids: string[], day: Day, eventStart: (eventId: string) => Day | undefined) => Promise<void>;
   /** Puts the Task in a List, or in none (null). A Task that is missing or deleted throws `NoTaskError`, like `linkTask`. */
-  setTaskList(id: string, listId: string | null): Promise<void>;
+  setTaskList: (id: string, listId: string | null) => Promise<void>;
   /** Adds a Tag; one the Task has already changes nothing (no write, nothing to sync). Missing or deleted: `NoTaskError`. */
-  addTaskTag(id: string, tagId: string): Promise<void>;
+  addTaskTag: (id: string, tagId: string) => Promise<void>;
   /** Removes a Tag; one the Task does not have changes nothing. Missing or deleted: `NoTaskError`. */
-  removeTaskTag(id: string, tagId: string): Promise<void>;
+  removeTaskTag: (id: string, tagId: string) => Promise<void>;
   /** Every live Task in the List loses its List (used when the List is deleted); Tasks in the Trash keep theirs. */
-  clearList(listId: string): Promise<void>;
+  clearList: (listId: string) => Promise<void>;
   /** Deletes a Task: it moves to the Trash (it leaves every list and syncs as deleted). */
-  deleteTask(id: string): Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
   /**
    * Takes a Task out of the Trash, exactly as it was. Only a Task that is in the Trash (deleted, and not for 30
    * days yet) is restored; one that is live, missing or expired is left alone, without an error.
    */
-  restoreTask(id: string): Promise<void>;
+  restoreTask: (id: string) => Promise<void>;
   /** Tasks in the order they were added; deleted ones are left out. */
-  listTasks(): Promise<Task[]>;
+  listTasks: () => Promise<Task[]>;
   /** The Trash: Tasks deleted less than 30 days ago, the latest deletion first. */
-  listTrash(): Promise<Task[]>;
-  close(): void;
+  listTrash: () => Promise<DeletedTask[]>;
+  close: () => void;
 }
 
 export interface TaskStoreOptions {
@@ -121,16 +129,13 @@ export const taskRecordType: RecordType<Task> = {
  * A Linked task has both its Event and its Offset. One of them can be missing for a while after a sync (the
  * fields arrive one by one); the Task then shows as a Task without an Event. Only the reading is changed.
  */
-function wholeLink(task: Task): Task {
+function wholeLink<T extends Task>(task: T): T {
   if (task.eventId !== null && task.offsetDays === null) return { ...task, eventId: null };
   if (task.eventId === null && task.offsetDays !== null) return { ...task, offsetDays: null };
   return task;
 }
 
-export async function openTaskStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: TaskStoreOptions = {},
-): Promise<TaskStore> {
+export async function openTaskStore(dbName = defaultDatabaseName, { now = () => new Date() }: TaskStoreOptions = {}): Promise<TaskStore> {
   const db = await openAppDb(dbName);
   const tasks = await openTable(db, taskRecordType, now);
 
@@ -222,7 +227,7 @@ export async function openTaskStore(
     async restoreTask(id) {
       const at = now();
       const deleted = await tasks.getDeleted(id);
-      if (deleted && !isExpired(deleted.deletedAt!, at)) await tasks.restore(id);
+      if (deleted && !isExpired(deleted.deletedAt, at)) await tasks.restore(id);
     },
 
     async listTasks() {
@@ -232,9 +237,9 @@ export async function openTaskStore(
     async listTrash() {
       const at = now();
       return (await tasks.listDeleted())
-        .filter((task) => !isExpired(task.deletedAt!, at))
+        .filter((task) => !isExpired(task.deletedAt, at))
         .map(wholeLink)
-        .sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!));
+        .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
     },
 
     close() {

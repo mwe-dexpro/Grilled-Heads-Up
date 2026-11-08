@@ -1,6 +1,6 @@
 import express from "express";
-import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { readAppShell } from "./appShell.js";
 import { createAuth } from "./auth.js";
 import { createSyncRoutes } from "./sync.js";
 
@@ -33,7 +33,7 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
   app.get("/api/passkeys", (_req, res) => {
     const passkeys = db
       .prepare("SELECT created_at AS createdAt, last_used_at AS lastUsedAt FROM passkeys WHERE user_id = ? ORDER BY created_at")
-      .all(res.locals.userId as string);
+      .all(res.locals["userId"] as string);
     res.json(passkeys);
   });
 
@@ -41,25 +41,30 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
     res.status(404).json({ error: "Not found." });
   });
 
-  if (clientDir) {
+  if (clientDir !== undefined) {
     app.use(
       express.static(clientDir, {
+        // `/` is the app shell below, like every other address of a screen.
+        index: false,
         setHeaders(res, path) {
-          // Hashed build assets never change; everything else (index.html, sw.js, manifest) must revalidate
+          // Hashed build assets never change; everything else (sw.js, manifest) must revalidate
           // so a new deploy reaches installed apps.
-          res.setHeader(
-            "Cache-Control",
-            path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
-          );
+          res.setHeader("Cache-Control", path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache");
         },
       }),
     );
 
-    // Client-side routes fall back to the app shell.
-    app.get(/^\/(?!api\/).*/, (_req, res) => {
-      res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(resolve(clientDir, "index.html"));
-    });
+    // Client-side routes fall back to the app shell, which must revalidate too (a new deploy restarts the server).
+    const appShell = readAppShell(clientDir);
+    if (appShell === undefined) {
+      // The server is healthy and every screen answers 404: say why, once, where the operator reads the log.
+      console.warn(`The app is not served: ${clientDir} holds no index.html (build the client first: npm run build).`);
+    } else {
+      app.get(/^\/(?!api\/).*/, (_req, res) => {
+        res.setHeader("Cache-Control", "no-cache");
+        res.type("html").send(appShell);
+      });
+    }
   }
 
   return app;

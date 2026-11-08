@@ -15,7 +15,7 @@ interface ProjectsScreenProps {
   /** The live Tasks with their Events' dates (`withEventDates`). */
   tasks: Task[];
   now: Date;
-  onAddList(name: string, isProject: boolean): void;
+  onAddList: (name: string, isProject: boolean) => void;
 }
 
 /** The Projects tab: Projects as cards with their Progress and next Task, the other Lists as rows below. */

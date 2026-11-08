@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { Task } from "../tasks/taskStore";
 import type { Subtask } from "./subtaskStore";
 import { offersCompletion, stillPending, subtaskProgress, withPendingTicks } from "./subtasks";
@@ -8,7 +8,7 @@ interface CompletionOfferOptions {
   /** The Task's live Subtasks, in order. */
   subtasks: Subtask[];
   /** Saves the tick; a promise that fails tells the hook that it did not happen. */
-  onSetDone(id: string, done: boolean): Promise<void> | void;
+  onSetDone: (id: string, done: boolean) => Promise<void> | void;
   /** The row elements and the "Add subtask" input: where the focus goes when the offer's button goes. */
   rows: RefObject<Map<string, HTMLLIElement>>;
   addInput: RefObject<HTMLInputElement | null>;
@@ -37,20 +37,24 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
     // The tick that made the offer is over (it failed, or was undone) and the offer does not hold: forget it.
     if (offered !== null && !offering && !pendingTicks.current.has(offered)) setOffered(null);
   }, [subtasks, offered, offering]);
+  // (An Effect Event: which Subtask the offer is for is read as it is when the offer appears.)
+  const rememberOffer = useEffectEvent(() => {
+    offeredFor.current = offered;
+  });
   useLayoutEffect(() => {
     if (offering) {
       completeButton.current?.focus();
-      offeredFor.current = offered;
+      rememberOffer();
     } else if (offeredFor.current !== null) {
       // The offer went by itself (a Subtask was unticked or added, or the Task was Completed elsewhere). If it held the
       // focus, the button that had it is gone: the ticked Subtask's check gets it.
       if (document.activeElement === document.body || document.activeElement === null) {
         const check = rows.current.get(offeredFor.current)?.querySelector<HTMLElement>(".check");
-        (check || addInput.current)?.focus();
+        (check ?? addInput.current)?.focus();
       }
       offeredFor.current = null;
     }
-  }, [offering]);
+  }, [offering, rows, addInput]);
 
   function tick(subtask: Subtask) {
     // What the tick does, and whether it is the last open one, is decided on the Subtasks with the ticks still being saved.
@@ -62,7 +66,7 @@ export function useCompletionOffer({ task, subtasks, onSetDone, rows, addInput }
     pendingTicks.current.set(subtask.id, done);
     // A save that fails for a real reason (the Subtask being gone ends calmly, without a rejection) has not happened: the
     // tick stops being pending, or the next tap on this check would take it for done and do the opposite.
-    Promise.resolve(onSetDone(subtask.id, done)).catch((error) => {
+    Promise.resolve(onSetDone(subtask.id, done)).catch((error: unknown) => {
       if (pendingTicks.current.get(subtask.id) === done) pendingTicks.current.delete(subtask.id);
       setOffered((current) => (current === subtask.id ? null : current));
       throw error;

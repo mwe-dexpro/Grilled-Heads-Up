@@ -1,8 +1,8 @@
 import { Calendar, Check, ChevronRight, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { hrefOf } from "../app/routes";
 import { maxTagLength } from "../data/limits";
-import { eventDays, eventProgress, withEventDates, type Event } from "../events/event";
+import { eventDays, eventProgress, withEventDate, type Event } from "../events/event";
 import { formatEventWhen, formatOffset } from "../events/formatEvent";
 import { dayOf, daysBetween, type Day } from "../home/days";
 import { formatShortDay, formatTime } from "../home/format";
@@ -29,24 +29,24 @@ interface TaskScreenProps {
   /** Every live Subtask on this device; the screen shows the Task's own. */
   subtasks: Subtask[];
   now: Date;
-  onComplete(id: string): void;
-  onReschedule(id: string, day: Day): void;
+  onComplete: (id: string) => void;
+  onReschedule: (id: string, day: Day) => void;
   /** Deletes the Task (to the Trash), offers to undo it and goes back. */
-  onDelete(task: Task): void;
-  onLink(id: string, eventId: string, offsetDays: number): void;
-  onUnlink(id: string, date: string | null): void;
+  onDelete: (task: Task) => void;
+  onLink: (id: string, eventId: string, offsetDays: number) => void;
+  onUnlink: (id: string, date: string | null) => void;
   /** Puts the Task in a List, or in none (null). */
-  onSetList(id: string, listId: string | null): void;
+  onSetList: (id: string, listId: string | null) => void;
   /** Adds the Tag of that name, making it if there is none. */
-  onAddTag(id: string, name: string): void;
-  onRemoveTag(id: string, tagId: string): void;
-  onAddSubtask(taskId: string, title: string): void;
-  onRenameSubtask(id: string, title: string): void;
-  onSetSubtaskDone(id: string, done: boolean): Promise<void> | void;
-  onMoveSubtask(id: string, toIndex: number): Promise<void> | void;
-  onMoveSubtaskBy(id: string, by: number): Promise<void> | void;
+  onAddTag: (id: string, name: string) => void;
+  onRemoveTag: (id: string, tagId: string) => void;
+  onAddSubtask: (taskId: string, title: string) => void;
+  onRenameSubtask: (id: string, title: string) => void;
+  onSetSubtaskDone: (id: string, done: boolean) => Promise<void> | void;
+  onMoveSubtask: (id: string, toIndex: number) => Promise<void> | void;
+  onMoveSubtaskBy: (id: string, by: number) => Promise<void> | void;
   /** Deletes the Subtask and offers to undo it; the screen stays. */
-  onDeleteSubtask(subtask: Subtask): void;
+  onDeleteSubtask: (subtask: Subtask) => void;
 }
 
 /** Task detail: when it's due, its Subtasks, List and Tags, Reschedule, Delete and Complete, and for a Linked task the Event it is part of. */
@@ -93,19 +93,19 @@ export function TaskScreen({
     );
   }
 
-  const [task] = withEventDates([rawTask], events);
-  const event = task.eventId === null ? undefined : events.find((e) => e.id === task.eventId);
+  const event = rawTask.eventId === null ? undefined : events.find((e) => e.id === rawTask.eventId);
+  const task = withEventDate(rawTask, event);
   const taskTags = liveTags(task, tags);
   const completed = task.completedAt !== null;
   const today = dayOf(now);
   const due =
     task.date === null
       ? t("task.noDate")
-      : t("task.due", { date: [formatShortDay(task.date, language), task.time && formatTime(task.time, language)].filter(Boolean).join(" · ") });
+      : t("task.due", { date: [formatShortDay(task.date, language), task.time !== null ? formatTime(task.time, language) : null].filter(Boolean).join(" · ") });
   const upcoming = events.filter((e) => eventDays(e).last >= today);
   const actions = availableActions(task, new Set(events.map((e) => e.id)));
 
-  function addTag(e: FormEvent) {
+  function addTag(e: SyntheticEvent) {
     e.preventDefault();
     if (newTag.trim() === "") return;
     onAddTag(task.id, newTag);
@@ -147,7 +147,7 @@ export function TaskScreen({
             </span>
             <span className="task-text">
               <span className="part-of-label">
-                {t("task.partOf")} · {formatOffset(task.offsetDays!, t)}
+                {t("task.partOf")} · {formatOffset(task.offsetDays ?? 0, t)}
               </span>
               <span className="event-title">{event.title}</span>
               <span className="task-meta">

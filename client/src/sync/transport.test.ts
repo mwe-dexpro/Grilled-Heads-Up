@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { httpTransport, TransportError } from "./transport";
+import { defined } from "../testing/defined";
 
 function answer(status: number, body: unknown = {}) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+  );
 }
 
 const kindOf = async (call: () => Promise<unknown>) => {
@@ -31,7 +35,11 @@ describe("HTTP transport", () => {
 
     expect(await httpTransport.push([{ type: "task", id: "t1", field: "title", value: "x", hlc: "h" }])).toEqual({ serverTime: 42 });
 
-    expect(fetch).toHaveBeenCalledWith("/api/sync/push", expect.objectContaining({ method: "POST", body: expect.stringContaining('"title"') }));
+    const [url, init] = defined(vi.mocked(fetch).mock.calls[0]);
+    expect(url).toBe("/api/sync/push");
+    expect(init?.method).toBe("POST");
+    expect(init?.headers).toEqual({ "Content-Type": "application/json" });
+    expect(init?.body).toBe(JSON.stringify({ changes: [{ type: "task", id: "t1", field: "title", value: "x", hlc: "h" }] }));
   });
 
   it("asks for a page after a position", async () => {
@@ -58,6 +66,12 @@ describe("HTTP transport", () => {
     expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { badChange: 3 } });
   });
 
+  it("tells a 400 that names the first change as a refusal of that change", async () => {
+    answer(400, { error: "Change 0 is malformed.", index: 0 });
+
+    expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "rejected", refusal: { badChange: 0 } });
+  });
+
   it("tells a 413 as a refusal for being too big", async () => {
     answer(413);
 
@@ -71,16 +85,25 @@ describe("HTTP transport", () => {
     ["an index that is not a position", JSON.stringify({ index: "3" })],
     ["a negative index", JSON.stringify({ index: -1 })],
   ])("tells a 400 with %s as a failure, which says nothing about the changes in the request", async (_name, body) => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(body, { status: 400 }))),
+    );
 
     expect(await refusalOf(() => httpTransport.push([]))).toEqual({ kind: "failed", refusal: undefined });
   });
 
   it("tells a missing connection as offline, and an answer that isn't JSON as failed", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))),
+    );
     expect(await kindOf(() => httpTransport.pull(0, 500))).toBe("offline");
 
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>", { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("<html>", { status: 200 }))),
+    );
     expect(await kindOf(() => httpTransport.pull(0, 500))).toBe("failed");
   });
 });

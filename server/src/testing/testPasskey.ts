@@ -21,16 +21,20 @@ export class TestPasskey {
   ) {}
 
   /** Answers `navigator.credentials.create()`; `userVerified: false` is a security key that only checks presence. */
-  register(options: { challenge: string; user: { id: string } }, { userVerified = true } = {}) {
+  register(
+    options: { challenge: string; user: { id: string } },
+    { userVerified = true, transports = ["internal"] }: { userVerified?: boolean; transports?: string[] | null } = {},
+  ) {
     this.userHandle = options.user.id;
-    const jwk = this.keys.publicKey.export({ format: "jwk" });
+    const { x, y } = this.keys.publicKey.export({ format: "jwk" });
+    if (x === undefined || y === undefined) throw new Error("The test passkey is not an EC key.");
     const publicKey = isoCBOR.encode(
       new Map<number, number | Uint8Array>([
         [1, 2], // kty: EC2
         [3, -7], // alg: ES256
         [-1, 1], // crv: P-256
-        [-2, bytes(Buffer.from(jwk.x!, "base64url"))],
-        [-3, bytes(Buffer.from(jwk.y!, "base64url"))],
+        [-2, bytes(Buffer.from(x, "base64url"))],
+        [-3, bytes(Buffer.from(y, "base64url"))],
       ]),
     );
     const credentialId = Buffer.from(this.id, "base64url");
@@ -54,7 +58,7 @@ export class TestPasskey {
       response: {
         clientDataJSON: this.clientData("webauthn.create", options.challenge).toString("base64url"),
         attestationObject: Buffer.from(attestationObject).toString("base64url"),
-        transports: ["internal"],
+        ...(transports === null ? {} : { transports }),
       },
       clientExtensionResults: {},
     };

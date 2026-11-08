@@ -3,7 +3,7 @@ import { openTable, type RecordType } from "../sync/replica";
 import { validateEvent, type Event, type EventFields } from "./event";
 
 export interface EventStore {
-  addEvent(fields: EventFields): Promise<Event>;
+  addEvent: (fields: EventFields) => Promise<Event>;
   /**
    * Changes what a person can edit; Linked tasks follow because their dates come from the Event. Only fields that
    * differ from `base` are written (`base` defaults to the stored Event), so a form opened before another
@@ -11,13 +11,13 @@ export interface EventStore {
    * was opened with. The exception is when the Event's time changes (see `whenFields`): then all of those fields are
    * written, so that two devices' competing edits of when the Event is never mixed into one that neither made.
    */
-  updateEvent(id: string, fields: EventFields, base?: EventFields): Promise<Event>;
+  updateEvent: (id: string, fields: EventFields, base?: EventFields) => Promise<Event>;
   /**
    * Events in the order they were created; deleted ones are left out, and so is one that has not fully arrived
    * from another device yet (no title, start date or end date), until it has.
    */
-  listEvents(): Promise<Event[]>;
-  close(): void;
+  listEvents: () => Promise<Event[]>;
+  close: () => void;
 }
 
 export interface EventStoreOptions {
@@ -87,10 +87,7 @@ function checked(fields: EventFields): EventFields {
   return clean;
 }
 
-export async function openEventStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: EventStoreOptions = {},
-): Promise<EventStore> {
+export async function openEventStore(dbName = defaultDatabaseName, { now = () => new Date() }: EventStoreOptions = {}): Promise<EventStore> {
   const db = await openAppDb(dbName);
   const events = await openTable(db, eventRecordType, now);
 
@@ -112,7 +109,7 @@ export async function openEventStore(
       const clean = checked(fields);
       const event = await events.update(id, (current) => {
         const from: EventFields = base ?? current;
-        const changed = (Object.keys(clean) as Array<keyof EventFields>).filter((field) => clean[field] !== from[field]);
+        const changed = (Object.keys(clean) as (keyof EventFields)[]).filter((field) => clean[field] !== from[field]);
         // Any change to when the Event is writes all of it, so that it is won or lost as a unit.
         const written = changed.some((field) => (whenFields as readonly string[]).includes(field)) ? [...new Set([...changed, ...whenFields])] : changed;
         return Object.fromEntries(written.map((field) => [field, clean[field]]));
@@ -122,7 +119,10 @@ export async function openEventStore(
     },
 
     async listEvents() {
-      return (await events.list()).filter(arrived).map(wholeShape).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return (await events.list())
+        .filter(arrived)
+        .map(wholeShape)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
 
     close() {

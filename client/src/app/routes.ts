@@ -11,14 +11,17 @@ export type Route =
   | { name: "trash" };
 
 export function parseRoute(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
-  const [first, second, third] = parts;
-  if (parts.length === 1 && (first === "calendar" || first === "projects" || first === "trash")) return { name: first };
-  if (first === "event" && second === "new" && parts.length === 2) return { name: "newEvent" };
-  if (first === "event" && parts.length === 2) return { name: "event", id: second };
-  if (first === "event" && third === "edit" && parts.length === 3) return { name: "editEvent", id: second };
-  if (first === "task" && parts.length === 2) return { name: "task", id: second };
-  if (first === "list" && parts.length === 2) return { name: "list", id: second };
+  const [first, second, third, ...more] = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  if (more.length > 0) return { name: "today" };
+  if (second === undefined) {
+    if (first === "calendar" || first === "projects" || first === "trash") return { name: first };
+  } else if (third === undefined) {
+    if (first === "event") return second === "new" ? { name: "newEvent" } : { name: "event", id: second };
+    if (first === "task") return { name: "task", id: second };
+    if (first === "list") return { name: "list", id: second };
+  } else if (first === "event" && third === "edit") {
+    return { name: "editEvent", id: second };
+  }
   return { name: "today" };
 }
 

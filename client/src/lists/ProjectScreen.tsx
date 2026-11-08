@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { navigate } from "../app/navigation";
 import { parseRoute } from "../app/routes";
 import { bucketOf, type Progress } from "../home/buckets";
@@ -26,7 +26,7 @@ export const defaultProjectView: ProjectView = { showCompleted: false, tagId: nu
 interface ProjectScreenProps {
   list: List | undefined;
   view: ProjectView;
-  onView(view: ProjectView): void;
+  onView: (view: ProjectView) => void;
   /** The live Tasks with their Events' dates (`withEventDates`). */
   tasks: Task[];
   events: Event[];
@@ -35,9 +35,9 @@ interface ProjectScreenProps {
   actions: TaskActions;
   /** Each Task's Subtask count (only Tasks that have Subtasks). */
   counts: Map<string, Progress>;
-  onRename(id: string, name: string): Promise<void> | void;
-  onSetProject(id: string, isProject: boolean): Promise<void> | void;
-  onDelete(id: string): Promise<void> | void;
+  onRename: (id: string, name: string) => Promise<void> | void;
+  onSetProject: (id: string, isProject: boolean) => Promise<void> | void;
+  onDelete: (id: string) => Promise<void> | void;
 }
 
 /** The Project view: one List or Project with its open Tasks and Progress, "Show completed" and a Tag filter. */
@@ -52,8 +52,10 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
   const chips = list ? tagsInList(tasks, list.id, tags) : [];
   const chosen = chips.some((tag) => tag.id === tagId) ? tagId : null;
   // And it is forgotten, not only hidden: it must not filter again when a Task gets that Tag back.
+  // (An Effect Event: it uses the view and `onView` as they are when the effect runs, which only the three values below start.)
+  const forgetTag = useEffectEvent(() => onView({ ...view, tagId: null }));
   useEffect(() => {
-    if (list && tagId !== null && chosen === null) onView({ ...view, tagId: null });
+    if (list && tagId !== null && chosen === null) forgetTag();
   }, [list, tagId, chosen]);
 
   if (leaving) return null;
@@ -70,6 +72,35 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
   const progress = listProgress(tasks, list.id);
   const shown = projectViewTasks(tasks, list.id, { showCompleted, tagId: chosen }, today);
   const eventsById = new Map(events.map((event) => [event.id, event]));
+
+  const listId = list.id;
+
+  async function saveChanges({ name, isProject }: { name?: string; isProject?: boolean }) {
+    try {
+      if (name !== undefined) await onRename(listId, name);
+      if (isProject !== undefined) await onSetProject(listId, isProject);
+    } catch (error) {
+      // Deleted meanwhile (in another tab): the screen reloads and says so. Any other failure is not hidden.
+      if (!(error instanceof NoListError)) throw error;
+    }
+  }
+
+  async function deleteList() {
+    setEditing(false);
+    // Delete first, then leave, replacing the entry (so that Back does not return to a List that is gone). The
+    // screen shows nothing meanwhile: the route would say "not found", and the Projects tab, not yet shown,
+    // must not list a List that is going.
+    setLeaving(true);
+    try {
+      await onDelete(listId);
+    } catch (error) {
+      setLeaving(false);
+      throw error;
+    }
+    // Only while this List is still the route: after Back, the entry that was gone back to stays as it is.
+    const route = parseRoute(window.location.hash);
+    if (route.name === "list" && route.id === listId) navigate({ name: "projects" }, { replace: true });
+  }
 
   return (
     <div className="screen">
@@ -141,31 +172,8 @@ export function ProjectScreen({ list, view, onView, tasks, events, tags, now, ac
         <EditListSheet
           list={list}
           taskCount={listTasks(tasks, list.id).length}
-          onSave={async ({ name, isProject }) => {
-            try {
-              if (name !== undefined) await onRename(list.id, name);
-              if (isProject !== undefined) await onSetProject(list.id, isProject);
-            } catch (error) {
-              // Deleted meanwhile (in another tab): the screen reloads and says so. Any other failure is not hidden.
-              if (!(error instanceof NoListError)) throw error;
-            }
-          }}
-          onDelete={async () => {
-            setEditing(false);
-            // Delete first, then leave, replacing the entry (so that Back does not return to a List that is gone). The
-            // screen shows nothing meanwhile: the route would say "not found", and the Projects tab, not yet shown,
-            // must not list a List that is going.
-            setLeaving(true);
-            try {
-              await onDelete(list.id);
-            } catch (error) {
-              setLeaving(false);
-              throw error;
-            }
-            // Only while this List is still the route: after Back, the entry that was gone back to stays as it is.
-            const route = parseRoute(window.location.hash);
-            if (route.name === "list" && route.id === list.id) navigate({ name: "projects" }, { replace: true });
-          }}
+          onSave={(changes) => void saveChanges(changes)}
+          onDelete={() => void deleteList()}
           onClose={() => setEditing(false)}
         />
       )}

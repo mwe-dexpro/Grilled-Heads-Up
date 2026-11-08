@@ -4,7 +4,7 @@ export interface MemoryServerOptions {
   /** The server's clock in ms. */
   time?: () => number;
   /** Most changes it returns per pull, below what the client asks for. */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /** The largest push it takes, as the JSON text in bytes; a bigger one is refused like the real server's 413. */
   maxPushBytes?: number;
 }
@@ -87,20 +87,22 @@ export class MemoryServer {
         await hook?.();
         return { serverTime: this.time() };
       },
-      pull: async (after, limit): Promise<PullPage> => {
-        this.check();
-        this.pullRequests++;
-        const feed = [...this.fields.values()].filter((row) => row.seq > after).sort((a, b) => a.seq - b.seq);
-        const size = Math.min(limit, this.pageSize);
-        const page = feed.slice(0, size);
-        this.pulledChanges += page.length;
-        return {
-          changes: page.map((row) => row.change),
-          cursor: page.length > 0 ? page[page.length - 1].seq : after,
-          more: feed.length > size,
-          serverTime: this.time(),
-        };
-      },
+      // A promise made by hand: a refusal (`check`) throws inside it and so rejects, as in an async function.
+      pull: (after, limit) =>
+        new Promise<PullPage>((resolve) => {
+          this.check();
+          this.pullRequests++;
+          const feed = [...this.fields.values()].filter((row) => row.seq > after).sort((a, b) => a.seq - b.seq);
+          const size = Math.min(limit, this.pageSize);
+          const page = feed.slice(0, size);
+          this.pulledChanges += page.length;
+          resolve({
+            changes: page.map((row) => row.change),
+            cursor: page.at(-1)?.seq ?? after,
+            more: feed.length > size,
+            serverTime: this.time(),
+          });
+        }),
     };
   }
 
@@ -109,7 +111,7 @@ export class MemoryServer {
    * what the transport does with each status is part of what is tested.
    */
   fetch: typeof fetch = async (input, init) => {
-    const url = new URL(String(input), "http://localhost");
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://localhost");
     const transport = this.transport();
     const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
     if (url.pathname === "/api/sync/push" && this.pushStatus !== null) {
@@ -118,7 +120,7 @@ export class MemoryServer {
     }
     try {
       if (url.pathname === "/api/sync/push") {
-        const { changes } = JSON.parse(String(init?.body)) as { changes: Change[] };
+        const { changes } = JSON.parse(typeof init?.body === "string" ? init.body : "") as { changes: Change[] };
         return json(200, await transport.push(changes));
       }
       return json(200, await transport.pull(Number(url.searchParams.get("after")), Number(url.searchParams.get("limit"))));

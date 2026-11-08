@@ -1,3 +1,4 @@
+import { openDB } from "idb";
 import { describe, expect, it } from "vitest";
 import { openAppDb } from "../data/database";
 import { taskRecordType, type Task } from "../tasks/taskStore";
@@ -5,6 +6,7 @@ import { createSyncEngine } from "./engine";
 import { decode } from "./hlc";
 import { openTable } from "./replica";
 import { MemoryServer } from "./testing/memoryServer";
+import { defined } from "../testing/defined";
 
 let dbCounter = 0;
 
@@ -45,6 +47,38 @@ const task = (fields: Partial<Task> = {}): Task => ({
 
 const everyField = ["completedAt", "createdAt", "date", "deletedAt", "eventId", "listId", "offsetDays", "rescheduleCount", "tagIds", "time", "title"];
 
+describe("Records saved before sync existed", () => {
+  const raw = (id: string) => ({ id, title: `Saved ${id}`, createdAt: "2026-09-28T09:00:00.000Z", completedAt: null });
+
+  it("are queued once, and only those that no sync has given clocks to; a record that arrives later is not queued by it", async () => {
+    const name = `replica-test-${dbCounter++}`;
+    (await openAppDb(name)).close();
+    // Opened without the app's types: the records are as an older version saved them, which Task no longer describes.
+    const older = await openDB(name);
+    await older.put("tasks", raw("old"));
+    await older.put("tasks", raw("synced"));
+    await older.put("fieldClocks", { type: "task", id: "synced", clocks: { title: "000000000000001-00000-other" } });
+    older.close();
+    const db = await openAppDb(name);
+
+    await openTable(db, taskRecordType, tickingClock());
+
+    const queued = (await db.getAll("outbox")).map((entry) => [entry.id, entry.field]);
+    expect(queued.filter(([id]) => id === "synced")).toEqual([]);
+    expect(queued.filter(([id]) => id === "old").map(([, field]) => field)).toContain("title");
+    expect(await db.get("fieldClocks", ["task", "synced"])).toEqual({ type: "task", id: "synced", clocks: { title: "000000000000001-00000-other" } });
+    expect(await db.get("syncInfo", "queued:task")).toBeDefined();
+
+    const lateWriter = await openDB(name);
+    await lateWriter.put("tasks", raw("later"));
+    lateWriter.close();
+    const before = (await db.getAll("outbox")).length;
+    await openTable(db, taskRecordType, tickingClock());
+    expect((await db.getAll("outbox")).length).toBe(before);
+    db.close();
+  });
+});
+
 describe("Replica table", () => {
   it("sends every field of a new record, all under one clock, and none for the id", async () => {
     const { tasks, push } = await open();
@@ -54,7 +88,7 @@ describe("Replica table", () => {
     const sent = await push();
     expect(Object.keys(sent).sort()).toEqual(everyField);
     expect(new Set(Object.values(sent).map((change) => change.hlc)).size).toBe(1);
-    expect(sent.title.value).toBe("Buy gift");
+    expect(defined(sent["title"]).value).toBe("Buy gift");
   });
 
   it("sends only the fields that changed, and only the latest edit of a field", async () => {
@@ -68,22 +102,22 @@ describe("Replica table", () => {
     const second = await push();
 
     expect(server.pushedChanges - pushed).toBe(1);
-    expect(second.completedAt.value).toBe("2026-10-01T11:00:00.000Z");
-    expect(second.title.hlc).toBe(first.title.hlc);
-    expect(second.completedAt.hlc > first.title.hlc).toBe(true);
+    expect(defined(second["completedAt"]).value).toBe("2026-10-01T11:00:00.000Z");
+    expect(defined(second["title"]).hlc).toBe(defined(first["title"]).hlc);
+    expect(defined(second["completedAt"]).hlc > defined(first["title"]).hlc).toBe(true);
   });
 
   it("stamps a later change later even when the device clock stands still or runs backwards", async () => {
     let seconds = 100;
     const { tasks, push } = await open(() => new Date(Date.UTC(2026, 9, 1, 9, 0, seconds)));
     await tasks.put(task());
-    const first = (await push()).title.hlc;
+    const first = defined((await push())["title"]).hlc;
 
     await tasks.update("t1", { title: "Same instant" });
-    const second = (await push()).title.hlc;
+    const second = defined((await push())["title"]).hlc;
     seconds = 50;
     await tasks.update("t1", { title: "Clock went back" });
-    const third = (await push()).title.hlc;
+    const third = defined((await push())["title"]).hlc;
 
     expect(second > first).toBe(true);
     expect(third > second).toBe(true);
@@ -91,12 +125,15 @@ describe("Replica table", () => {
   });
 
   it("sends nothing for an update that names no field", async () => {
-    const { tasks, server, push } = await open();
+    const { db, tasks, server, push } = await open();
     await tasks.put(task());
     await push();
     const pushed = server.pushedChanges;
 
+    const clock = await db.get("syncInfo", "clock");
     await tasks.update("t1", {});
+    // The device's clock did not move for it either: nothing was stamped.
+    expect(await db.get("syncInfo", "clock")).toEqual(clock);
     await push();
 
     expect(server.pushedChanges).toBe(pushed);
@@ -109,8 +146,8 @@ describe("Replica table", () => {
 
     const sent = await push();
 
-    expect(sent.title.hlc > sent.date.hlc).toBe(true);
-    expect(decode(sent.date.hlc).node).toBe(decode(sent.title.hlc).node);
+    expect(defined(sent["title"]).hlc > defined(sent["date"]).hlc).toBe(true);
+    expect(decode(defined(sent["date"]).hlc).node).toBe(decode(defined(sent["title"]).hlc).node);
   });
 
   it("deletes by setting deletedAt, keeps the record stored and leaves it out of get and list", async () => {
@@ -121,10 +158,10 @@ describe("Replica table", () => {
 
     expect(await tasks.get("t1")).toBeUndefined();
     expect(await tasks.list()).toEqual([]);
-    expect(((await db.get("tasks", "t1")) as Task).deletedAt).toBe("2026-10-01T09:00:01.000Z");
+    expect(defined(await db.get("tasks", "t1")).deletedAt).toBe("2026-10-01T09:00:01.000Z");
     const sent = await push();
-    expect(sent.deletedAt.value).toBe("2026-10-01T09:00:01.000Z");
-    expect(sent.deletedAt.hlc > sent.title.hlc).toBe(true);
+    expect(defined(sent["deletedAt"]).value).toBe("2026-10-01T09:00:01.000Z");
+    expect(defined(sent["deletedAt"]).hlc > defined(sent["title"]).hlc).toBe(true);
   });
 
   it("ignores deleting a record that is missing or already deleted", async () => {
@@ -182,7 +219,7 @@ describe("Replica table", () => {
     const deleted = await tasks.listDeleted();
 
     expect(deleted.map((t) => t.id).sort()).toEqual(["t2", "t3"]);
-    expect(deleted.every((t) => t.deletedAt !== null)).toBe(true);
+    expect(deleted.map((t) => t.deletedAt)).not.toContain(null);
     expect(deleted.find((t) => t.id === "t2")).toMatchObject({ title: "Doomed" });
   });
 
@@ -213,9 +250,9 @@ describe("Replica table", () => {
       expect(restored).toEqual(task({ date: "2026-10-04" }));
       expect(await tasks.get("t1")).toEqual(restored);
       expect(await tasks.listDeleted()).toEqual([]);
-      expect(sent.deletedAt.value).toBeNull();
-      expect(sent.deletedAt.hlc > deleted.deletedAt.hlc).toBe(true);
-      expect(sent.title.hlc).toBe(deleted.title.hlc);
+      expect(defined(sent["deletedAt"]).value).toBeNull();
+      expect(defined(sent["deletedAt"]).hlc > defined(deleted["deletedAt"]).hlc).toBe(true);
+      expect(defined(sent["title"]).hlc).toBe(defined(deleted["title"]).hlc);
     });
 
     it("writes a single outbox entry", async () => {
@@ -272,9 +309,9 @@ describe("Replica table", () => {
       await tasks.update("t1", { date: null, completedAt: "2026-10-01T10:00:00.000Z" });
       const second = await push();
 
-      expect(second.date.hlc).toBe(second.completedAt.hlc);
-      expect(second.date.hlc > first.date.hlc).toBe(true);
-      expect(second.title.hlc).toBe(first.title.hlc);
+      expect(defined(second["date"]).hlc).toBe(defined(second["completedAt"]).hlc);
+      expect(defined(second["date"]).hlc > defined(first["date"]).hlc).toBe(true);
+      expect(defined(second["title"]).hlc).toBe(defined(first["title"]).hlc);
     });
 
     it("does nothing for an empty change, a missing record or a deleted one", async () => {
@@ -299,7 +336,7 @@ describe("Replica table", () => {
     it("refuses an id that is taken, also by a deleted record, and leaves the stored record alone", async () => {
       const { tasks, push } = await open();
       await tasks.put(task());
-      const staleCopy = (await tasks.get("t1"))!;
+      const staleCopy = defined(await tasks.get("t1"));
 
       await expect(tasks.put({ ...staleCopy, title: "Written from a copy" })).rejects.toThrow("exists already");
       await tasks.delete("t1");
@@ -307,9 +344,9 @@ describe("Replica table", () => {
 
       expect(await tasks.list()).toEqual([]);
       const sent = await push();
-      expect(sent.deletedAt.value).not.toBeNull();
-      expect(sent.title.value).toBe("Buy gift");
-      expect(sent.completedAt.value).toBeNull();
+      expect(defined(sent["deletedAt"]).value).not.toBeNull();
+      expect(defined(sent["title"]).value).toBe("Buy gift");
+      expect(defined(sent["completedAt"]).value).toBeNull();
     });
 
     it("never writes deletedAt: only a deletion does", async () => {
@@ -317,7 +354,7 @@ describe("Replica table", () => {
       await tasks.put(task({ deletedAt: "2026-10-01T10:00:00.000Z" }));
 
       expect(await tasks.get("t1")).toEqual(task());
-      expect((await push()).deletedAt.value).toBeNull();
+      expect(defined((await push())["deletedAt"]).value).toBeNull();
     });
   });
 
@@ -329,7 +366,7 @@ describe("Replica table", () => {
 
       expect(saved).toEqual(task());
       expect(await tasks.list()).toEqual([task()]);
-      expect((await push()).title.value).toBe("Buy gift");
+      expect(defined((await push())["title"]).value).toBe("Buy gift");
     });
 
     it("returns the picked live record and writes nothing, and offers only live records to the pick", async () => {

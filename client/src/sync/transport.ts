@@ -20,8 +20,8 @@ export interface PullPage {
 
 /** How the engine talks to the server; the app uses HTTP, tests an in-memory server. */
 export interface Transport {
-  push(changes: Change[]): Promise<{ serverTime: number }>;
-  pull(after: number, limit: number): Promise<PullPage>;
+  push: (changes: Change[]) => Promise<{ serverTime: number }>;
+  pull: (after: number, limit: number) => Promise<PullPage>;
 }
 
 /**
@@ -83,8 +83,7 @@ export function createHttpTransport(request: typeof fetch = (...args) => fetch(.
   }
 
   return {
-    push: (changes) =>
-      call("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) }),
+    push: (changes) => call("push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes }) }),
     pull: (after, limit) => call(`pull?after=${after}&limit=${limit}`),
   };
 }

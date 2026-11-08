@@ -13,7 +13,10 @@ import "./styles.css";
 
 registerSW({ immediate: true });
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (root === null) throw new Error("index.html has no #root to put the app in.");
+
+createRoot(root).render(
   <StrictMode>
     <I18nProvider>
       <AuthGate>

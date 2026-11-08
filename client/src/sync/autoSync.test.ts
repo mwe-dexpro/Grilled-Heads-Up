@@ -9,18 +9,19 @@ function fakeEnvironment() {
 }
 
 describe("Automatic sync", () => {
-  let auto: AutoSync | undefined;
+  let running: AutoSync | undefined;
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
-    auto?.stop();
+    running?.stop();
     vi.useRealTimers();
   });
 
   function start() {
     const sync = vi.fn();
     const env = fakeEnvironment();
-    auto = startAutoSync(sync, env);
-    return { sync, env };
+    const auto = startAutoSync(sync, env);
+    running = auto;
+    return { sync, env, auto };
   }
 
   it("syncs when it starts", () => {
@@ -50,11 +51,11 @@ describe("Automatic sync", () => {
   });
 
   it("syncs about 2 seconds after a local change, once for a burst of changes", () => {
-    const { sync } = start();
+    const { sync, auto } = start();
 
-    auto!.afterChange();
+    auto.afterChange();
     vi.advanceTimersByTime(1500);
-    auto!.afterChange();
+    auto.afterChange();
     vi.advanceTimersByTime(1999);
     expect(sync).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1);
@@ -80,10 +81,10 @@ describe("Automatic sync", () => {
   });
 
   it("stops listening and waiting when stopped", () => {
-    const { sync, env } = start();
-    auto!.afterChange();
+    const { sync, env, auto } = start();
+    auto.afterChange();
 
-    auto!.stop();
+    auto.stop();
     env.window.dispatchEvent(new Event("online"));
     env.document.dispatchEvent(new Event("visibilitychange"));
     vi.advanceTimersByTime(300_000);

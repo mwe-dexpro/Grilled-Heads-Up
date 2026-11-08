@@ -24,16 +24,16 @@ export class NoListError extends Error {
 
 export interface ListStore {
   /** Throws for an empty or too long name. */
-  addList(name: string, options?: { isProject?: boolean }): Promise<List>;
+  addList: (name: string, options?: { isProject?: boolean }) => Promise<List>;
   /** Same checks as `addList`; a List that is missing or deleted throws `NoListError`. */
-  renameList(id: string, name: string): Promise<void>;
+  renameList: (id: string, name: string) => Promise<void>;
   /** Marks a List as a Project, or unmarks it; a List that is missing or deleted throws `NoListError`. */
-  setProject(id: string, isProject: boolean): Promise<void>;
+  setProject: (id: string, isProject: boolean) => Promise<void>;
   /** Deletes a List (its Tasks are the caller's business, see `TaskStore.clearList`); one that is missing is ignored. */
-  deleteList(id: string): Promise<void>;
+  deleteList: (id: string) => Promise<void>;
   /** Live Lists by name; one whose name has not arrived from another device yet is left out. */
-  listLists(): Promise<List[]>;
-  close(): void;
+  listLists: () => Promise<List[]>;
+  close: () => void;
 }
 
 export interface ListStoreOptions {
@@ -60,10 +60,7 @@ function checkedName(raw: string): string {
   return name;
 }
 
-export async function openListStore(
-  dbName = defaultDatabaseName,
-  { now = () => new Date() }: ListStoreOptions = {},
-): Promise<ListStore> {
+export async function openListStore(dbName = defaultDatabaseName, { now = () => new Date() }: ListStoreOptions = {}): Promise<ListStore> {
   const db = await openAppDb(dbName);
   const lists = await openTable(db, listRecordType, now);
 

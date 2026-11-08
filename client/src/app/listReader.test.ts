@@ -1,19 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { createListReader } from "./listReader";
+import { defined } from "../testing/defined";
 
 /** A read that finishes when the test says so. */
 function slowRead<T>() {
-  const pending: Array<(value: T | null) => void> = [];
+  const pending: ((value: T | null) => void)[] = [];
   return {
     read: () => new Promise<T | null>((resolve) => pending.push(resolve)),
-    finish: (index: number, value: T | null) => pending[index](value),
+    finish: (index: number, value: T | null) => defined(pending[index])(value),
   };
 }
 
 describe("List reader", () => {
   it("hands on what a read found", async () => {
     const delivered: string[] = [];
-    const reload = createListReader(async () => "lists", (value) => delivered.push(value));
+    const reload = createListReader(
+      () => Promise.resolve("lists"),
+      (value) => delivered.push(value),
+    );
 
     await reload();
 
@@ -37,7 +41,10 @@ describe("List reader", () => {
   it("hands on nothing when there was nothing to read, and reads again later", async () => {
     const delivered: string[] = [];
     let ready = false;
-    const reload = createListReader(async () => (ready ? "lists" : null), (value) => delivered.push(value));
+    const reload = createListReader(
+      () => Promise.resolve(ready ? "lists" : null),
+      (value) => delivered.push(value),
+    );
 
     await reload();
     expect(delivered).toEqual([]);
@@ -69,7 +76,7 @@ describe("List reader", () => {
 
   it("does not fail an older read that was passed over when the newest one fails, and fails the newest", async () => {
     const delivered: string[] = [];
-    const pending: Array<{ resolve(value: string): void; reject(error: Error): void }> = [];
+    const pending: { resolve(value: string): void; reject(error: Error): void }[] = [];
     const reload = createListReader(
       () => new Promise<string>((resolve, reject) => pending.push({ resolve, reject })),
       (value) => delivered.push(value),
@@ -77,12 +84,12 @@ describe("List reader", () => {
 
     const first = reload();
     const second = reload();
-    const secondResult = expect(second).rejects.toThrow("newest failed");
-    pending[0].resolve("older");
-    pending[1].reject(new Error("newest failed"));
+    const secondRejection = second.catch((error: unknown) => error);
+    defined(pending[0]).resolve("older");
+    defined(pending[1]).reject(new Error("newest failed"));
 
     await expect(first).resolves.toBeUndefined();
-    await secondResult;
+    expect(await secondRejection).toMatchObject({ message: "newest failed" });
     expect(delivered).toEqual([]);
   });
 

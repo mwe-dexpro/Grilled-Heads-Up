@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type SyntheticEvent, type ReactNode } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/i18n";
 import { fetchSession, newRecoveryCode, registerPasskey, signInWithPasskey, signInWithRecoveryCode, signOut } from "./authApi";
@@ -18,10 +18,10 @@ type Stage =
 /** What the signed-in Owner can do about signing in, from inside the app. */
 interface SignedIn {
   /** Replaces the recovery code and shows the new one once. */
-  showNewRecoveryCode(): Promise<void>;
-  signOut(): Promise<void>;
+  showNewRecoveryCode: () => Promise<void>;
+  signOut: () => Promise<void>;
   /** Asks the server whether this device is still signed in, and shows the sign-in screen if not (e.g. a session that expired). */
-  recheck(): Promise<void>;
+  recheck: () => Promise<void>;
 }
 
 const SignedInContext = createContext<SignedIn | null>(null);
@@ -108,9 +108,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       return null;
     case "setup":
       return (
-        <SetupScreen
-          onRegistered={(recoveryCode) => enter(recoveryCode ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })}
-        />
+        <SetupScreen onRegistered={(recoveryCode) => enter(recoveryCode !== null ? { name: "recoveryCode", recoveryCode, then: "app" } : { name: "app" })} />
       );
     case "signIn":
       return (
@@ -151,7 +149,7 @@ function Problem({ text }: { text: TranslationKey | null }) {
   ) : null;
 }
 
-function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | null): void }) {
+function SetupScreen({ onRegistered }: { onRegistered: (recoveryCode: string | null) => void }) {
   const { t } = useI18n();
   const { busy, message, run } = useStep();
 
@@ -163,7 +161,7 @@ function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | nul
           type="button"
           className="button-primary"
           disabled={busy}
-          onClick={() => run(async () => onRegistered((await registerPasskey()).recoveryCode), { refused: "auth.problem.createPasskey" })}
+          onClick={() => void run(async () => onRegistered((await registerPasskey()).recoveryCode), { refused: "auth.problem.createPasskey" })}
         >
           {t("auth.createPasskey")}
         </button>
@@ -173,24 +171,16 @@ function SetupScreen({ onRegistered }: { onRegistered(recoveryCode: string | nul
   );
 }
 
-function SignInScreen({
-  unreachable,
-  onSignedIn,
-  onRecovered,
-}: {
-  unreachable: boolean;
-  onSignedIn(): void;
-  onRecovered(recoveryCode: string): void;
-}) {
+function SignInScreen({ unreachable, onSignedIn, onRecovered }: { unreachable: boolean; onSignedIn: () => void; onRecovered: (recoveryCode: string) => void }) {
   const { t } = useI18n();
   const passkey = useStep();
   const recovery = useStep();
   const [code, setCode] = useState("");
 
-  function handleRecover(event: FormEvent) {
+  function handleRecover(event: SyntheticEvent) {
     event.preventDefault();
     if (code.trim() === "") return;
-    recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });
+    void recovery.run(async () => onRecovered((await signInWithRecoveryCode(code)).recoveryCode), { refused: "auth.problem.code" });
   }
 
   return (
@@ -202,10 +192,13 @@ function SignInScreen({
           className="button-primary"
           disabled={passkey.busy}
           onClick={() =>
-            passkey.run(async () => {
-              await signInWithPasskey();
-              onSignedIn();
-            }, { refused: "auth.problem.signIn" })
+            void passkey.run(
+              async () => {
+                await signInWithPasskey();
+                onSignedIn();
+              },
+              { refused: "auth.problem.signIn" },
+            )
           }
         >
           {t("auth.signInWithPasskey")}
@@ -240,7 +233,7 @@ function SignInScreen({
   );
 }
 
-function NewPasskeyScreen({ onDone }: { onDone(): void }) {
+function NewPasskeyScreen({ onDone }: { onDone: () => void }) {
   const { t } = useI18n();
   const { busy, message, run } = useStep();
 
@@ -253,10 +246,13 @@ function NewPasskeyScreen({ onDone }: { onDone(): void }) {
           className="button-primary"
           disabled={busy}
           onClick={() =>
-            run(async () => {
-              await registerPasskey();
-              onDone();
-            }, { refused: "auth.problem.createPasskey" })
+            void run(
+              async () => {
+                await registerPasskey();
+                onDone();
+              },
+              { refused: "auth.problem.createPasskey" },
+            )
           }
         >
           {t("auth.createPasskey")}
@@ -270,7 +266,7 @@ function NewPasskeyScreen({ onDone }: { onDone(): void }) {
   );
 }
 
-function RecoveryCodeScreen({ recoveryCode, onDone }: { recoveryCode: string; onDone(): void }) {
+function RecoveryCodeScreen({ recoveryCode, onDone }: { recoveryCode: string; onDone: () => void }) {
   const { t } = useI18n();
 
   return (

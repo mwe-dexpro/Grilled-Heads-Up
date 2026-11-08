@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { actionWidth, canStartSwipe, dragOffset, settle } from "./swipe";
 
 export interface SwipeAction {
@@ -8,13 +8,13 @@ export interface SwipeAction {
   icon: LucideIcon;
   /** Picks the colours (see `.swipe-action` in styles.css). */
   tone: "neutral" | "primary" | "strong";
-  onSelect(): void;
+  onSelect: () => void;
 }
 
 interface SwipeRowProps {
   actions: SwipeAction[];
   /** Long press (`contextmenu`, which Android Chrome fires on long press and desktop on right click). */
-  onMenu(): void;
+  onMenu: () => void;
   /** Classes of the row's content, which slides over the actions. */
   className?: string;
   children: ReactNode;
@@ -57,11 +57,13 @@ export function SwipeRow({ actions, onMenu, className, children }: SwipeRowProps
   }
 
   // An open row closes when the pointer lands anywhere else, and when the page scrolls.
+  // (An Effect Event: it closes the row as the row is when the pointer or the scroll comes.)
+  const closeRow = useEffectEvent(() => show(0));
   useEffect(() => {
     if (!open || dragging) return;
-    const close = () => show(0);
+    const close = () => closeRow();
     const closeOutside = (event: globalThis.PointerEvent) => {
-      if (!row.current?.contains(event.target as Node)) close();
+      if (row.current?.contains(event.target as Node) !== true) close();
     };
     document.addEventListener("pointerdown", closeOutside, true);
     window.addEventListener("scroll", close, true);
@@ -109,7 +111,7 @@ export function SwipeRow({ actions, onMenu, className, children }: SwipeRowProps
 
   function handleMove(event: PointerEvent<HTMLDivElement>) {
     const g = gesture.current;
-    if (!g || event.pointerId !== g.id) return;
+    if (g?.id !== event.pointerId) return;
     // A mouse moving with no button down is not dragging, whatever became of the release.
     if (event.pointerType === "mouse" && event.buttons === 0) {
       stopListening.current?.();

@@ -41,9 +41,6 @@ export function tick(state: Timestamp, now: number): Timestamp {
 /** The clock after seeing a timestamp from elsewhere (another device's change, or the server's time). */
 export function receive(state: Timestamp, remote: Pick<Timestamp, "wall" | "counter">, now: number): Timestamp {
   const wall = Math.max(state.wall, remote.wall, now);
-  const counters = [
-    ...(wall === state.wall ? [state.counter] : []),
-    ...(wall === remote.wall ? [remote.counter] : []),
-  ];
+  const counters = [...(wall === state.wall ? [state.counter] : []), ...(wall === remote.wall ? [remote.counter] : [])];
   return normalized(wall, counters.length === 0 ? 0 : Math.max(...counters) + 1, state.node);
 }
