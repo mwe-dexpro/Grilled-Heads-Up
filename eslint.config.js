@@ -17,10 +17,12 @@ const leftOutVitest = {
 };
 // Vitest's own way to leave out the running test: `skip(...)` taken from the test context (`({ skip }) => ...`, `context.skip()`),
 // which vitest/no-disabled-tests misses when the name is destructured. `it.skip` and the like stay with that rule (its disable names the issue).
+// They match by the name `skip`, so a data field, a variable or a function of that name is flagged as well: rename it.
+const skipContextMessage = `${leftOutMessage} (Matched by the name \`skip\`: if this is a field or a function of your own that leaves no test out, give it another name.)`;
 const leftOutVitestContext = [
-  { selector: "MemberExpression[property.name='skip']:not([object.name=/^(it|test|describe|suite)$/])", message: leftOutMessage },
-  { selector: "ObjectPattern > Property[key.name='skip']", message: leftOutMessage },
-  { selector: "CallExpression[callee.name='skip']", message: leftOutMessage },
+  { selector: "MemberExpression[property.name='skip']:not([object.name=/^(it|test|describe|suite)$/])", message: skipContextMessage },
+  { selector: "ObjectPattern > Property[key.name='skip']", message: skipContextMessage },
+  { selector: "CallExpression[callee.name='skip']", message: skipContextMessage },
 ];
 const leftOutPlaywright = { selector: "MemberExpression[property.name='fixme']", message: leftOutMessage };
 // `test.info().skip(...)` and `.fixme(...)` leave out the running test; `testInfo.skip()` is found by playwright/no-skipped-test, this call is not.
@@ -107,6 +109,7 @@ export default tseslint.config(
     rules: {
       // Off: a false positive. It follows a function that reads a ref into everything that receives it (the list reader of
       // `useAppData`, the Subtasks offer's handlers), although none is called while rendering; refs are read only in handlers and effects.
+      // To be turned on again when the plugin stops flagging them: #38.
       "react-hooks/refs": "off",
     },
   },
@@ -134,8 +137,9 @@ export default tseslint.config(
     rules: { "n/no-process-exit": "off" },
   },
   {
-    // Off here only: the path is the operator's DATABASE_FILE or CLIENT_DIR setting (the app shell is read once, at start), not input from a request.
-    files: ["server/src/database.ts", "server/src/app.ts"],
+    // Off here only: the path is the operator's DATABASE_FILE or CLIENT_DIR setting (the app shell is read once at start, in its own
+    // module), not input from a request. The route handlers (app.ts, sync.ts, auth.ts) keep the rule.
+    files: ["server/src/database.ts", "server/src/appShell.ts"],
     rules: { "security/detect-non-literal-fs-filename": "off" },
   },
   {

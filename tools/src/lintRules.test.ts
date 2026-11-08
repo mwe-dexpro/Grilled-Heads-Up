@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // The repository's own ESLint config, run over a snippet that is checked as if it were an existing file of the project.
 const root = fileURLToPath(new URL("../..", import.meta.url));
@@ -18,9 +18,22 @@ async function flagged(code: string, filePath: string): Promise<string[]> {
     .flatMap(({ ruleId }) => (ruleId !== null && /skip|todo|fixme|restricted|disabled|eslint-comments\/no-use/.test(ruleId) ? [ruleId] : []));
 }
 
+/** The security rule for a path that is not a literal, as reported for `code` standing in `filePath`. */
+async function nonLiteralPath(code: string, filePath: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath });
+  return (result?.messages ?? []).flatMap(({ ruleId }) => (ruleId === "security/detect-non-literal-fs-filename" ? [ruleId] : []));
+}
+
 // The first lint of each kind of file builds the type information of the whole project: seconds on a busy machine, and the
-// default 5 s timed out when the other test files ran at the same time.
-describe("the ESLint config refuses a test that is left out without naming its issue", { timeout: 60_000 }, () => {
+// default 5 s timed out when the other test files ran at the same time. Only that warm-up gets the long timeout, so a case
+// that has become slow (a config that rebuilds the program for every lint) is caught by the default.
+beforeAll(async () => {
+  await flagged("", unitTest);
+  await flagged("", endToEnd);
+  await nonLiteralPath("", resolve(root, "server/src/app.ts"));
+}, 60_000);
+
+describe("the ESLint config refuses a test that is left out without naming its issue", () => {
   const skippedInVitest: [string, string][] = [
     ["it.skip", 'it.skip("x", () => { expect(1).toBe(1); });'],
     ["it.skipIf", 'it.skipIf(process.platform === "win32")("x", () => { expect(1).toBe(1); });'],
@@ -79,9 +92,32 @@ describe("the ESLint config refuses a test that is left out without naming its i
     expect(await flagged(withReason, unitTest)).toEqual([]);
   });
 
+  it("says on the message for `skip` that a field or function of that name has to be renamed, as the name is all the rule can match", async () => {
+    const header = 'import { expect, it } from "vitest";\n';
+    const [result] = await eslint.lintText(`${header}it("x", () => { const page = { skip: 10 }; expect(page.skip).toBe(10); });`, { filePath: unitTest });
+
+    const messages = (result?.messages ?? []).filter(({ ruleId }) => ruleId === "no-restricted-syntax").map(({ message }) => message);
+
+    expect(messages).not.toEqual([]);
+    for (const message of messages) expect(message).toContain("give it another name");
+  });
+
   it("lets an ordinary test, and other uses of the words todo and runIf, through", async () => {
     expect(await flagged('it("x", () => { expect({ todo: 1 }.todo).toBe(1); });', unitTest)).toEqual([]);
     expect(await flagged('test("x", async () => { await Promise.resolve(); });', endToEnd)).toEqual([]);
     expect(await flagged('it("x", () => { expect([1, 2].map((n) => n * 2)).toEqual([2, 4]); });', unitTest)).toEqual([]);
+  });
+});
+
+describe("a file is opened by a path that is not a literal only where the config says so", () => {
+  const handler = 'import { readFileSync } from "node:fs";\nexport const read = (name: string) => readFileSync(name);';
+  const server = (name: string) => resolve(root, "server/src", name);
+
+  it.each(["app.ts", "sync.ts", "auth.ts"])("is reported in server/src/%s, the files of the route handlers", async (name) => {
+    expect(await nonLiteralPath(handler, server(name))).toEqual(["security/detect-non-literal-fs-filename"]);
+  });
+
+  it.each(["appShell.ts", "database.ts"])("is not reported in server/src/%s, which read the files the operator's settings name", async (name) => {
+    expect(await nonLiteralPath(handler, server(name))).toEqual([]);
   });
 });

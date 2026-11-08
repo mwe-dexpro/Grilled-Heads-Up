@@ -3,7 +3,7 @@ import { request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { createApp } from "./app.js";
 import { openDatabase } from "./database.js";
 import { TestBrowser } from "./testing/testBrowser.js";
@@ -161,6 +161,7 @@ describe("the built app", () => {
   });
 
   test("starts, and answers 404 to every screen, when the folder holds no index.html or does not exist", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const empty = mkdtempSync(join(tmpdir(), "heads-up-empty-"));
     writeFileSync(join(empty, "sw.js"), "// service worker");
 
@@ -174,6 +175,27 @@ describe("the built app", () => {
     }
     const url = await start({ clientDir: empty });
     expect(await (await fetch(`${url}/sw.js`)).text()).toBe("// service worker");
+    warn.mockRestore();
+    rmSync(empty, { recursive: true, force: true });
+  });
+
+  test("says so in the log at start when the folder holds no index.html, and not when it does or no folder is set", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const empty = mkdtempSync(join(tmpdir(), "heads-up-empty-"));
+    const create = (dir?: string) =>
+      createApp({ db: openDatabase(":memory:"), origins: ["http://localhost:3000"], ...(dir === undefined ? {} : { clientDir: dir }) });
+
+    create(clientDir);
+    create();
+    expect(warn).not.toHaveBeenCalled();
+    create(empty);
+    create(join(empty, "missing"));
+
+    expect(warn.mock.calls).toEqual([
+      [`The app is not served: ${empty} holds no index.html (build the client first: npm run build).`],
+      [`The app is not served: ${join(empty, "missing")} holds no index.html (build the client first: npm run build).`],
+    ]);
+    warn.mockRestore();
     rmSync(empty, { recursive: true, force: true });
   });
 

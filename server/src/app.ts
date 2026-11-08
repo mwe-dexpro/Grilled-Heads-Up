@@ -1,7 +1,6 @@
 import express from "express";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { readAppShell } from "./appShell.js";
 import { createAuth } from "./auth.js";
 import { createSyncRoutes } from "./sync.js";
 
@@ -11,16 +10,6 @@ export interface AppConfig {
   clientDir?: string;
   /** Where the app is served from; see `AuthConfig.origins`. */
   origins: string[];
-}
-
-/**
- * The app shell (`index.html` of the build), read once. A route handler that answered from the file would touch the file
- * system for every request; this one sends a string. None when the build has no `index.html` (the tests, development);
- * a file that is there and cannot be read stops the server from starting.
- */
-function readAppShell(clientDir: string): string | undefined {
-  const file = resolve(clientDir, "index.html");
-  return existsSync(file) ? readFileSync(file, "utf8") : undefined;
 }
 
 export function createApp({ db, clientDir, origins }: AppConfig): express.Express {
@@ -67,7 +56,10 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
 
     // Client-side routes fall back to the app shell, which must revalidate too (a new deploy restarts the server).
     const appShell = readAppShell(clientDir);
-    if (appShell !== undefined) {
+    if (appShell === undefined) {
+      // The server is healthy and every screen answers 404: say why, once, where the operator reads the log.
+      console.warn(`The app is not served: ${clientDir} holds no index.html (build the client first: npm run build).`);
+    } else {
       app.get(/^\/(?!api\/).*/, (_req, res) => {
         res.setHeader("Cache-Control", "no-cache");
         res.type("html").send(appShell);
