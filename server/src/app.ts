@@ -1,5 +1,5 @@
 import express from "express";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { createAuth } from "./auth.js";
@@ -16,15 +16,11 @@ export interface AppConfig {
 /**
  * The app shell (`index.html` of the build), read once. A route handler that answered from the file would touch the file
  * system for every request; this one sends a string. None when the build has no `index.html` (the tests, development);
- * any other failure to read it stops the server from starting.
+ * a file that is there and cannot be read stops the server from starting.
  */
 function readAppShell(clientDir: string): string | undefined {
-  try {
-    return readFileSync(resolve(clientDir, "index.html"), "utf8");
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
-  }
+  const file = resolve(clientDir, "index.html");
+  return existsSync(file) ? readFileSync(file, "utf8") : undefined;
 }
 
 export function createApp({ db, clientDir, origins }: AppConfig): express.Express {

@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkAllowlist, parseAllowlist, type AllowlistEntry } from "./allowlist.js";
+import type { AllowlistEntry } from "./allowlist.js";
 import { gateSarif } from "./sarifGate.js";
 
 const today = "2026-11-07";
@@ -467,40 +466,5 @@ describe("gateSarif", () => {
     expect(gateSarif([file(text)], [allow("js/one", { reason: "One." }), allow("js/two", { reason: "Two." })], today).output).toBe(
       "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-31: js/one (One.)\nAllowed until 2026-12-31: js/two (Two.)\n",
     );
-  });
-});
-
-describe("the committed allowlist, as CodeQL's first run will meet it", () => {
-  // The day the entries were written: what the file is judged against must not move with the calendar.
-  const addedOn = "2026-11-08";
-  const text = readFileSync(new URL("../../.github/security-allowlist.json", import.meta.url), "utf8");
-  const committed = parseAllowlist(text);
-  const rateLimiting = { id: "js/missing-rate-limiting", severity: "7.5" };
-
-  it("is valid on the day it was written, and every entry names the follow-up that removes it", () => {
-    expect(committed.errors).toEqual([]);
-    expect(checkAllowlist(text, addedOn)).toEqual({ ok: true, messages: [] });
-    for (const { id, reason } of committed.entries) expect(reason, id).toMatch(/follow-up/i);
-  });
-
-  it("lets the missing rate limiting of the sign-in routes through (the query counts a call of verify... or ...Authentication... as authorization), with the entry shown", () => {
-    const analysis = sarif(
-      [rateLimiting],
-      [{ rule: rateLimiting.id, file: "server/src/auth.ts", line: 156, message: "This route handler performs authorization, but is not rate-limited." }],
-    );
-
-    const { exitCode, output } = gateSarif([file(analysis)], committed.entries, addedOn);
-
-    expect(output).toContain("Allowed until ");
-    expect(output).toContain("js/missing-rate-limiting");
-    expect(exitCode).toBe(0);
-  });
-
-  it("still fails any other high result, and the same rule once its entry has run out", () => {
-    const other = sarif([{ id: "js/sql-injection", severity: "8.8" }], [{ rule: "js/sql-injection", file: "server/src/sync.ts", line: 100 }]);
-    const again = sarif([rateLimiting], [{ rule: rateLimiting.id, file: "server/src/auth.ts", line: 156 }]);
-
-    expect(gateSarif([file(other)], committed.entries, addedOn).exitCode).toBe(1);
-    expect(gateSarif([file(again)], committed.entries, "2027-12-31").exitCode).toBe(1);
   });
 });

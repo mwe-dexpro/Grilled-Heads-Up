@@ -35,6 +35,8 @@ describe("skipsWithoutIssue", () => {
   it("leaves a comment that only talks about eslint alone", () => {
     expect(check("// eslint has a rule called no-disabled-tests")).toEqual([]);
     expect(check("/* eslintish no-restricted-syntax */")).toEqual([]);
+    // Only a comment that begins with it is a setting: the words in the middle of a comment are talk.
+    expect(check("/* see the eslint docs on no-disabled-tests and no-restricted-syntax */")).toEqual([]);
     // ESLint reads an inline setting in a block comment only: a line comment of the same words is just a comment.
     expect(check('// eslint vitest/no-disabled-tests: "off"')).toEqual([]);
   });
