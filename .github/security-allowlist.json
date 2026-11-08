@@ -1,1 +1,10 @@
-{ "entries": [] }
+{
+  "entries": [
+    {
+      "tool": "codeql",
+      "id": "js/missing-rate-limiting",
+      "reason": "CodeQL counts a call of verify... or ...Authentication... as authorization, so it flags the three passkey routes of server/src/auth.ts (register/verify, sign-in/options, sign-in/verify), and the server has no rate limiter the query knows (express-rate-limit and the like). One owner, one-time challenges, recovery codes of 100 bits: nothing there can be guessed, only repeated. The app shell route no longer reads files per request (it sends the index.html read at start), so it is not covered by this entry. Follow-up issue 'Rate-limit the sign-in routes' (follow-up 10 of issue 35) adds a limiter the query recognises and removes this entry.",
+      "expires": "2027-02-04"
+    }
+  ]
+}

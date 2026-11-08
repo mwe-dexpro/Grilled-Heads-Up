@@ -120,8 +120,8 @@ export default tseslint.config(
     rules: { "n/no-process-exit": "off" },
   },
   {
-    // Off here only: the path is the operator's DATABASE_FILE setting, not input from a request.
-    files: ["server/src/database.ts"],
+    // Off here only: the path is the operator's DATABASE_FILE or CLIENT_DIR setting (the app shell is read once, at start), not input from a request.
+    files: ["server/src/database.ts", "server/src/app.ts"],
     rules: { "security/detect-non-literal-fs-filename": "off" },
   },
   {

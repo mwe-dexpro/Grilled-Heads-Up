@@ -76,7 +76,7 @@ The gates fail on high and critical findings. The only way past one is an entry 
 - `reason` says why, `expires` is the last day it holds, **at most 90 days from the day you add it**. After that day CI fails again (`npm run security:allowlist`, and the scanner itself for Trivy, whose `exp:` is written as the day after `expires`). An entry that has run out is renewed with a new reason, or the finding is fixed.
 - Every entry has a follow-up issue that removes it; name it in the reason.
 - The Trivy and gitleaks entries become `.trivyignore` and `.gitleaksignore` right before those scanners run (`npm run security:ignorefiles`); both files are git-ignored.
-- The file ships empty. Fix the finding first: for the Docker image that means a newer base digest or less in the image, not an exception.
+- Fix the finding first: for the Docker image that means a newer base digest or less in the image, not an exception. The file holds one entry today: CodeQL's `js/missing-rate-limiting` for the passkey routes (the server has no rate limiter the query recognises; a follow-up issue adds one and removes the entry). The entry excuses the rule for the whole repository until its day, so a new route that touches the file system or the database per request is not caught by CodeQL meanwhile: keep such a handler free of file access (the app shell is read once at start) and review new routes by hand.
 
 ## Maintainer settings (a pull request cannot change these)
 

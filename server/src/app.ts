@@ -1,4 +1,5 @@
 import express from "express";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { createAuth } from "./auth.js";
@@ -10,6 +11,20 @@ export interface AppConfig {
   clientDir?: string;
   /** Where the app is served from; see `AuthConfig.origins`. */
   origins: string[];
+}
+
+/**
+ * The app shell (`index.html` of the build), read once. A route handler that answered from the file would touch the file
+ * system for every request; this one sends a string. None when the build has no `index.html` (the tests, development);
+ * any other failure to read it stops the server from starting.
+ */
+function readAppShell(clientDir: string): string | undefined {
+  try {
+    return readFileSync(resolve(clientDir, "index.html"), "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  }
 }
 
 export function createApp({ db, clientDir, origins }: AppConfig): express.Express {
@@ -44,19 +59,24 @@ export function createApp({ db, clientDir, origins }: AppConfig): express.Expres
   if (clientDir !== undefined) {
     app.use(
       express.static(clientDir, {
+        // `/` is the app shell below, like every other address of a screen.
+        index: false,
         setHeaders(res, path) {
-          // Hashed build assets never change; everything else (index.html, sw.js, manifest) must revalidate
+          // Hashed build assets never change; everything else (sw.js, manifest) must revalidate
           // so a new deploy reaches installed apps.
           res.setHeader("Cache-Control", path.includes("/assets/") ? "public, max-age=31536000, immutable" : "no-cache");
         },
       }),
     );
 
-    // Client-side routes fall back to the app shell.
-    app.get(/^\/(?!api\/).*/, (_req, res) => {
-      res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(resolve(clientDir, "index.html"));
-    });
+    // Client-side routes fall back to the app shell, which must revalidate too (a new deploy restarts the server).
+    const appShell = readAppShell(clientDir);
+    if (appShell !== undefined) {
+      app.get(/^\/(?!api\/).*/, (_req, res) => {
+        res.setHeader("Cache-Control", "no-cache");
+        res.type("html").send(appShell);
+      });
+    }
   }
 
   return app;
