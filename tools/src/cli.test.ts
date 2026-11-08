@@ -432,6 +432,12 @@ describe("leftOutTestsCommand", () => {
     }
   });
 
+  it("takes everything after the first = as the file's name, also a name with an = in it", () => {
+    const root = repository({ "client/reports/a=b.json": ran });
+
+    expect(run(leftOutTestsCommand, root, ["vitest=client/reports/a=b.json"]).stdout).toBe("No test is left out (1 test in 1 report).\n");
+  });
+
   it("fails a report file that is not there, and says the tests have to run first", () => {
     const root = repository({});
 

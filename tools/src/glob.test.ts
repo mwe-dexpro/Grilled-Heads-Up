@@ -8,6 +8,8 @@ describe("matchesGlob", () => {
     expect(matchesGlob("server/src/auth.ts", "server/src/auth.tsx")).toBe(false);
     expect(matchesGlob("server/src/auth.ts", "xserver/src/auth.ts")).toBe(false);
     expect(matchesGlob("server/src/auth.ts", "server/src")).toBe(false);
+    expect(matchesGlob("server/src", "server/src/auth.ts")).toBe(false);
+    expect(matchesGlob("server/src/*", "server/src/testing/key.ts")).toBe(false);
     expect(matchesGlob("", "")).toBe(true);
     expect(matchesGlob("", "a.ts")).toBe(false);
   });

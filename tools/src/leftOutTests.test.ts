@@ -77,6 +77,24 @@ describe("gateLeftOut: Vitest", () => {
     expect(output).toContain("test-results.json: c (no status)");
   });
 
+  it("names a test by its title when it has no full name, and counts a status that is no text as no status", () => {
+    const text = JSON.stringify({
+      testResults: [
+        {
+          assertionResults: [
+            { title: "only a title", status: "todo" },
+            { fullName: "odd", status: 5 },
+          ],
+        },
+      ],
+    });
+
+    const { output } = gateLeftOut([vitest(text)]);
+
+    expect(output).toContain("test-results.json: only a title (todo)\n");
+    expect(output).toContain("test-results.json: odd (no status)\n");
+  });
+
   it("says test for one, and report for one, and tests and reports for more", () => {
     const one = vitestOf({ status: "skipped", fullName: "a" });
     const ok = vitestOf({ status: "passed", fullName: "a" });
@@ -176,6 +194,24 @@ describe("gateLeftOut: Playwright", () => {
     });
   });
 
+  it("finds a test left out by its expected status alone, whatever its status says", () => {
+    for (const status of ["expected", undefined, 5]) {
+      const text = playwrightOf({ expectedStatus: "skipped", status, annotations: [], results: [] });
+
+      expect(gateLeftOut([playwright(text)]).output, String(status)).toContain("a.spec.ts › test 0 (skipped)");
+    }
+  });
+
+  it("reads the issue from an annotation description that stands alone, not glued to the title, and copes with annotations of any shape", () => {
+    const skipped = { expectedStatus: "skipped", status: "skipped", results: [] };
+    const alone = playwrightOf({ ...skipped, annotations: [null, 5, { type: "skip", description: "#77" }] });
+    const missing = playwrightOf({ ...skipped });
+    const notAList = playwrightOf({ ...skipped, annotations: "skip" });
+
+    expect(gateLeftOut([playwright(alone)]).exitCode).toBe(0);
+    for (const text of [missing, notAList]) expect(gateLeftOut([playwright(text)]).output).toContain("a.spec.ts › test 0 (skipped)");
+  });
+
   it("finds tests in nested suites and names the project of one that runs in several", () => {
     const left = { expectedStatus: "skipped", status: "skipped", annotations: [], results: [], projectName: "android-chrome" };
     const text = JSON.stringify({
@@ -208,6 +244,9 @@ describe("gateLeftOut: Playwright", () => {
       '{"suites": [5]}',
       '{"testResults": []}',
       '{"suites": [{"specs": [5]}]}',
+      '{"suites": [{"specs": 5}]}',
+      '{"suites": [{"suites": [5]}]}',
+      '{"suites": [{"suites": 5}]}',
       '{"suites": [{"specs": [{"tests": [5]}]}]}',
     ]) {
       expect(gateLeftOut([playwright(text)]), text).toEqual({ exitCode: 1, output: "reports/e2e-results.json is not a Playwright JSON report.\n" });

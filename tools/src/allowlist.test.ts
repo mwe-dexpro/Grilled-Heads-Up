@@ -141,6 +141,26 @@ describe("parseAllowlist", () => {
     ]);
   });
 
+  it("reports a problem of the paths only for what is wrong with them, not as well for another problem of the entry", () => {
+    const result = parseAllowlist(
+      file([
+        { ...entry({ tool: "semgrep" as never }), paths: ["a.ts"] },
+        { ...entry({ tool: "trivy" }), paths: [] },
+        { ...entry({ tool: "codeql", id: "" }), paths: ["a.ts"] },
+        entry({ tool: "codeql", id: "" }),
+        entry({ tool: "codeql", expires: "never" }),
+      ]),
+    );
+
+    expect(result.errors).toEqual([
+      'Entry 1: the tool "semgrep" is not one of npm-audit, trivy, codeql, gitleaks.',
+      "Entry 2: paths are for codeql entries only (the other tools' findings have no path).",
+      "Entry 3: the id is missing.",
+      "Entry 4: the id is missing.",
+      "Entry 5: the expiry date must be a day as YYYY-MM-DD.",
+    ]);
+  });
+
   it("keeps the valid entries when others are broken", () => {
     const result = parseAllowlist(file([entry({ id: "GHSA-ok" }), entry({ reason: "" })]));
 

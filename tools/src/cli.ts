@@ -126,8 +126,9 @@ export const checkSkipsCommand: Command = ({ root }) => {
 export const leftOutTestsCommand: Command = ({ args, root }) => {
   const reports: Report[] = [];
   for (const arg of args) {
-    const [, kind, name] = /^(vitest|playwright)=(.+)$/.exec(arg) ?? [];
-    if ((kind !== "vitest" && kind !== "playwright") || name === undefined) return fail(`${arg} is not vitest=<file> or playwright=<file>.\n`);
+    const [kind, ...rest] = arg.split("=");
+    const name = rest.join("=");
+    if ((kind !== "vitest" && kind !== "playwright") || name === "") return fail(`${arg} is not vitest=<file> or playwright=<file>.\n`);
     const path = resolve(root, name);
     if (!existsSync(path)) return fail(`${name} was not written: run the tests first.\n`);
     reports.push({ kind, name, text: readFileSync(path, "utf8") });

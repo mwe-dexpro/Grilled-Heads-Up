@@ -64,12 +64,12 @@ function countPlaywright(data: unknown): Counted | undefined {
         const titles = [...here, textOf(spec["title"])];
         const annotations = optionalRecords(test["annotations"]);
         const annotation = annotations.map((one) => textOf(one["type"])).find((type) => type === "skip" || type === "fixme");
-        const skipped = test["status"] === "skipped" || test["expectedStatus"] === "skipped";
-        if (!skipped && annotation === undefined) continue;
+        const how = test["status"] === "skipped" || test["expectedStatus"] === "skipped" ? "skipped" : annotation;
+        if (how === undefined) continue;
         const project = textOf(test["projectName"]);
         leftOut.push({
           name: `${project === "" ? "" : `[${project}] `}${titles.join(" › ")}`,
-          how: skipped ? "skipped" : (annotation ?? ""),
+          how,
           cited: namesIssue([...titles, ...annotations.map((one) => textOf(one["description"]))].join(" ")),
         });
       }
