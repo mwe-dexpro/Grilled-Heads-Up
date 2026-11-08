@@ -52,7 +52,7 @@ Coverage is measured for every file, and gated **per file** in the client and in
 | --- | --- | --- | --- | --- | --- |
 | client | `src/**/!(use[A-Z]*).ts`: every `.ts` file but React hooks | 99 | 99 | 99 | 90 |
 | tools | `src/*.ts` and `src/!(bin)/**/*.ts`: every module, in any folder | 98 | 98 | 96 | 92 |
-| server | everything, as one total over four files (a new untested file of any size fails it: the headroom is under a point) | 93 | 93 | 92 | 88 |
+| server | everything, as one total over four files (a new untested file of any size fails it: the headroom is under a point) | 93 | 93 | 92 | 87 |
 
 Not gated, on purpose: client components (`*.tsx`) and hooks (only the end-to-end tests reach them, so a new component cannot turn `unit` red), and the command-line wrappers in tools' `src/bin/` (run as processes by `bin.test.ts`, which coverage cannot see). The whole-tree figures of the client (components and hooks included) stay in the summary. A per-file floor replaces the old total over the same files: it is looser for one weak file (the weakest file sets the branch floor, 90 in the client) and tighter for a new one (0% fails).
 
