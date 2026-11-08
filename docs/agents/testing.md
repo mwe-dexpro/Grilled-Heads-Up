@@ -9,7 +9,7 @@ Work as a reviewer of your own change. A test that passes proves nothing until y
 - [ ] **Every new or changed behaviour has tests for the happy path, the error paths and the likely edge cases** (the prompt list below).
 - [ ] **Each new test has been seen to fail.** Break the code by hand (the most likely bug), or check that Stryker's mutants on the new code are killed. No surviving mutant on new code unless its reason is written down (README, "Mutation testing").
 - [ ] **Tests assert results and states that can be seen**, not only calls on mocks. No snapshot-only tests, no tautologies (the expected value worked out by the code's own logic), no `.only`, no `.skip`, `skipIf`, `runIf`, `todo` or `fixme` without an issue.
-- [ ] **New source files are covered automatically** by the mutation and coverage globs: no config edit was needed. No threshold was lowered.
+- [ ] **New source files are covered automatically** by the mutation and coverage globs: no config edit was needed. A new `.ts` file with no test fails `unit` (per-file floors). No threshold was lowered.
 - [ ] **`npm run typecheck` and `npm run lint` pass with zero warnings.** Violations were fixed in the code. No new `any`, `as` cast, `!` assertion, `eslint-disable` or baseline entry; if one is truly the last resort it names its rule, says why, and has a follow-up issue.
 - [ ] **No dependency with a high or critical advisory, or a GPL or AGPL licence, was added**, and every new dependency is justified in the pull request.
 - [ ] **The same checks that CI runs were run locally** (the commands below).
@@ -46,7 +46,15 @@ Run a single workspace with `-w`, e.g. `npm run test:mutation -w server` (about 
 
 Thresholds only go up. Coverage thresholds are in each workspace's `vitest.config.ts` (the measured value rounded down); mutation `break` is in each `stryker.config.json` (never below 80). Raise them when a change lifts the score; never lower one to get green.
 
-Coverage is measured for every file, but gated where unit tests are the way to test: in the client on `src/**/!(use[A-Z]*).ts` (every `.ts` file but React hooks; components and hooks only the end-to-end tests reach, so a new component cannot turn `unit` red while a new untested domain module does), in tools on `src/*.ts` (the command-line wrappers in `src/bin/` are run as processes by `bin.test.ts`, which coverage cannot see), in the server on everything. The client's whole-tree figures (components and hooks included) stay in the summary.
+Coverage is measured for every file, and gated **per file** in the client and in tools (Vitest `perFile`): every gated file has to reach the floors on its own, so a new `.ts` file that no test reaches fails `unit` whatever its size (a floor on the total over a folder left room for a small untested module). The floors are the measured values of the weakest file, rounded down (in the client every file is at 100% for lines, statements and functions, and those floors stay at 99, the value of the total they replace):
+
+| Workspace | Gated files | lines | statements | functions | branches |
+| --- | --- | --- | --- | --- | --- |
+| client | `src/**/!(use[A-Z]*).ts`: every `.ts` file but React hooks | 99 | 99 | 99 | 90 |
+| tools | `src/*.ts` and `src/!(bin)/**/*.ts`: every module, in any folder | 98 | 98 | 96 | 92 |
+| server | everything, as one total over four files (a new untested file of any size fails it: the headroom is under a point) | 93 | 93 | 92 | 87 |
+
+Not gated, on purpose: client components (`*.tsx`) and hooks (only the end-to-end tests reach them, so a new component cannot turn `unit` red), and the command-line wrappers in tools' `src/bin/` (run as processes by `bin.test.ts`, which coverage cannot see). The whole-tree figures of the client (components and hooks included) stay in the summary. A per-file floor replaces the old total over the same files: it is looser for one weak file (the weakest file sets the branch floor, 90 in the client) and tighter for a new one (0% fails).
 
 ## What is mutation-tested and what is not
 

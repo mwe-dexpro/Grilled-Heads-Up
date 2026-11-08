@@ -2030,6 +2030,20 @@ describe("Sync between two devices", () => {
       expect(reopened.engine.state()).toEqual({ status: "idle", lastSyncedAt: world.ms });
     });
 
+    it("takes the time of the device's own clock unless it is given one", async () => {
+      const server = new MemoryServer({ time: () => Date.now() });
+      const db = await openAppDb(freshDbName());
+      const engine = await createSyncEngine({ db, types: recordTypes, transport: server.transport() });
+      const before = Date.now();
+
+      await engine.syncNow();
+
+      const syncedAt = engine.state().lastSyncedAt ?? 0;
+      expect(syncedAt).toBeGreaterThanOrEqual(before);
+      expect(syncedAt).toBeLessThanOrEqual(Date.now());
+      db.close();
+    });
+
     it("does not report syncing during a background run, so the status line stays calm", async () => {
       const { world, a } = await twoDevices();
       await a.sync();

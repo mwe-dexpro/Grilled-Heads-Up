@@ -85,6 +85,17 @@ describe("stamping a local change", () => {
     again.close();
   });
 
+  it("keeps a device id that is stored without a clock yet, instead of making up another", async () => {
+    const db = await open(freshName());
+    await db.put("syncInfo", "device-from-before", "deviceId");
+
+    const stamped = await stamp(db, moment);
+
+    expect(stamped.node).toBe("device-from-before");
+    expect(await db.get("syncInfo", "deviceId")).toBe("device-from-before");
+    db.close();
+  });
+
   it("gives two databases two device ids", async () => {
     const [one, other] = [await open(freshName()), await open(freshName())];
 

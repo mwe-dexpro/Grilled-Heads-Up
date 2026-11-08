@@ -31,6 +31,11 @@ describe("Translations", () => {
     expect(translate("de", "task.completeNamed", { title: "Bake cake" })).toBe("Bake cake erledigen");
   });
 
+  it("leaves a placeholder as it is when no value is given for it", () => {
+    expect(translate("en", "task.completeNamed")).toBe("Complete {title}");
+    expect(translate("en", "task.completeNamed", { other: "x" })).toBe("Complete {title}");
+  });
+
   it("uses English when no language was chosen yet", () => {
     expect(loadLanguage(memoryStorage())).toBe("en");
   });

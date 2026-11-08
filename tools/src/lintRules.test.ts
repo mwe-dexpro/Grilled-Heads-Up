@@ -18,7 +18,9 @@ async function flagged(code: string, filePath: string): Promise<string[]> {
     .flatMap(({ ruleId }) => (ruleId !== null && /skip|todo|fixme|restricted|disabled/.test(ruleId) ? [ruleId] : []));
 }
 
-describe("the ESLint config refuses a test that is left out without naming its issue", () => {
+// The first lint of each kind of file builds the type information of the whole project: seconds on a busy machine, and the
+// default 5 s timed out when the other test files ran at the same time.
+describe("the ESLint config refuses a test that is left out without naming its issue", { timeout: 60_000 }, () => {
   const skippedInVitest: [string, string][] = [
     ["it.skip", 'it.skip("x", () => { expect(1).toBe(1); });'],
     ["it.skipIf", 'it.skipIf(process.platform === "win32")("x", () => { expect(1).toBe(1); });'],

@@ -236,6 +236,23 @@ describe("Subtask store", () => {
     await expect(subtasks.renameSubtask("missing", "Nope")).rejects.toMatchObject({ name: "NoSubtaskError", message: "No Subtask with id missing" });
   });
 
+  it("refuses to move a Subtask that is deleted while the move is being worked out, and leaves the others as they were", async () => {
+    const { subtasks, task } = await open();
+    const a = await subtasks.addSubtask(task.id, "A");
+    await subtasks.addSubtask(task.id, "B");
+    await subtasks.addSubtask(task.id, "C");
+
+    const move = subtasks.moveSubtask(a.id, 2);
+    // The move has started reading the Subtasks, so the delete is queued behind that read and ahead of the move's write.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const [moved] = await Promise.allSettled([move, subtasks.deleteSubtask(a.id)]);
+
+    expect(moved).toMatchObject({ status: "rejected", reason: { name: "NoSubtaskError" } });
+    expect(await titles(subtasks, task.id)).toEqual(["B", "C"]);
+  });
+
   describe("moving", () => {
     async function four() {
       const env = await open();

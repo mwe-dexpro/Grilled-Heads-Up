@@ -63,7 +63,7 @@ The PWA needs HTTPS (or `localhost`) to be installable. To try it on a phone dur
 
 ```sh
 npm test                    # unit tests, then end-to-end tests
-npm run test:unit           # Vitest in client, server and tools, with coverage (thresholds on the unit-testable `.ts` files fail the run)
+npm run test:unit           # Vitest in client, server and tools, with coverage (per-file floors on the unit-testable `.ts` files: a new file with no test fails the run)
 npm run test:e2e            # builds, starts the servers, runs Playwright on an emulated Pixel 7
 npm run test:mutation       # Stryker mutation tests of client, server and tools, every source file by glob
 npm run typecheck           # tsc in client, server, tools, and for e2e/ and the config files
