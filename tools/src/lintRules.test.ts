@@ -15,7 +15,7 @@ async function flagged(code: string, filePath: string): Promise<string[]> {
   const [result] = await eslint.lintText(header + code, { filePath });
   return (result?.messages ?? [])
     .filter(({ line }) => line > 1)
-    .flatMap(({ ruleId }) => (ruleId !== null && /skip|todo|fixme|restricted|disabled/.test(ruleId) ? [ruleId] : []));
+    .flatMap(({ ruleId }) => (ruleId !== null && /skip|todo|fixme|restricted|disabled|eslint-comments\/no-use/.test(ruleId) ? [ruleId] : []));
 }
 
 // The first lint of each kind of file builds the type information of the whole project: seconds on a busy machine, and the
@@ -52,8 +52,36 @@ describe("the ESLint config refuses a test that is left out without naming its i
     expect(rules).not.toEqual([]);
   });
 
+  const skippedAnotherWay: [string, string, string][] = [
+    [
+      "an inline rule setting that switches the skip rule off",
+      "unit",
+      '/* eslint vitest/no-disabled-tests: "off" -- flaky */\nit.skip("x", () => { expect(1).toBe(1); });',
+    ],
+    ["an inline rule setting for Playwright's skip rule", "e2e", '/* eslint playwright/no-skipped-test: "off" -- flaky */\ntest.skip("x", async () => {});'],
+    ["an inline setting of any other rule", "unit", '/* eslint no-console: "off" -- noisy */\nit("x", () => { expect(1).toBe(1); });'],
+    ["skip destructured from the test context", "unit", 'it("x", ({ skip }) => { skip(process.platform === "linux", "later"); expect(1).toBe(1); });'],
+    ["skip read from the test context under another name", "unit", 'it("x", (task) => { task.skip("later"); expect(1).toBe(1); });'],
+    ["skip taken out of the context in the body", "unit", 'it("x", (context) => { const { skip } = context; skip(); expect(1).toBe(1); });'],
+    ["test.info().skip()", "e2e", 'test("x", async () => { test.info().skip(true, "later"); });'],
+    ["test.info().fixme()", "e2e", 'test("x", async () => { test.info().fixme(true, "later"); });'],
+  ];
+
+  it.each(skippedAnotherWay)("%s", async (_form, kind, code) => {
+    const rules = await flagged(code, kind === "unit" ? unitTest : endToEnd);
+
+    expect(rules).not.toEqual([]);
+  });
+
+  it("still lets the disables of a left-out test through to lint:skips, which asks for the issue", async () => {
+    const withReason = '// eslint-disable-next-line vitest/no-disabled-tests -- waits for #42\nit.skip("x", () => { expect(1).toBe(1); });';
+
+    expect(await flagged(withReason, unitTest)).toEqual([]);
+  });
+
   it("lets an ordinary test, and other uses of the words todo and runIf, through", async () => {
     expect(await flagged('it("x", () => { expect({ todo: 1 }.todo).toBe(1); });', unitTest)).toEqual([]);
     expect(await flagged('test("x", async () => { await Promise.resolve(); });', endToEnd)).toEqual([]);
+    expect(await flagged('it("x", () => { expect([1, 2].map((n) => n * 2)).toEqual([2, 4]); });', unitTest)).toEqual([]);
   });
 });

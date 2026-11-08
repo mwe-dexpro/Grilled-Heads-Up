@@ -15,7 +15,19 @@ const leftOutVitest = {
   selector: "MemberExpression[object.name=/^(it|test|describe|suite)$/][property.name=/^(skipIf|runIf|todo)$/]",
   message: leftOutMessage,
 };
+// Vitest's own way to leave out the running test: `skip(...)` taken from the test context (`({ skip }) => ...`, `context.skip()`),
+// which vitest/no-disabled-tests misses when the name is destructured. `it.skip` and the like stay with that rule (its disable names the issue).
+const leftOutVitestContext = [
+  { selector: "MemberExpression[property.name='skip']:not([object.name=/^(it|test|describe|suite)$/])", message: leftOutMessage },
+  { selector: "ObjectPattern > Property[key.name='skip']", message: leftOutMessage },
+  { selector: "CallExpression[callee.name='skip']", message: leftOutMessage },
+];
 const leftOutPlaywright = { selector: "MemberExpression[property.name='fixme']", message: leftOutMessage };
+// `test.info().skip(...)` and `.fixme(...)` leave out the running test; `testInfo.skip()` is found by playwright/no-skipped-test, this call is not.
+const leftOutPlaywrightInfo = {
+  selector: "CallExpression[callee.object.callee.property.name='info'][callee.property.name=/^(skip|fixme)$/]",
+  message: leftOutMessage,
+};
 
 /**
  * One flat config for the whole repo (client, server, tools, e2e). Rules the presets enable stay on; each rule that is
@@ -51,6 +63,8 @@ export default tseslint.config(
       "@eslint-community/eslint-comments/require-description": ["error", { ignore: [] }],
       "@eslint-community/eslint-comments/no-unlimited-disable": "error",
       "@eslint-community/eslint-comments/no-unused-disable": "error",
+      // Only the disable comments: `/* eslint rule: "off" */` would switch a rule off for the file without a disable (and without lint:skips seeing it).
+      "@eslint-community/eslint-comments/no-use": ["error", { allow: ["eslint-disable", "eslint-disable-line", "eslint-disable-next-line", "eslint-enable"] }],
       "@eslint-community/eslint-comments/disable-enable-pair": "error",
       // Off: it flags every `obj[key]` (25 hits here, none a real injection: keys are literals, enum values or ids looked up in
       // a Map or Record we built). With noUncheckedIndexedAccess the compiler already makes every such read prove it exists.
@@ -141,7 +155,7 @@ export default tseslint.config(
       "vitest/no-focused-tests": "error",
       "vitest/no-disabled-tests": "error",
       // `skipIf`, `runIf` and `todo` (a test that is not there) leave a test out without `.skip`: they need the same disable with an issue as `it.skip` (see lint:skips).
-      "no-restricted-syntax": ["error", leftOutVitest],
+      "no-restricted-syntax": ["error", leftOutVitest, ...leftOutVitestContext],
       // Vitest's expect takes a message as its second argument (`expect(value, "what it is")`), which the default of 1 refuses.
       "vitest/valid-expect": ["error", { maxArgs: 2 }],
     },
@@ -157,7 +171,7 @@ export default tseslint.config(
       "playwright/no-focused-test": "error",
       "playwright/no-skipped-test": "error",
       // `test.fixme` and `test.describe.fixme` leave a test out like `test.skip`: same disable, same issue (see lint:skips).
-      "no-restricted-syntax": ["error", leftOutPlaywright],
+      "no-restricted-syntax": ["error", leftOutPlaywright, leftOutPlaywrightInfo],
       "playwright/missing-playwright-await": "error",
       "playwright/no-wait-for-timeout": "error",
     },

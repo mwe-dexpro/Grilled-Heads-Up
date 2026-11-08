@@ -19,6 +19,26 @@ describe("skipsWithoutIssue", () => {
     expect(check("// eslint-disable-next-line vitest/no-disabled-tests")).toHaveLength(1);
   });
 
+  it("finds an inline setting that switches a skip rule off, which ESLint reads like a disable (`/* eslint rule: off */`)", () => {
+    expect(check('/* eslint vitest/no-disabled-tests: "off" -- flaky on CI */')).toHaveLength(1);
+    expect(check('/*\n * eslint playwright/no-skipped-test: "off"\n * -- later\n */')).toHaveLength(1);
+    expect(check("/* eslint no-restricted-syntax: 0 */")).toHaveLength(1);
+    expect(check('/* eslint vitest/no-disabled-tests: "off" -- waits for #42 */')).toEqual([]);
+  });
+
+  it("finds a setting that switches off the rule that refuses inline settings, as that is how one would get past it", () => {
+    expect(check('/* eslint @eslint-community/eslint-comments/no-use: "off" -- later */')).toHaveLength(1);
+    expect(check("// eslint-disable-next-line @eslint-community/eslint-comments/no-use -- later")).toHaveLength(1);
+    expect(check("// eslint-disable-next-line @eslint-community/eslint-comments/no-use -- needed for #42")).toEqual([]);
+  });
+
+  it("leaves a comment that only talks about eslint alone", () => {
+    expect(check("// eslint has a rule called no-disabled-tests")).toEqual([]);
+    expect(check("/* eslintish no-restricted-syntax */")).toEqual([]);
+    // ESLint reads an inline setting in a block comment only: a line comment of the same words is just a comment.
+    expect(check('// eslint vitest/no-disabled-tests: "off"')).toEqual([]);
+  });
+
   it("accepts a skip whose reason names an issue by number or by address", () => {
     expect(check("// eslint-disable-next-line vitest/no-disabled-tests -- waits for #42")).toEqual([]);
     expect(check("// eslint-disable-next-line playwright/no-skipped-test -- https://github.com/mwe-dexpro/Grilled-Heads-Up/issues/17")).toEqual([]);

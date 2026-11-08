@@ -34,7 +34,7 @@ Weak patterns to fix when you meet them: asserting on mocks or calls only, tauto
 | Command | What it checks | CI job |
 | --- | --- | --- |
 | `npm run typecheck` | `tsc` in client, server, tools and for `e2e/` and the config files, with `strict` and the stricter flags (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, …) | `typecheck` |
-| `npm run lint` | ESLint (typed `strictTypeChecked` and `stylisticTypeChecked`, React hooks, Vitest, Playwright, security, Node rules; `--max-warnings 0`), knip (dead files, exports and dependencies), the Prettier check, and `lint:skips` (a test that is left out names its issue: `.skip`, `skipIf`, `runIf`, `todo`, `fixme`; the disable may be a block comment over several lines) | `lint` |
+| `npm run lint` | ESLint (typed `strictTypeChecked` and `stylisticTypeChecked`, React hooks, Vitest, Playwright, security, Node rules; `--max-warnings 0`), knip (dead files, exports and dependencies), the Prettier check, and `lint:skips` (a test that is left out names its issue: `.skip`, `skipIf`, `runIf`, `todo`, `fixme`, `skip` taken from the test context, `test.info().skip()`; the disable may be a block comment over several lines; inline rule settings such as `/* eslint rule: "off" */` are refused outright) | `lint` |
 | `npm run format` | Prettier, to fix what `lint:format` reports | |
 | `npm run test:unit` | Vitest in client, server and tools **with coverage**; below a workspace's thresholds it fails; a `.only` fails | `unit` |
 | `npm run test:e2e` | builds and runs Playwright against three servers with in-memory databases | `e2e` |
