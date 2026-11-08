@@ -89,6 +89,10 @@ export function gateSarif(files: { name: string; text: string }[], allowlist: Al
     const runRecords = runs.filter(isRecord);
     if (!isRecord(data) || !Array.isArray(data["runs"]) || runRecords.length !== runs.length)
       return { exitCode: 1, output: `${name} is not valid SARIF JSON.\n` };
+    // SARIF: `results: []` says a run found nothing, no `results` says it produced nothing (it did not finish); no run says nothing was analysed.
+    if (runRecords.length === 0) return { exitCode: 1, output: `${name} holds no run, so nothing was analysed.\n` };
+    if (runRecords.some((run) => !Array.isArray(run["results"])))
+      return { exitCode: 1, output: `${name} has a run without a results list: the analysis did not finish.\n` };
     for (const run of runRecords) {
       const components = componentsOf(run);
       for (const result of list(run["results"]).filter(isRecord)) {

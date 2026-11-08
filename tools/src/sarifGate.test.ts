@@ -368,8 +368,7 @@ describe("gateSarif", () => {
             { ruleId: "js/x", message: "plain", locations: "none" },
           ],
         },
-        { tool: null, results: "none" },
-        { tool: { driver: { rules: {} }, extensions: {} } },
+        { tool: { driver: { rules: {} }, extensions: {} }, results: [] },
       ],
     });
 
@@ -391,11 +390,41 @@ describe("gateSarif", () => {
     }
   });
 
-  it("passes a file with a run that found nothing", () => {
-    expect(gateSarif([file(JSON.stringify({ runs: [{ tool: { driver: { name: "CodeQL" } } }] }))], [], today)).toEqual({
+  it("passes a file with a run that found nothing: a results list that is empty", () => {
+    expect(gateSarif([file(JSON.stringify({ runs: [{ tool: { driver: { name: "CodeQL" } }, results: [] }] }))], [], today)).toEqual({
       exitCode: 0,
       output: "No high or critical CodeQL results (0 results of lower severity).\n",
     });
+  });
+
+  it("fails a file with no run: nothing was analysed, which is not the same as nothing found", () => {
+    for (const text of ['{"runs": []}', '{"version": "2.1.0", "runs": []}']) {
+      expect(gateSarif([file(text, "empty.sarif")], [], today), text).toEqual({
+        exitCode: 1,
+        output: "empty.sarif holds no run, so nothing was analysed.\n",
+      });
+    }
+  });
+
+  it("fails a file with a run that has no results list (the analysis did not finish), whichever other run it stands beside", () => {
+    const finished = { tool: { driver: { name: "CodeQL" } }, results: [] };
+    const skeleton = { tool: { driver: { name: "CodeQL" } } };
+    const withOddResults = [{ ...finished, results: "none" }, { ...finished, results: null }, { ...finished, results: {} }, { tool: null }];
+
+    for (const runs of [[skeleton], [finished, skeleton], [skeleton, finished], ...withOddResults.map((run) => [run])]) {
+      const text = JSON.stringify({ runs });
+      expect(gateSarif([file(text, "partial.sarif")], [], today), text).toEqual({
+        exitCode: 1,
+        output: "partial.sarif has a run without a results list: the analysis did not finish.\n",
+      });
+    }
+  });
+
+  it("does not let a good file hide a skeleton beside it", () => {
+    const good = sarif([], []);
+    const skeleton = JSON.stringify({ runs: [{ tool: { driver: { name: "CodeQL" } } }] });
+
+    expect(gateSarif([file(good, "a.sarif"), file(skeleton, "b.sarif")], [], today).exitCode).toBe(1);
   });
 
   it('takes a severity of only blanks for no severity (Number(" ") would be 0, a result that passes)', () => {
