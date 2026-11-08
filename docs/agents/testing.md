@@ -52,10 +52,10 @@ Coverage is measured for every file, and gated **per file** in the client and in
 | Workspace | Gated files | lines | statements | functions | branches |
 | --- | --- | --- | --- | --- | --- |
 | client | `src/**/!(use[A-Z]*).ts`: every `.ts` file but React hooks | 99 | 99 | 99 | 90 |
-| tools | `src/*.ts` and `src/!(bin)/**/*.ts`: every module, in any folder | 98 | 98 | 96 | 92 |
+| tools | `src/*.ts` and `src/!(bin)/**/*.ts`: every module, in any folder | 98 | 98 | 96 | 93 |
 | server | everything, as one total over four files (a new untested file of any size fails it: the headroom is under a point) | 93 | 93 | 92 | 87 |
 
-Not gated, on purpose: client components (`*.tsx`) and hooks (only the end-to-end tests reach them, so a new component cannot turn `unit` red), and the command-line wrappers in tools' `src/bin/` (run as processes by `bin.test.ts`, which coverage cannot see). The whole-tree figures of the client (components and hooks included) stay in the summary. A per-file floor replaces the old total over the same files: it is looser for one weak file (the weakest file sets the branch floor, 90 in the client) and tighter for a new one (0% fails).
+Not gated, on purpose: client components (`*.tsx`) and hooks (only the end-to-end tests reach them, so a new component cannot turn `unit` red), and the command-line wrappers in tools' `src/bin/` (run as processes by `bin.test.ts`, which coverage cannot see). The whole-tree figures of the client (components and hooks included) stay in the summary. A per-file floor replaces the old total over the same files (Vitest applies `perFile` to every threshold set, so a total cannot be kept beside it). For a change to one file it is **stricter** than the total: the old client branch total (98%) left about nine branches of slack anywhere, a file's floor leaves a few (the largest file has 76 branches, 90% of them is 7 to lose, and a small file has less), and lines, statements and functions at 99 mean 100% for every file under 100 lines; a new file at or near 0% fails whatever its size. It is **looser** only for a drift spread over many files (ten files losing one branch each pass, which the total failed).
 
 ## What is mutation-tested and what is not
 
@@ -63,7 +63,7 @@ Stryker mutates every `src/**/*.ts` of client, server and tools by glob, so a ne
 
 | Excluded | Why |
 | --- | --- |
-| `*.tsx` (not matched by `src/**/*.ts`) | React components: there is no React unit-test setup (README, "Not covered by a test"); the end-to-end tests cover them, and Stryker does not run those. Coverage still measures them. |
+| `*.tsx` (not matched by `src/**/*.ts`) | React components: there is no React unit-test setup yet (#37; README, "Not covered by a test"); the end-to-end tests cover them, and Stryker does not run those. Coverage still measures them. |
 | `client/src/**/use[A-Z]*.ts` | React hooks (use, then a capital: a file like `user.ts` or `useful.ts` stays in), for the same reason. |
 | `client/src/main.tsx`, `server/src/server.ts` | Entry points that read the environment and start listening. |
 | `**/*.test.ts`, `src/**/testing/**`, `tools/src/fixtures/**` | Tests and their helpers. |
