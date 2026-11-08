@@ -1,6 +1,9 @@
+import { matchesGlob } from "./glob.js";
+
 /**
  * The one list of exceptions to the security gates (`.github/security-allowlist.json`). An exception names the tool
  * that found something, what it found, why that is acceptable, and the day it runs out; after that day CI fails again.
+ * A CodeQL exception can be limited to files.
  */
 const toolNames = ["npm-audit", "trivy", "codeql", "gitleaks"] as const;
 export type ToolName = (typeof toolNames)[number];
@@ -12,6 +15,11 @@ export interface AllowlistEntry {
   reason: string;
   /** The last day the exception holds, as `YYYY-MM-DD`. */
   expires: string;
+  /**
+   * For `codeql` only: the files (globs, see `matchesGlob`) the exception is limited to. A result in any other file, or with no
+   * file, is not excused. Without it the exception holds for the rule in the whole repository.
+   */
+  paths?: string[];
 }
 
 /** An exception holds for at most this many days from the day it is added. */
@@ -20,6 +28,9 @@ export const maxDays = 90;
 const dayPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const textOf = (value: unknown): string | undefined => (typeof value === "string" && value.trim() !== "" ? value : undefined);
+/** A non-empty list of non-blank texts, or undefined. */
+const pathsOf = (value: unknown): string[] | undefined =>
+  Array.isArray(value) && value.length > 0 && value.every((path) => typeof path === "string" && path.trim() !== "") ? value.map(String) : undefined;
 const toolOf = (value: unknown): ToolName | undefined => toolNames.find((name) => name === value);
 
 /** The time of a day (midnight UTC), or undefined for anything that is no day of the calendar. */
@@ -59,12 +70,17 @@ export function parseAllowlist(text: string): { entries: AllowlistEntry[]; error
     const id = textOf(row["id"]);
     const reason = textOf(row["reason"]);
     const expires = dayOf(row["expires"]);
-    if (tool === undefined || id === undefined || reason === undefined || expires === undefined) {
+    const scoped = row["paths"] !== undefined;
+    const paths = scoped ? pathsOf(row["paths"]) : undefined;
+    if (tool === undefined || id === undefined || reason === undefined || expires === undefined || (scoped && (tool !== "codeql" || paths === undefined))) {
       if (tool === undefined)
         errors.push(`${label}: the tool ${typeof row["tool"] === "string" ? `"${row["tool"]}"` : String(row["tool"])} is not one of ${toolNames.join(", ")}.`);
       if (id === undefined) errors.push(`${label}: the id is missing.`);
       if (reason === undefined) errors.push(`${label}: the reason is missing.`);
       if (expires === undefined) errors.push(`${label}: the expiry date must be a day as YYYY-MM-DD.`);
+      if (scoped && tool !== undefined && tool !== "codeql")
+        errors.push(`${label}: paths are for codeql entries only (the other tools' findings have no path).`);
+      if (scoped && tool === "codeql" && paths === undefined) errors.push(`${label}: the paths must be a list of path globs, each a text.`);
       return;
     }
     const first = entries.findIndex((other) => other.tool === tool && other.id === id);
@@ -72,7 +88,7 @@ export function parseAllowlist(text: string): { entries: AllowlistEntry[]; error
       errors.push(`${label}: ${tool} ${id} is on the allowlist already (entry ${first + 1}).`);
       return;
     }
-    entries.push({ tool, id, reason, expires });
+    entries.push({ tool, id, reason, expires, ...(paths === undefined ? {} : { paths }) });
   });
   return { entries, errors };
 }
@@ -82,9 +98,18 @@ export function expired(entries: AllowlistEntry[], today: string): AllowlistEntr
   return entries.filter((entry) => entry.expires < today);
 }
 
-/** The exception that holds for this finding today, if there is one. An expired exception excepts nothing. */
-export function allowedBy(entries: AllowlistEntry[], tool: ToolName, id: string, today: string): AllowlistEntry | undefined {
-  return entries.find((entry) => entry.tool === tool && entry.id === id && entry.expires >= today);
+/**
+ * The exception that holds for this finding today, if there is one. An expired exception excepts nothing, and an exception
+ * limited to paths excepts only a finding in one of those files (`file`; a finding whose file is not known is never excepted).
+ */
+export function allowedBy(entries: AllowlistEntry[], tool: ToolName, id: string, today: string, file?: string): AllowlistEntry | undefined {
+  return entries.find(
+    (entry) =>
+      entry.tool === tool &&
+      entry.id === id &&
+      entry.expires >= today &&
+      (entry.paths === undefined || (file !== undefined && entry.paths.some((glob) => matchesGlob(glob, file)))),
+  );
 }
 
 /** What `npm run security:allowlist` says: is the file valid, has nothing expired, does nothing run longer than 90 days. */

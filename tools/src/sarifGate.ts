@@ -12,6 +12,8 @@ interface Finding {
   severity: "high" | "critical" | "unclassified";
   rule: string;
   place: string;
+  /** The file of the result's first location, if it has one (what an exception limited to paths is matched against). */
+  file: string | undefined;
   message: string;
 }
 
@@ -58,14 +60,17 @@ function ruleOf(components: Record<string, unknown>[][], result: Record<string, 
   return { name: name ?? info?.id, info };
 }
 
-function placeOf(result: Record<string, unknown>): string {
+function placeOf(result: Record<string, unknown>): { place: string; file: string | undefined } {
   const location = list(result["locations"]).find(isRecord);
   const physical = location !== undefined && isRecord(location["physicalLocation"]) ? location["physicalLocation"] : undefined;
   const artifact = physical !== undefined && isRecord(physical["artifactLocation"]) ? physical["artifactLocation"] : undefined;
   const region = physical !== undefined && isRecord(physical["region"]) ? physical["region"] : undefined;
-  if (artifact === undefined || typeof artifact["uri"] !== "string") return "(no location)";
-  return typeof region?.["startLine"] === "number" ? `${artifact["uri"]}:${region["startLine"]}` : artifact["uri"];
+  if (artifact === undefined || typeof artifact["uri"] !== "string") return { place: "(no location)", file: undefined };
+  const file = artifact["uri"];
+  return { place: typeof region?.["startLine"] === "number" ? `${file}:${region["startLine"]}` : file, file };
 }
+
+const byRuleAndPlace = (a: Finding, b: Finding) => a.rule.localeCompare(b.rule) || a.place.localeCompare(b.place);
 
 /**
  * What the CodeQL job does with the SARIF files the analysis wrote: fails on every result of a rule with a security
@@ -110,16 +115,18 @@ export function gateSarif(files: { name: string; text: string }[], allowlist: Al
         }
         const message = isRecord(result["message"]) && typeof result["message"]["text"] === "string" ? result["message"]["text"] : "";
         const level = severity === undefined ? "unclassified" : severity >= criticalFrom ? "critical" : "high";
-        findings.push({ severity: level, rule, place: placeOf(result), message });
+        findings.push({ severity: level, rule, ...placeOf(result), message });
       }
     }
   }
 
-  const found = findings.map((finding) => ({ finding, entry: allowedBy(allowlist, "codeql", finding.rule, today) }));
+  const found = findings.map((finding) => ({ finding, entry: allowedBy(allowlist, "codeql", finding.rule, today, finding.file) }));
   const open = found.filter(({ entry }) => entry === undefined).map(({ finding }) => finding);
-  const allowed = new Map<string, AllowlistEntry>();
-  for (const { finding, entry } of found) if (entry !== undefined) allowed.set(finding.rule, entry);
-  const allowedLines = [...allowed].map(([rule, entry]) => `Allowed until ${entry.expires}: ${rule} (${entry.reason})\n`);
+  // Every result an exception lets through is written with its place: a new one shows in the log although it passes.
+  const allowedLines = found
+    .flatMap(({ finding, entry }) => (entry === undefined ? [] : [{ finding, entry }]))
+    .sort((a, b) => byRuleAndPlace(a.finding, b.finding))
+    .map(({ finding, entry }) => `Allowed until ${entry.expires}: ${finding.rule}  ${finding.place}  ${finding.message}\n`);
 
   if (open.length === 0) {
     return {
@@ -129,7 +136,7 @@ export function gateSarif(files: { name: string; text: string }[], allowlist: Al
   }
   const rank = (finding: Finding) => ["critical", "high", "unclassified"].indexOf(finding.severity);
   const lines = [...open]
-    .sort((a, b) => rank(a) - rank(b) || a.rule.localeCompare(b.rule) || a.place.localeCompare(b.place))
+    .sort((a, b) => rank(a) - rank(b) || byRuleAndPlace(a, b))
     .map((finding) => `${finding.severity.padEnd(8)}  ${finding.rule}  ${finding.place}  ${finding.message}\n`);
   const kind = open.some(({ severity }) => severity === "unclassified") ? "high, critical or unclassified" : "high or critical";
   return {

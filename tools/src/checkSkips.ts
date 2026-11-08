@@ -24,6 +24,9 @@ const setting = /^[\s*]*eslint\s/;
 /** `#42` (not inside a longer word, as in `colour#3` or `&#39;`), or an address of an issue: `…/issues/42`. */
 const issue = /(?<![\w&])#\d+(?!\w)|https?:\/\/\S+\/issues\/\d/;
 
+/** Whether a text names an issue the way a left-out test must: `#42` or the address of the issue. */
+export const namesIssue = (text: string): boolean => issue.test(text);
+
 interface Comment {
   /** What stands between the comment's delimiters. */
   body: string;
@@ -69,7 +72,7 @@ export function skipsWithoutIssue(files: SourceFile[]): Skip[] {
     const lineStarts = [0];
     for (const match of file.text.matchAll(/\n/g)) lineStarts.push(match.index + 1);
     return commentsOf(file)
-      .filter(({ body, block }) => (disable.test(body) || (block && setting.test(body))) && skipRules.test(body) && !issue.test(body))
+      .filter(({ body, block }) => (disable.test(body) || (block && setting.test(body))) && skipRules.test(body) && !namesIssue(body))
       .map(({ start }) => {
         const line = lineStarts.findLastIndex((offset) => offset <= start);
         return { path: file.path, line: line + 1, text: lines[line] ?? "" };

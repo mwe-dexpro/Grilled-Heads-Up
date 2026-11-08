@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { skipsWithoutIssue } from "./checkSkips.js";
+import { namesIssue, skipsWithoutIssue } from "./checkSkips.js";
 
 const check = (...lines: string[]) => skipsWithoutIssue([{ path: "a.test.ts", text: lines.join("\n") }]);
 
@@ -185,5 +185,21 @@ describe("skipsWithoutIssue", () => {
     );
 
     expect(found.map(({ line }) => line)).toEqual([2, 4, 6]);
+  });
+});
+
+describe("namesIssue", () => {
+  it("is true for #42 and for the address of an issue, wherever they stand in the text", () => {
+    expect(namesIssue("#42")).toBe(true);
+    expect(namesIssue("Issue #45 removes this entry.")).toBe(true);
+    expect(namesIssue("see https://github.com/mwe-dexpro/Grilled-Heads-Up/issues/45")).toBe(true);
+  });
+
+  it("is false for a placeholder, a number that is no issue number, and a # inside a word", () => {
+    expect(namesIssue("")).toBe(false);
+    expect(namesIssue("follow-up 10 of issue 35")).toBe(false);
+    expect(namesIssue("# and #x and 42")).toBe(false);
+    expect(namesIssue("colour#3 and &#39;")).toBe(false);
+    expect(namesIssue("https://example.com/pull/3")).toBe(false);
   });
 });

@@ -120,6 +120,27 @@ describe("parseAllowlist", () => {
     expect(result.errors).toHaveLength(4);
   });
 
+  it("reads the paths a codeql entry is limited to, and an entry without paths as one for everywhere", () => {
+    const scoped = entry({ tool: "codeql", id: "js/one", paths: ["server/src/auth.ts", "server/src/testing/**"] });
+    const everywhere = entry({ tool: "codeql", id: "js/two" });
+
+    const result = parseAllowlist(file([scoped, everywhere]));
+
+    expect(result).toEqual({ entries: [scoped, everywhere], errors: [] });
+    expect(result.entries[1]).not.toHaveProperty("paths");
+  });
+
+  it("refuses paths that are no list of paths, or are no use to the tool, rather than reading the entry as one for everywhere", () => {
+    const bad: unknown[] = [[], "server/src/auth.ts", ["a.ts", ""], ["a.ts", "  "], ["a.ts", 5], null, {}];
+    const result = parseAllowlist(file([...bad.map((paths) => ({ ...entry({ tool: "codeql", id: "js/one" }), paths })), { ...entry(), paths: ["a.ts"] }]));
+
+    expect(result.entries).toEqual([]);
+    expect(result.errors).toEqual([
+      ...bad.map((_, index) => `Entry ${index + 1}: the paths must be a list of path globs, each a text.`),
+      `Entry ${bad.length + 1}: paths are for codeql entries only (the other tools' findings have no path).`,
+    ]);
+  });
+
   it("keeps the valid entries when others are broken", () => {
     const result = parseAllowlist(file([entry({ id: "GHSA-ok" }), entry({ reason: "" })]));
 
@@ -171,6 +192,32 @@ describe("allowedBy", () => {
 
   it("is nothing once the entry has expired: it excepts nothing then", () => {
     expect(allowedBy(entries, "trivy", "CVE-1", "2026-07-16")).toBeUndefined();
+  });
+
+  describe("an entry limited to paths", () => {
+    const scoped = entry({ tool: "codeql", id: "js/one", paths: ["server/src/auth.ts", "client/**/*.ts"] });
+    const everywhere = entry({ tool: "codeql", id: "js/two" });
+
+    it("excepts a result in one of its files, and only there", () => {
+      expect(allowedBy([scoped], "codeql", "js/one", "2026-07-01", "server/src/auth.ts")).toBe(scoped);
+      expect(allowedBy([scoped], "codeql", "js/one", "2026-07-01", "client/src/a/b.ts")).toBe(scoped);
+      expect(allowedBy([scoped], "codeql", "js/one", "2026-07-01", "server/src/sync.ts")).toBeUndefined();
+      expect(allowedBy([scoped], "codeql", "js/one", "2026-07-01", "client/src/a.tsx")).toBeUndefined();
+    });
+
+    it("excepts nothing for a result whose file is not known", () => {
+      expect(allowedBy([scoped], "codeql", "js/one", "2026-07-01")).toBeUndefined();
+    });
+
+    it("is not limited when it names no paths, whatever the file is, or whether it is known", () => {
+      expect(allowedBy([everywhere], "codeql", "js/two", "2026-07-01", "any/file.ts")).toBe(everywhere);
+      expect(allowedBy([everywhere], "codeql", "js/two", "2026-07-01")).toBe(everywhere);
+    });
+
+    it("still needs the rule and the day to fit", () => {
+      expect(allowedBy([scoped], "codeql", "js/other", "2026-07-01", "server/src/auth.ts")).toBeUndefined();
+      expect(allowedBy([scoped], "codeql", "js/one", "2027-01-01", "server/src/auth.ts")).toBeUndefined();
+    });
   });
 });
 

@@ -249,7 +249,7 @@ describe("gateSarif", () => {
     expect(some.output).toContain("js/two");
     expect(some.output).not.toMatch(/high +js\/one/);
     expect(all.exitCode).toBe(0);
-    expect(all.output).toContain("Allowed until 2026-12-31: js/one (Input is checked before.)");
+    expect(all.output).toContain("Allowed until 2026-12-31: js/one  a.ts:1  A problem of js/one");
   });
 
   it("does not let an expired entry or an entry of another tool pass a result, and lets an entry pass on its last day", () => {
@@ -287,21 +287,25 @@ describe("gateSarif", () => {
     expect(gateSarif([file(two)], [], today).output).toBe("No high or critical CodeQL results (2 results of lower severity).\n");
   });
 
-  it("writes an allowed rule once, with its day and reason, however many results it has", () => {
+  it("writes every allowed result with its day, rule and place, so a new one shows in the log although it passes", () => {
     const text = sarif(
       [{ id: "js/one", severity: "8.0" }],
       [
-        { rule: "js/one", file: "a.ts", line: 1 },
-        { rule: "js/one", file: "b.ts", line: 2 },
+        { rule: "js/one", file: "b.ts", line: 2, message: "Second." },
+        { rule: "js/one", file: "a.ts", line: 1, message: "First." },
+        { rule: "js/one", file: "a.ts", line: 10, message: "Third." },
       ],
     );
 
     expect(gateSarif([file(text)], [allow("js/one", { reason: "Checked before.", expires: "2026-12-01" })], today).output).toBe(
-      "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-01: js/one (Checked before.)\n",
+      "No high or critical CodeQL results (0 results of lower severity).\n" +
+        "Allowed until 2026-12-01: js/one  a.ts:1  First.\n" +
+        "Allowed until 2026-12-01: js/one  a.ts:10  Third.\n" +
+        "Allowed until 2026-12-01: js/one  b.ts:2  Second.\n",
     );
   });
 
-  it("writes each allowed rule on a line of its own, and each finding too", () => {
+  it("writes each allowed result of each rule, and each finding too", () => {
     const text = sarif(
       [
         { id: "js/one", severity: "8.0" },
@@ -309,16 +313,68 @@ describe("gateSarif", () => {
         { id: "js/three", severity: "8.0" },
       ],
       [
-        { rule: "js/one", file: "a.ts", line: 1 },
         { rule: "js/two", file: "b.ts", line: 2 },
+        { rule: "js/one", file: "a.ts", line: 1 },
         { rule: "js/three", file: "c.ts", line: 3 },
       ],
     );
 
-    expect(gateSarif([file(text)], [allow("js/one", { reason: "One." }), allow("js/two", { reason: "Two." })], today).output).toBe(
-      "1 high or critical CodeQL result:\nhigh      js/three  c.ts:3  A problem of js/three\nAllowed until 2026-12-31: js/one (One.)\nAllowed until 2026-12-31: js/two (Two.)\n",
+    expect(gateSarif([file(text)], [allow("js/one"), allow("js/two")], today).output).toBe(
+      "1 high or critical CodeQL result:\nhigh      js/three  c.ts:3  A problem of js/three\n" +
+        "Allowed until 2026-12-31: js/one  a.ts:1  A problem of js/one\n" +
+        "Allowed until 2026-12-31: js/two  b.ts:2  A problem of js/two\n",
     );
     expect(gateSarif([file(text)], [], today).output.split("\n")).toHaveLength(5);
+  });
+
+  describe("an entry limited to paths", () => {
+    const rules = [{ id: "js/one", severity: "8.0" }];
+    const scoped = allow("js/one", { paths: ["server/src/auth.ts"] });
+
+    it("lets a result in its file through, and shows it", () => {
+      const text = sarif(rules, [{ rule: "js/one", file: "server/src/auth.ts", line: 156 }]);
+
+      expect(gateSarif([file(text)], [scoped], today)).toEqual({
+        exitCode: 0,
+        output:
+          "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-31: js/one  server/src/auth.ts:156  A problem of js/one\n",
+      });
+    });
+
+    it("fails the same rule in a file outside its paths, and still shows the result it let through", () => {
+      const text = sarif(rules, [
+        { rule: "js/one", file: "server/src/auth.ts", line: 156 },
+        { rule: "js/one", file: "server/src/sync.ts", line: 90 },
+        { rule: "js/one", file: "server/src/app.ts", line: 40 },
+      ]);
+
+      expect(gateSarif([file(text)], [scoped], today)).toEqual({
+        exitCode: 1,
+        output:
+          "2 high or critical CodeQL results:\n" +
+          "high      js/one  server/src/app.ts:40  A problem of js/one\n" +
+          "high      js/one  server/src/sync.ts:90  A problem of js/one\n" +
+          "Allowed until 2026-12-31: js/one  server/src/auth.ts:156  A problem of js/one\n",
+      });
+    });
+
+    it("fails a result that has no location, which no path can be matched against", () => {
+      const result = gateSarif([file(sarif(rules, [{ rule: "js/one" }]))], [scoped], today);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.output).toContain("js/one  (no location)");
+    });
+
+    it("takes globs, and an entry without paths still lets the rule through in every file", () => {
+      const text = sarif(rules, [
+        { rule: "js/one", file: "server/src/auth.ts", line: 1 },
+        { rule: "js/one", file: "client/src/a.ts", line: 2 },
+      ]);
+
+      expect(gateSarif([file(text)], [allow("js/one", { paths: ["server/**"] })], today).exitCode).toBe(1);
+      expect(gateSarif([file(text)], [allow("js/one", { paths: ["server/**", "client/src/*.ts"] })], today).exitCode).toBe(0);
+      expect(gateSarif([file(text)], [allow("js/one")], today).exitCode).toBe(0);
+    });
   });
 
   it("writes the place as file and line, the file alone without a line, and says so without a location", () => {
@@ -451,20 +507,22 @@ describe("gateSarif", () => {
     expect(gateSarif([file(text)], [], today).output).toBe("1 high or critical CodeQL result:\nhigh      js/x  (no location)  \n");
   });
 
-  it("writes each allowed rule on a line of its own also when nothing else fails", () => {
+  it("writes the allowed results of several rules in the order of rule and place also when nothing else fails", () => {
     const text = sarif(
       [
         { id: "js/one", severity: "8.0" },
         { id: "js/two", severity: "8.0" },
       ],
       [
-        { rule: "js/one", file: "a.ts", line: 1 },
         { rule: "js/two", file: "b.ts", line: 2 },
+        { rule: "js/one", file: "a.ts", line: 1 },
       ],
     );
 
-    expect(gateSarif([file(text)], [allow("js/one", { reason: "One." }), allow("js/two", { reason: "Two." })], today).output).toBe(
-      "No high or critical CodeQL results (0 results of lower severity).\nAllowed until 2026-12-31: js/one (One.)\nAllowed until 2026-12-31: js/two (Two.)\n",
+    expect(gateSarif([file(text)], [allow("js/two"), allow("js/one")], today).output).toBe(
+      "No high or critical CodeQL results (0 results of lower severity).\n" +
+        "Allowed until 2026-12-31: js/one  a.ts:1  A problem of js/one\n" +
+        "Allowed until 2026-12-31: js/two  b.ts:2  A problem of js/two\n",
     );
   });
 });

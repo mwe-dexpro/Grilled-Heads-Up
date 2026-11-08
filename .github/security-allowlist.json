@@ -3,7 +3,8 @@
     {
       "tool": "codeql",
       "id": "js/missing-rate-limiting",
-      "reason": "CodeQL counts a call of verify... or ...Authentication... as authorization, so it flags the three passkey routes of server/src/auth.ts (register/verify, sign-in/options, sign-in/verify), and the server has no rate limiter the query knows (express-rate-limit and the like). One owner, one-time challenges, recovery codes of 100 bits: nothing there can be guessed, only repeated. The app shell route no longer reads files per request (it sends the index.html read at start), so it is not covered by this entry. Follow-up issue 'Rate-limit the sign-in routes' (follow-up 10 of issue 35) adds a limiter the query recognises and removes this entry.",
+      "paths": ["server/src/auth.ts"],
+      "reason": "CodeQL counts a call of verify... or ...Authentication... as authorization, so it flags the three passkey routes of server/src/auth.ts (register/verify, sign-in/options, sign-in/verify), and the server has no rate limiter the query knows (express-rate-limit and the like). One owner, one-time challenges, recovery codes of 100 bits: nothing there can be guessed, but it can be repeated: 100 unauthenticated POST /api/auth/sign-in/options evict the owner's waiting sign-in (maxCeremonies, oldest first), so sign-in can be blocked while a flood lasts; that exposure was there before this entry. The app shell route (res.sendFile) is not expected to be flagged any more, because it sends the index.html read at start; the entry is limited to server/src/auth.ts, so a result of this rule in any other file fails the codeql job. Issue #45 adds a limiter the query recognises and removes this entry.",
       "expires": "2027-02-04"
     }
   ]

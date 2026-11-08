@@ -76,15 +76,16 @@ The gates fail on high and critical findings. The only way past one is an entry 
 
 ```json
 {
-  "entries": [{ "tool": "npm-audit", "id": "GHSA-xxxx-xxxx-xxxx", "reason": "Why it does not apply or cannot be fixed yet.", "expires": "2027-01-31" }]
+  "entries": [{ "tool": "npm-audit", "id": "GHSA-xxxx-xxxx-xxxx", "reason": "Why it does not apply or cannot be fixed yet. Removed by #123.", "expires": "2027-01-31" }]
 }
 ```
 
 - `tool` is `npm-audit`, `trivy`, `codeql` or `gitleaks`; `id` is the advisory (GHSA or CVE) for the first two, the rule id for `codeql`, the finding's fingerprint for `gitleaks`.
 - `reason` says why, `expires` is the last day it holds, **at most 90 days from the day you add it**. After that day CI fails again (`npm run security:allowlist`, and the scanner itself for Trivy, whose `exp:` is written as the day after `expires`). An entry that has run out is renewed with a new reason, or the finding is fixed.
-- Every entry has a follow-up issue that removes it; name it in the reason.
+- `paths` (optional, `codeql` entries only) is a list of file globs (`*` inside a folder level, `?` for one character, a `**` level for any number of folders). An entry with `paths` excuses a result only in those files; a result of the rule anywhere else, or one with no file, still fails. Without `paths` the entry holds for the rule in the whole repository, so give a `codeql` entry its paths whenever the places are known. The codeql job prints every result an entry lets through (`Allowed until <day>: <rule>  <file:line>  <message>`), so a new one shows in the log although it passes.
+- Every entry has an issue that removes it; name it in the reason as `#123` (the unit test `committedAllowlist.test.ts` checks that every committed entry does, and nothing else about the file's days: adding, renewing or removing an entry needs no test change).
 - The Trivy and gitleaks entries become `.trivyignore` and `.gitleaksignore` right before those scanners run (`npm run security:ignorefiles`); both files are git-ignored.
-- Fix the finding first: for the Docker image that means a newer base digest or less in the image, not an exception. The file holds one entry today: CodeQL's `js/missing-rate-limiting` for the passkey routes (the server has no rate limiter the query recognises; a follow-up issue adds one and removes the entry). The entry excuses the rule for the whole repository until its day, so a new route that touches the file system or the database per request is not caught by CodeQL meanwhile: keep such a handler free of file access (the app shell is read once at start) and review new routes by hand.
+- Fix the finding first: for the Docker image that means a newer base digest or less in the image, not an exception. The file holds one entry today: CodeQL's `js/missing-rate-limiting`, limited to `server/src/auth.ts` (the passkey routes; the server has no rate limiter the query recognises, #45 adds one and removes the entry). A result of that rule in another file fails the job, and the job's log lists the results the entry lets through. Keep a route handler free of file access and review new routes by hand all the same (the app shell is read once at start).
 
 ## Maintainer settings (a pull request cannot change these)
 
