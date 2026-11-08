@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc",
-    "test": "vitest run --coverage",
+    "test": "vitest run --coverage --reporter=default --reporter=json --outputFile.json=reports/test-results.json",
     "test:mutation": "stryker run"
   },
   "dependencies": {

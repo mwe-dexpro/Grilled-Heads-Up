@@ -1,0 +1,68 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 0,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 8,
+  "numPassedTests": 1,
+  "numFailedTests": 1,
+  "numPendingTests": 3,
+  "numTodoTests": 3,
+  "success": false,
+  "testResults": [
+    {
+      "name": "mixed.test.ts",
+      "status": "failed",
+      "assertionResults": [
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group passes",
+          "status": "passed",
+          "title": "passes"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group fails",
+          "status": "failed",
+          "title": "fails"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group is skipped without a reason",
+          "status": "skipped",
+          "title": "is skipped without a reason"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group is skipped until #123 is fixed",
+          "status": "skipped",
+          "title": "is skipped until #123 is fixed"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group is a todo",
+          "status": "todo",
+          "title": "is a todo"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group is a todo by option",
+          "status": "todo",
+          "title": "is a todo by option"
+        },
+        {
+          "ancestorTitles": ["a group"],
+          "fullName": "a group is a todo for https://github.com/example/repo/issues/7",
+          "status": "todo",
+          "title": "is a todo for https://github.com/example/repo/issues/7"
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "is skipped through an alias",
+          "status": "skipped",
+          "title": "is skipped through an alias"
+        }
+      ]
+    }
+  ]
+}

@@ -180,3 +180,18 @@ describe("lint:skips (bin/checkSkips.js)", () => {
     expect(start("checkSkips", good)).toMatchObject({ status: 0, stdout: "Every skipped test names its issue (there are none).\n" });
   });
 });
+
+describe("the left-out tests check (bin/leftOutTests.js)", () => {
+  const report = (status: string) => JSON.stringify({ testResults: [{ assertionResults: [{ status, fullName: "a test" }] }] });
+
+  it("exits 0 when every test ran and 1 when one is left out without an issue, with the test on stderr", () => {
+    const ran = repository({ "r.json": report("passed") });
+    const left = repository({ "r.json": report("todo") });
+
+    expect(start("leftOutTests", ran, ["vitest=r.json"])).toMatchObject({ status: 0, stdout: "No test is left out (1 test in 1 report).\n", stderr: "" });
+    const failed = start("leftOutTests", left, ["vitest=r.json"]);
+    expect(failed.status).toBe(1);
+    expect(failed.stdout).toBe("");
+    expect(failed.stderr).toContain("r.json: a test (todo)");
+  });
+});

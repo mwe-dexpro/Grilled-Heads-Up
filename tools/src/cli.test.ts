@@ -6,6 +6,7 @@ import {
   allowlistCommand,
   checkSkipsCommand,
   ignoreFilesCommand,
+  leftOutTestsCommand,
   npmAuditCommand,
   runCli,
   sarifGateCommand,
@@ -390,6 +391,55 @@ describe("checkSkipsCommand", () => {
     const root = repository({ "client/src/a.ts": "", "server/src/a.ts": "", "tools/src/a.ts": "" });
 
     expect(() => run(checkSkipsCommand, root)).toThrow(/ENOENT/);
+  });
+});
+
+describe("leftOutTestsCommand", () => {
+  const ran = JSON.stringify({ testResults: [{ assertionResults: [{ status: "passed", fullName: "a" }] }] });
+
+  it("passes reports of tests that all ran, and says how many, reading the files from the root or by an absolute path", () => {
+    const root = repository({ "client/reports/t.json": ran });
+    const absolute = join(root, "client/reports/t.json");
+
+    expect(run(leftOutTestsCommand, root, [`vitest=${absolute}`])).toEqual({ exitCode: 0, stdout: "No test is left out (1 test in 1 report).\n", stderr: "" });
+    expect(run(leftOutTestsCommand, root, ["vitest=client/reports/t.json", "vitest=client/reports/t.json"]).stdout).toBe(
+      "No test is left out (2 tests in 2 reports).\n",
+    );
+  });
+
+  it("fails reports with a test that is left out, naming the report and the test on stderr, for Vitest and for Playwright", () => {
+    const root = repository({ "client/reports/t.json": fixture("vitest-report.json"), "reports/e2e.json": fixture("playwright-report.json") });
+
+    const result = run(leftOutTestsCommand, root, ["vitest=client/reports/t.json", "playwright=reports/e2e.json"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("7 tests are left out without naming an issue");
+    expect(result.stderr).toContain("client/reports/t.json: a group is a todo (todo)\n");
+    expect(result.stderr).toContain("reports/e2e.json: mixed.spec.mjs › a group › is skipped (skipped)\n");
+  });
+
+  it("fails without a report, and for an argument that is not vitest=<file> or playwright=<file>", () => {
+    const root = repository({ "t.json": ran });
+
+    expect(run(leftOutTestsCommand, root)).toEqual({ exitCode: 1, stdout: "", stderr: "No test report was given, so nothing was checked.\n" });
+    for (const arg of ["t.json", "jest=t.json", "vitest", "vitest=", "--vitest=t.json"]) {
+      expect(run(leftOutTestsCommand, root, [arg]), arg).toEqual({
+        exitCode: 1,
+        stdout: "",
+        stderr: `${arg} is not vitest=<file> or playwright=<file>.\n`,
+      });
+    }
+  });
+
+  it("fails a report file that is not there, and says the tests have to run first", () => {
+    const root = repository({});
+
+    expect(run(leftOutTestsCommand, root, ["vitest=client/reports/t.json"])).toEqual({
+      exitCode: 1,
+      stdout: "",
+      stderr: "client/reports/t.json was not written: run the tests first.\n",
+    });
   });
 });
 

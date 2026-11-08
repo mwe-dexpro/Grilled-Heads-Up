@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --coverage",
+    "test": "vitest run --coverage --reporter=default --reporter=json --outputFile.json=reports/test-results.json",
     "test:mutation": "stryker run"
   },
   "devDependencies": {

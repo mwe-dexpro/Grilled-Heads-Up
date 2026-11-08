@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { checkAllowlist, parseAllowlist } from "./allowlist.js";
 import { skipsWithoutIssue, type SourceFile } from "./checkSkips.js";
 import { gitleaksIgnore, trivyIgnore } from "./ignoreFiles.js";
+import { gateLeftOut, type Report } from "./leftOutTests.js";
 import { gateNpmAudit } from "./npmAudit.js";
 import { gateSarif } from "./sarifGate.js";
 import { todayFrom } from "./today.js";
@@ -116,6 +117,22 @@ export const checkSkipsCommand: Command = ({ root }) => {
   return fail(
     found.map(({ path, line, text }) => `${path}:${line}: a skipped test needs the issue that brings it back (#123 or its address): ${text.trim()}\n`).join(""),
   );
+};
+
+/**
+ * `node tools/dist/bin/leftOutTests.js vitest=<report>… playwright=<report>…`: after the test runs, fails on any test the JSON
+ * reports of the runners show as skipped, todo or fixme without naming an issue.
+ */
+export const leftOutTestsCommand: Command = ({ args, root }) => {
+  const reports: Report[] = [];
+  for (const arg of args) {
+    const [, kind, name] = /^(vitest|playwright)=(.+)$/.exec(arg) ?? [];
+    if ((kind !== "vitest" && kind !== "playwright") || name === undefined) return fail(`${arg} is not vitest=<file> or playwright=<file>.\n`);
+    const path = resolve(root, name);
+    if (!existsSync(path)) return fail(`${name} was not written: run the tests first.\n`);
+    reports.push({ kind, name, text: readFileSync(path, "utf8") });
+  }
+  return gated(gateLeftOut(reports), "");
 };
 
 /** What `runCli` needs of the process it runs in. */

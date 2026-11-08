@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices, type ReporterDescription } from "@playwright/test";
 import { ownerState, syncOwnerState } from "./e2e/passkeys";
 
 const port = 4173;
@@ -11,6 +11,9 @@ const syncPort = 4175;
 const chromiumPath = process.env["CHROMIUM_PATH"];
 const launchOptions = chromiumPath !== undefined && chromiumPath !== "" ? { executablePath: chromiumPath } : {};
 const onCI = (process.env["CI"] ?? "") !== "";
+
+// Read by `npm run check:left-out` after the run: a test that was left out without naming an issue fails it, whatever the way it was left out.
+const jsonReport: ReporterDescription = ["json", { outputFile: "reports/e2e-results.json" }];
 
 /** Serves the production build, exactly like the Docker image does, with a fresh database each run. */
 const server = (serverPort: number) => ({
@@ -25,7 +28,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
-  reporter: onCI ? [["list"], ["html", { open: "never" }]] : "list",
+  reporter: onCI ? [["list"], ["html", { open: "never" }], jsonReport] : [["list"], jsonReport],
   use: {
     baseURL: `http://localhost:${port}`,
     trace: "retain-on-failure",
