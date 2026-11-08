@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { checkAllowlist, parseAllowlist } from "./allowlist.js";
 import { skipsWithoutIssue, type SourceFile } from "./checkSkips.js";
 import { gitleaksIgnore, trivyIgnore } from "./ignoreFiles.js";
@@ -52,7 +52,7 @@ function allowlistOf(root: string) {
 export const allowlistCommand: Command = (input) => {
   const { day, notice } = judgedDay(input);
   const file = input.args.find((arg) => arg.endsWith(".json")) ?? defaultAllowlist;
-  const result = checkAllowlist(readFileSync(join(input.root, file), "utf8"), day);
+  const result = checkAllowlist(readFileSync(resolve(input.root, file), "utf8"), day);
   if (result.ok) return succeed(`${file}: every exception is valid and has not run out.\n`, notice);
   return fail(`${notice}${result.messages.map((message) => `${file}: ${message}`).join("\n")}\n`);
 };
@@ -65,10 +65,13 @@ export const npmAuditCommand: Command = (input) => {
   return gated(gateNpmAudit(input.stdin(), allowlist.entries, day), notice);
 };
 
-/** The SARIF files a path stands for: itself, or the `.sarif` and `.sarif.json` files of a folder, in name order. */
+/**
+ * The SARIF files a path stands for: itself, or the `.sarif` and `.sarif.json` files of a folder, in name order. A path is
+ * relative to the root, or absolute (`resolve`, not `join`, which would put an absolute path below the root).
+ */
 function sarifFiles(root: string, path: string): string[] {
-  if (!statSync(join(root, path)).isDirectory()) return [path];
-  return readdirSync(join(root, path))
+  if (!statSync(resolve(root, path)).isDirectory()) return [path];
+  return readdirSync(resolve(root, path))
     .filter((name) => name.endsWith(".sarif") || name.endsWith(".sarif.json"))
     .sort()
     .map((name) => join(path, name));
@@ -80,7 +83,7 @@ export const sarifGateCommand: Command = (input) => {
   const allowlist = allowlistOf(input.root);
   if (allowlist.entries === undefined) return fail(notice + allowlist.errors);
   const paths = input.args.filter((arg) => !arg.startsWith("--"));
-  const files = paths.flatMap((path) => sarifFiles(input.root, path)).map((name) => ({ name, text: readFileSync(join(input.root, name), "utf8") }));
+  const files = paths.flatMap((path) => sarifFiles(input.root, path)).map((name) => ({ name, text: readFileSync(resolve(input.root, name), "utf8") }));
   return gated(gateSarif(files, allowlist.entries, day), notice);
 };
 

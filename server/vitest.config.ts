@@ -13,7 +13,7 @@ export default defineConfig({
       reporter: ["text-summary", "html", "json-summary"],
       reportsDirectory: "reports/coverage",
       // The measured values, rounded down. They only go up: raise them when a change lifts the coverage, never lower them.
-      thresholds: { lines: 93, branches: 87, functions: 92, statements: 93 },
+      thresholds: { lines: 93, branches: 88, functions: 92, statements: 93 },
     },
   },
 });

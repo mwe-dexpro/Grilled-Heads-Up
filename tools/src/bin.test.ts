@@ -36,8 +36,14 @@ function start(name: string, cwd: string, args: string[] = [], input = "", env: 
 
 beforeAll(() => {
   const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
-  // A compile error does not stop tsc from writing its output; a missing output fails every test below.
-  spawnSync(process.execPath, [tsc, "--project", "tsconfig.build.json", "--outDir", built], { cwd: tools, encoding: "utf8" });
+  // A compile error does not stop tsc from writing its output, so the tests below would run code that `typecheck` refuses:
+  // the build has to say it worked, and says what failed when it did not (also when tsc cannot start at all).
+  const { status, stdout, stderr, error } = spawnSync(process.execPath, [tsc, "--project", "tsconfig.build.json", "--outDir", built], {
+    cwd: tools,
+    encoding: "utf8",
+  });
+  expect(error, "tsc did not start").toBeUndefined();
+  expect(status, `tsc failed:\n${stdout}${stderr}`).toBe(0);
 }, 120_000);
 
 afterAll(() => {

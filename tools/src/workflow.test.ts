@@ -13,17 +13,22 @@ function job(id: string): string {
   return workflow.slice(start, next === null ? undefined : start + 1 + next.index);
 }
 
+// These read the text of two lines of the file: they catch a revert or a typo, not a wrong expression that someone writes into
+// the test as well (GitHub evaluates the expression, and only a run on GitHub shows what it does). They check the parts that
+// carry the promise, so an equivalent rewrite of the expression does not turn them red.
 describe("the workflow's concurrency", () => {
   const group = /^ {2}group: (.*)$/m.exec(workflow)?.[1] ?? "";
   const cancel = /^ {2}cancel-in-progress: (.*)$/m.exec(workflow)?.[1] ?? "";
 
   it("cancels an older run of the same pull request, and only of a pull request", () => {
     expect(cancel).toBe("${{ github.event_name == 'pull_request' }}");
-    expect(group).toContain("github.event_name == 'pull_request' && github.ref ||");
   });
 
-  it("gives every run on main, every nightly run and every manual run a group of its own: GitHub keeps one pending run per group and cancels the older, so a shared group would drop a commit's run", () => {
-    expect(group).toBe("${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}");
+  it("groups the runs of a pull request by its ref, and gives every other run (main, nightly, manual) the group of its own run id: GitHub keeps one pending run per group and cancels the older, so a shared group would drop a commit's run", () => {
+    expect(group).toMatch(/^\$\{\{ github\.workflow \}\}-\$\{\{ .+ \}\}$/);
+    const [condition, otherwise] = group.slice(group.indexOf("-${{ ") + 5, -3).split(" || ");
+    expect(condition).toMatch(/^github\.event_name == 'pull_request' && github\.ref$/);
+    expect(otherwise).toBe("github.run_id");
   });
 });
 

@@ -93,6 +93,17 @@ describe("allowlistCommand", () => {
     expect(result.stderr).toMatch(/^other\/list\.json: Expired on 2020-01-01/);
   });
 
+  it("reads a file named by an absolute path, as a person at the command line expects", () => {
+    const root = repository({ [allowlistFile]: allowlist() });
+    const elsewhere = repository({ "list.json": allowlist(entry({ expires: "2020-01-01" })) });
+    const named = join(elsewhere, "list.json");
+
+    const result = run(allowlistCommand, root, [named]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(`${named}: Expired on 2020-01-01`);
+  });
+
   it("fails an allowlist that is not valid, with every message on a line of its own", () => {
     const root = repository({ [allowlistFile]: allowlist(entry({ tool: "snyk" }), entry({ reason: "" })) });
 
@@ -261,6 +272,18 @@ describe("sarifGateCommand", () => {
 
     expect(run(sarifGateCommand, root, ["sarif"]).exitCode).toBe(0);
     expect(run(sarifGateCommand, broken, ["sarif"])).toEqual({ exitCode: 1, stdout: "", stderr: 'The allowlist must be an object with an "entries" list.\n' });
+  });
+
+  it("reads files and folders named by an absolute path, in name order, naming them as given", () => {
+    const root = repository({ [allowlistFile]: allowlist() });
+    const elsewhere = repository({ "out/b.sarif": sarif("js/b", "8.0", 2), "out/a.sarif": sarif("js/a", "9.5", 1), "single.sarif": sarif("js/c", "8.0", 3) });
+
+    const folder = run(sarifGateCommand, root, [join(elsewhere, "out")]);
+    const file = run(sarifGateCommand, root, [join(elsewhere, "single.sarif")]);
+
+    expect(folder.exitCode).toBe(1);
+    expect(folder.stderr).toBe(`2 high or critical CodeQL results:\ncritical  js/a  a.ts:1  m\nhigh      js/b  a.ts:2  m\n`);
+    expect(file.stderr).toBe("1 high or critical CodeQL result:\nhigh      js/c  a.ts:3  m\n");
   });
 
   it("throws for a path that is not there", () => {
